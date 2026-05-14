@@ -213,8 +213,6 @@ class GalgamePlugin(Star):
                 try:
                     msg = await asyncio.wait_for(queue.get(), timeout=25)
                     yield f"event: message\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
-                    if msg.get("type") in ("end", "error"):
-                        break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
 
