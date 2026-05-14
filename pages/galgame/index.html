@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Galgame 虚拟伙伴</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="scene">
+    <div id="background"></div>
+
+    <div id="sprite-container">
+      <img id="layer-body"       class="layer" src="" />
+      <img id="layer-hair-back"  class="layer" src="" />
+      <img id="layer-head"       class="layer face" src="" />
+      <img id="layer-hair-front" class="layer" src="" />
+      <img id="layer-mouth"      class="layer mouth-overlay" src="" />
+      <img id="layer-orb"        class="layer orb" src="" />
+    </div>
+
+    <div id="sprite-single">
+      <img id="sprite-single-img" src="" />
+    </div>
+
+    <div id="dialog-box">
+      <span id="character-name"></span>
+      <p id="dialog-text"></p>
+    </div>
+
+    <div id="input-area">
+      <input id="user-input" type="text" placeholder="说点什么..." autocomplete="off" />
+      <button id="send-btn">发送</button>
+    </div>
+  </div>
+
+  <audio id="tts-audio" preload="auto"></audio>
+
+  <script src="/api/plugin/page/bridge-sdk.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
