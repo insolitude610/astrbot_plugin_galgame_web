@@ -1,0 +1,7 @@
+name: "astrbot_plugin_galgame"
+author: "astrbot-contrib"
+desc: "Galgame风格AI虚拟伙伴插件 —— 支持分层PNG伪Live2D动画、情绪驱动表情切换、TTS语音、快速点击检测"
+version: "0.1.0"
+repo: ""
+display_name: "AI Galgame 虚拟伙伴"
+short_desc: "在浏览器中呈现可交互的AI虚拟伙伴，支持Live2D风格动画与实时对话"
