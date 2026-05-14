@@ -2,6 +2,11 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
+> **免责声明**  
+> 本项目为纯 vibe coding 产物，功能尚未完整测试，可能存在未知 bug。  
+> 请谨慎下载使用，生产环境部署前务必自行验证。  
+> 欢迎提 issue 或 PR 一起完善。
+
 一个 AstrBot 插件，在浏览器中呈现 Galgame 风格的 AI 虚拟伙伴界面。支持多层 PNG 伪 Live2D 独立动画、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
 
 ![screenshot](screenshot.png)
