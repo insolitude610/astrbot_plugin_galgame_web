@@ -1,20 +1,22 @@
 {
   "character_name": {
-    "description": "角色名",
+    "description": "角色显示名",
     "type": "string",
-    "default": "小星"
+    "default": "小星",
+    "hint": "在对话框上方显示的角色名称"
   },
-  "character_role": {
-    "description": "角色性格描述",
-    "type": "text",
-    "default": "一个友善的AI虚拟伙伴，喜欢聊天和分享日常，说话温柔亲切",
-    "hint": "会被写入 system prompt，定义角色的说话风格和性格"
+  "persona": {
+    "description": "角色人格",
+    "type": "string",
+    "_special": "select_persona",
+    "hint": "选择已在 AstrBot 中配置好的人格。人格的 system prompt 将作为角色的性格设定。",
+    "default": ""
   },
   "system_prompt_extra": {
     "description": "额外 System Prompt",
     "type": "text",
     "default": "",
-    "hint": "追加在默认模板之后，用于添加角色背景故事、特殊设定等"
+    "hint": "追加在人格 prompt 之后，用于添加 Galgame 专属规则或微调"
   },
   "tts_provider": {
     "description": "TTS 语音合成 Provider",
