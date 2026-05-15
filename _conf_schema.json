@@ -49,6 +49,12 @@
     "type": "int",
     "default": 3
   },
+  "session_retain_days": {
+    "description": "会话保留天数",
+    "type": "int",
+    "default": 7,
+    "hint": "超过该天数的旧会话自动清理。设为 0 则永不清理"
+  },
   "sprite_mode": {
     "description": "立绘渲染模式",
     "type": "string",
