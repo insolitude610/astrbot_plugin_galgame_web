@@ -10,6 +10,7 @@ html, body {
   overflow: hidden;
   font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
   user-select: none;
+  background: #2b1e1a;
 }
 
 #scene {
@@ -22,10 +23,18 @@ html, body {
 #background {
   position: absolute;
   inset: 0;
-  background-color: #1a1a2e;
+  background-color: #3b2a28;
   background-size: cover;
   background-position: center;
   z-index: 0;
+}
+
+#background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(255,200,160,0.12) 0%, rgba(20,10,8,0.55) 100%);
+  pointer-events: none;
 }
 
 /* ---- sprite-single mode ---- */
@@ -33,12 +42,13 @@ html, body {
 #sprite-single {
   display: none;
   position: absolute;
-  bottom: 120px;
+  bottom: 140px;
   left: 50%;
   translate: -50% 0;
   width: 360px;
   height: 520px;
   z-index: 1;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.35));
 }
 
 #sprite-single.active {
@@ -62,12 +72,13 @@ html, body {
 #sprite-container {
   display: none;
   position: absolute;
-  bottom: 100px;
+  bottom: 120px;
   left: 50%;
   translate: -50% 0;
   width: 380px;
   height: 560px;
   z-index: 1;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.35));
 }
 
 #sprite-container.active {
@@ -168,25 +179,29 @@ html, body {
 
 #dialog-box {
   position: absolute;
-  bottom: 20px;
+  bottom: 24px;
   left: 50%;
   translate: -50% 0;
   width: 86%;
   max-width: 700px;
-  min-height: 70px;
-  background: rgba(10, 10, 30, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 14px 20px;
+  min-height: 72px;
+  background: linear-gradient(180deg, rgba(255,252,248,0.92) 0%, rgba(250,245,238,0.88) 100%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(200,160,130,0.25);
+  border-radius: 18px;
+  padding: 16px 22px;
   z-index: 10;
-  animation: dialog-appear 0.4s ease-out;
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.12),
+    0 1px 3px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  animation: dialog-appear 0.45s ease-out;
 }
 
 @keyframes dialog-appear {
   from {
     opacity: 0;
-    transform: translate(-50%, 20px);
+    transform: translate(-50%, 16px);
   }
   to {
     opacity: 1;
@@ -196,17 +211,17 @@ html, body {
 
 #character-name {
   display: block;
-  color: rgba(140, 180, 255, 0.9);
+  color: #c47a5a;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 6px;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
 #dialog-text {
-  color: #e8e8f0;
+  color: #3d2c26;
   font-size: 16px;
-  line-height: 1.65;
+  line-height: 1.7;
   min-height: 24px;
 }
 
@@ -214,7 +229,7 @@ html, body {
   display: inline-block;
   width: 2px;
   height: 18px;
-  background: rgba(140, 180, 255, 0.8);
+  background: #c47a5a;
   vertical-align: text-bottom;
   margin-left: 1px;
   animation: blink 0.6s steps(1) infinite;
@@ -229,7 +244,7 @@ html, body {
 
 #input-area {
   position: absolute;
-  bottom: 110px;
+  bottom: 118px;
   left: 50%;
   translate: -50% 0;
   display: flex;
@@ -242,38 +257,45 @@ html, body {
 #user-input {
   flex: 1;
   padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  background: rgba(10, 10, 30, 0.78);
+  border: 1px solid rgba(180,140,120,0.3);
+  border-radius: 12px;
+  background: rgba(255,252,248,0.82);
   backdrop-filter: blur(8px);
-  color: #e8e8f0;
+  color: #3d2c26;
   font-size: 15px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#user-input::placeholder {
+  color: #b8a094;
 }
 
 #user-input:focus {
-  border-color: rgba(140, 180, 255, 0.6);
+  border-color: rgba(200,130,100,0.6);
+  box-shadow: 0 0 0 3px rgba(220,160,120,0.15);
 }
 
 #user-input:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 #send-btn {
-  padding: 12px 24px;
+  padding: 12px 26px;
   border: none;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #4a6cf7, #6c8cff);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #d4946e, #c47a5a);
   color: white;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 2px 10px rgba(196,122,90,0.3);
 }
 
 #send-btn:hover {
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: 0 4px 16px rgba(196,122,90,0.4);
 }
 
 #send-btn:active {
@@ -281,6 +303,7 @@ html, body {
 }
 
 #send-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
