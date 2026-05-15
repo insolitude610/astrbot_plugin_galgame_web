@@ -51,20 +51,18 @@
 
 ### 使用
 
-1. 在插件详情页点击**「Galgame」**页面
-2. 浏览器独立窗口打开虚拟伙伴界面
-3. 在输入框输入文字，回车发送
-4. 角色以打字机效果回复，表情随情绪变化，语音同步播放
+**打开界面：**
 
-### 发送指令
+- **方式一**：AstrBot Dashboard → 插件 → AI Galgame 虚拟伙伴 → 点击「Galgame」页面
+- **方式二**：直接浏览器访问 `http://localhost:6185/api/plugin/page/content/astrbot_plugin_galgame_web/galgame/index.html`（需先登录 Dashboard）
+- **方式三**：在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 会回复上述地址
 
-在任意支持 AstrBot 的消息平台发送：
+打开后：
+1. 在输入框输入文字，回车发送
+2. 角色以打字机效果回复，表情随情绪变化，语音同步播放
+3. 关闭页面后再次打开，对话历史自动恢复
 
-```
-/galgame
-```
-
-查看使用说明。
+> 注：页面通过 AstrBot Dashboard 提供服务，Dashboard 默认端口 `6185`，确保 Dashboard 已启动。
 
 ## 会话持久化说明
 

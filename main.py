@@ -351,9 +351,12 @@ class GalgamePlugin(Star):
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
-            "打开下方链接即可进入虚拟伙伴界面：\n"
+            "打开方式：\n"
+            "1. Dashboard → 插件 → AI Galgame 虚拟伙伴 → Galgame 页面\n"
+            "2. 或直接访问：\n"
             "http://localhost:6185/api/plugin/page/content/"
-            f"{PLUGIN_NAME}/galgame/index.html"
+            f"{PLUGIN_NAME}/galgame/index.html\n\n"
+            "在页面中输入文字即可与虚拟伙伴对话。"
         )
 
     async def terminate(self):
