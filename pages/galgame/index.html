@@ -8,30 +8,40 @@
 </head>
 <body>
   <div id="scene">
+
     <div id="background"></div>
 
-    <div id="sprite-container">
-      <img id="layer-body"       class="layer" src="" />
-      <img id="layer-hair-back"  class="layer" src="" />
-      <img id="layer-head"       class="layer face" src="" />
-      <img id="layer-hair-front" class="layer" src="" />
-      <img id="layer-mouth"      class="layer mouth-overlay" src="" />
-      <img id="layer-orb"        class="layer orb" src="" />
+    <div id="sprite-area">
+      <div id="sprite-container">
+        <img id="layer-body"       class="layer" src="" />
+        <img id="layer-hair-back"  class="layer" src="" />
+        <img id="layer-head"       class="layer face" src="" />
+        <img id="layer-hair-front" class="layer" src="" />
+        <img id="layer-mouth"      class="layer mouth-overlay" src="" />
+        <img id="layer-orb"        class="layer orb" src="" />
+      </div>
+      <div id="sprite-single">
+        <img id="sprite-single-img" src="" />
+      </div>
     </div>
 
-    <div id="sprite-single">
-      <img id="sprite-single-img" src="" />
+    <div id="ui-layer">
+      <div id="input-row">
+        <input id="user-input" type="text" placeholder="请输入你的回应..." autocomplete="off" />
+        <button id="send-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+
+      <div id="dialog-box">
+        <div id="name-tag"><span id="character-name"></span></div>
+        <p id="dialog-text"></p>
+      </div>
     </div>
 
-    <div id="dialog-box">
-      <span id="character-name"></span>
-      <p id="dialog-text"></p>
-    </div>
-
-    <div id="input-area">
-      <input id="user-input" type="text" placeholder="想说点什么..." autocomplete="off" />
-      <button id="send-btn">发送</button>
-    </div>
   </div>
 
   <audio id="tts-audio" preload="auto"></audio>
