@@ -19,7 +19,6 @@ EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "think
 EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
-SESSION_TTL = 86400 * 7  # 7 days
 
 
 class GalgamePlugin(Star):
@@ -114,13 +113,17 @@ class GalgamePlugin(Star):
             logger.info(f"Loaded {count} persisted sessions")
 
     def _gc_sessions(self):
+        retain_days = self.config.get("session_retain_days", 7)
+        if retain_days <= 0:
+            return
         now = time.time()
+        ttl = retain_days * 86400
         removed = 0
         for path in SESSIONS_DIR.glob("*.json"):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                if now - data.get("created_at", 0) > SESSION_TTL:
+                if now - data.get("created_at", 0) > ttl:
                     path.unlink()
                     removed += 1
             except (OSError, json.JSONDecodeError):
