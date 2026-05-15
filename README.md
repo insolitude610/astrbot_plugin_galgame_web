@@ -2,33 +2,29 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-> **免责声明**  
-> 本项目为纯 vibe coding 产物，功能尚未完整测试，可能存在未知 bug。  
-> 请谨慎下载使用，生产环境部署前务必自行验证。  
-> 欢迎提 issue 或 PR 一起完善。
-
 一个 AstrBot 插件，在浏览器中呈现 Galgame 风格的 AI 虚拟伙伴界面。支持多层 PNG 伪 Live2D 独立动画、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
-
-![screenshot](screenshot.png)
 
 ## 功能亮点
 
 - **多层 PNG 伪 Live2D** —— 身体/头发/脸部/嘴部各自独立动画，不依赖 Live2D SDK
 - **情绪实时切换** —— AI 回复中标记 `[emotion:happy]` 等标签，立绘表情自动淡入淡出
-- **TTS 语音朗读** —— 复用 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等）
+- **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
+- **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等）
 - **打字机效果** —— 回复文字逐字显示
 - **嘴型同步** —— 播放语音时嘴部自动开合
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
 - **双层渲染模式** —— 支持完整分层 PNG 或单张立绘 + 表情差分降级
 - **纯 CSS 动画** —— 呼吸、头发摆动、球体漂浮、对话框滑入，零依赖
 - **SSE 实时通信** —— 文本逐段推送、情绪即时切换、音频流式播放
+- **会话持久化** —— 对话历史自动存盘，重启/重载后保留；浏览器 localStorage 记录 session_id，关掉页面再打开可继续对话
+- **可配置场景背景图** —— 插件设置页直接指定背景图
 
 ## 快速开始
 
 ### 安装
 
 1. 在 AstrBot WebUI 中打开**插件市场**
-2. 搜索 `astrbot_plugin_galgame` 并安装
+2. 搜索 `astrbot_plugin_galgame_web` 并安装
 3. 启用插件
 
 ### 配置
@@ -37,16 +33,19 @@
 
 | 配置项 | 说明 | 推荐 |
 |--------|------|------|
-| 角色名 | 虚拟伙伴的名字 | 你的角色名 |
-| 角色性格描述 | 写入 system prompt，定义说话风格 | 友善亲切的AI伙伴 |
+| 角色显示名 | 对话框上方显示的名称 | 你的角色名 |
+| 角色人格 | 选择已在 AstrBot 配置好的 Persona | 可先用 AstrBot 预设或自建 |
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o 等 |
 | TTS Provider | 语音合成 | Edge TTS（免费） |
-| 表情立绘 | 各情绪对应的 PNG | 至少填写 neutral |
-| 分层立绘 | 身体/头发/脸部/嘴部等 | layered 模式 |
+| 场景背景图 | `assets/` 下的背景图文件名 | `bg.png` |
+| 表情立绘 | 各情绪对应的 PNG 文件名 | 至少填写 neutral |
+| 分层立绘 | 身体/头发/脸部/嘴部等文件名 | layered 模式 |
+| 会话保留天数 | 超过该天数未活跃的会话自动清理 | 默认 7 天，设 0 永不清理 |
+| 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
 
 ### 准备立绘
 
-参考 [立绘生成指南](#立绘指南) 使用 AI 生成角色立绘。
+参考 [立绘指南](#立绘指南) 使用 AI 生成角色立绘。
 
 将 PNG 文件放入 `pages/galgame/assets/` 目录，然后在配置中填写文件名。
 
@@ -66,6 +65,28 @@
 ```
 
 查看使用说明。
+
+## 会话持久化说明
+
+每次与 AI 对话后，对话历史会保存到 `data/plugin_data/astrbot_plugin_galgame_web/sessions/` 目录。浏览器端会将当前 `session_id` 存入 localStorage。下次打开页面时自动恢复。
+
+### 会导致会话消失的情况
+
+| 情况 | 是否丢失 | 原因 |
+|------|:--:|------|
+| 重载/重启 AstrBot | 否 | 从磁盘恢复 |
+| 插件升级/重装 | 否 | 会话文件不受影响 |
+| 关闭浏览器再打开 | 否 | localStorage 记录 session_id |
+| 同一台电脑数十天内多次打开 | 否 | 保留期内可恢复 |
+| 超过保留天数的旧会话 | **是** | GC 自动清理（默认 7 天） |
+| 手动删除 `sessions/` 目录下的 JSON | **是** | 物理删除 |
+| 更换浏览器 | **是** | localStorage 不共享 |
+| 无痕/隐私模式 | **是** | localStorage 不持久化 |
+| 清除浏览器缓存 | **是** | localStorage 被清 |
+| 换个电脑/设备 | **是** | 无跨设备同步 |
+
+> 如需关闭自动清理，将"会话保留天数"设为 `0`。
+> 如需跨设备同步，可自行备份 `sessions/` 目录。
 
 ## 立绘指南
 
@@ -130,21 +151,26 @@ AstrBot Dashboard (Quart)
 插件后端 main.py
   ↕ context.llm_generate / context.get_provider_by_id
 AstrBot Core
-  └─ LLM + TTS + 会话管理
+  └─ LLM + TTS + Persona + 会话管理
 ```
 
 - 前端：纯 HTML/CSS/JS，零外部依赖
 - 后端：Python，仅依赖 AstrBot Core 公开 API
 - CSS 动画：呼吸、头发飘动、头微倾、球体漂浮、嘴部开合、表情淡入淡出
 
-## 开发
+## 变更记录
 
-```bash
-git clone <repo-url>
-cd astrbot_plugin_galgame
-# 将插件目录放到 AstrBot 的 data/plugins/ 下
-# 启动 AstrBot 即可加载
-```
+### v0.2.0
+
+- 角色人格改用 AstrBot 内置 Persona 系统，无需手动填写性格描述
+- 新增场景背景图配置
+- 新增会话持久化（磁盘 + localStorage），支持断点续聊
+- 新增会话保留天数配置（0 = 永不清除）
+- 插件名改为 `astrbot_plugin_galgame_web`
+
+### v0.1.0
+
+- 首次发布，基础 Galgame 交互功能
 
 ## 许可证
 
