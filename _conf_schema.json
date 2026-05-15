@@ -2,7 +2,7 @@
   "character_name": {
     "description": "角色显示名",
     "type": "string",
-    "default": "小星",
+    "default": "",
     "hint": "在对话框上方显示的角色名称"
   },
   "persona": {

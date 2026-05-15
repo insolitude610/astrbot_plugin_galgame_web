@@ -330,7 +330,7 @@ class GalgamePlugin(Star):
             "tts_provider": self.config.get("tts_provider", ""),
             "expressions": self.config.get("expressions", {}),
             "layers": self.config.get("layers", {}),
-            "character_name": self.config.get("character_name", "小星"),
+            "character_name": self.config.get("character_name", ""),
             "background": self.config.get("background", ""),
         }
 
