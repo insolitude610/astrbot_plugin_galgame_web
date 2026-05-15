@@ -349,18 +349,13 @@ class GalgamePlugin(Star):
 
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
-        config = self.context.astrbot_config_mgr.get_conf(None)
-        port = config.get("dashboard", {}).get("port", 6185)
-        url = (
-            f"http://localhost:{port}/api/plugin/page/content/"
-            f"{PLUGIN_NAME}/galgame/index.html"
-        )
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
             "打开方式：\n"
-            f"1. Dashboard → 插件 → AI Galgame 虚拟伙伴 → Galgame 页面\n"
-            f"2. 或直接访问：{url}\n\n"
-            "在页面中输入文字即可与虚拟伙伴对话。"
+            "AstrBot Dashboard → 插件 → AI Galgame 虚拟伙伴 → Galgame 页面\n\n"
+            "或直接在 Dashboard 地址后追加：\n"
+            "/api/plugin/page/content/"
+            f"{PLUGIN_NAME}/galgame/index.html"
         )
 
     async def terminate(self):
