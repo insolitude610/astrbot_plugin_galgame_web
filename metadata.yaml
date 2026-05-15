@@ -1,4 +1,4 @@
-name: "astrbot_plugin_galgame"
+name: "astrbot_plugin_galgame_web"
 author: "astrbot-contrib"
 desc: "Galgame风格AI虚拟伙伴插件 —— 支持分层PNG伪Live2D动画、情绪驱动表情切换、TTS语音、快速点击检测"
 version: "0.1.0"
