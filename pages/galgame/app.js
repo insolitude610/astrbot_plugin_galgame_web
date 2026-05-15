@@ -76,6 +76,10 @@ function applyConfig(cfg) {
   layers = cfg.layers || {};
   characterName = cfg.character_name || "小星";
   el.characterName.textContent = characterName;
+  const bg = cfg.background || "";
+  if (bg) {
+    el.bg.style.backgroundImage = `url(${assetUrl(bg)})`;
+  }
 }
 
 function applySprites() {

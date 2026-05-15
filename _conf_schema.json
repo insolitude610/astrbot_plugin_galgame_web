@@ -30,6 +30,12 @@
     "hint": "选择驱动角色对话的 AI 模型",
     "default": ""
   },
+  "background": {
+    "description": "场景背景图",
+    "type": "string",
+    "default": "",
+    "hint": "assets/ 目录下的背景图文件名，留空则显示纯色背景"
+  },
   "rapid_click_threshold": {
     "description": "快速点击数阈值",
     "type": "int",

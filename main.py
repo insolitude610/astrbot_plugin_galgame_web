@@ -235,6 +235,7 @@ class GalgamePlugin(Star):
             "expressions": self.config.get("expressions", {}),
             "layers": self.config.get("layers", {}),
             "character_name": self.config.get("character_name", "小星"),
+            "background": self.config.get("background", ""),
         }
 
     async def _api_rapid_action(self):
