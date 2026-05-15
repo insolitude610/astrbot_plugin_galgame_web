@@ -54,8 +54,10 @@ async function init() {
   }
 
   try {
-    const resp = await bridge.apiPost("session/init");
+    const savedId = localStorage.getItem("galgame_session_id") || "";
+    const resp = await bridge.apiPost("session/init", { resume_id: savedId });
     sessionId = resp.session_id;
+    localStorage.setItem("galgame_session_id", sessionId);
     subscribeSSE();
   } catch (err) {
     console.error("Failed to init session:", err);
