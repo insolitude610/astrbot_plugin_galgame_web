@@ -324,7 +324,7 @@ function setupRapidDetection() {
   let keyTimestamps = [];
 
   document.addEventListener("click", (e) => {
-    if (e.target === el.sendBtn || e.target === el.userInput) return;
+    if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
     keyTimestamps = [];
   });

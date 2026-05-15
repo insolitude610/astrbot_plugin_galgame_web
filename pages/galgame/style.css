@@ -5,25 +5,27 @@
 }
 
 html, body {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
-  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
-  background: #2b1e1a;
+  background: #000;
 }
 
 #scene {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   position: relative;
   overflow: hidden;
 }
 
+/* ===== LAYER 1: Background ===== */
+
 #background {
   position: absolute;
   inset: 0;
-  background-color: #3b2a28;
+  background-color: #1a1a2e;
   background-size: cover;
   background-position: center;
   z-index: 0;
@@ -33,22 +35,28 @@ html, body {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(255,200,160,0.12) 0%, rgba(20,10,8,0.55) 100%);
+  background: radial-gradient(ellipse at center, rgba(255,200,160,0.08) 0%, rgba(0,0,0,0.50) 100%);
   pointer-events: none;
 }
 
-/* ---- sprite-single mode ---- */
+/* ===== LAYER 2: Sprite Area ===== */
+
+#sprite-area {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
 
 #sprite-single {
   display: none;
   position: absolute;
-  bottom: 140px;
+  bottom: 28vh;
   left: 50%;
   translate: -50% 0;
-  width: 360px;
-  height: 520px;
-  z-index: 1;
-  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.35));
+  width: min(40vw, 500px);
+  height: min(55vh, 700px);
+  filter: drop-shadow(0 4px 40px rgba(0,0,0,0.5));
 }
 
 #sprite-single.active {
@@ -60,25 +68,22 @@ html, body {
   height: 100%;
   object-fit: contain;
   animation: breathe 4s ease-in-out infinite;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.4s ease;
 }
 
 #sprite-single-img.switching {
   opacity: 0;
 }
 
-/* ---- layered sprite container ---- */
-
 #sprite-container {
   display: none;
   position: absolute;
-  bottom: 120px;
+  bottom: 28vh;
   left: 50%;
   translate: -50% 0;
-  width: 380px;
-  height: 560px;
-  z-index: 1;
-  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.35));
+  width: min(42vw, 520px);
+  height: min(58vh, 720px);
+  filter: drop-shadow(0 4px 40px rgba(0,0,0,0.5));
 }
 
 #sprite-container.active {
@@ -94,45 +99,16 @@ html, body {
   pointer-events: none;
 }
 
-#layer-body {
-  z-index: 1;
-  animation: breathe 4s ease-in-out infinite;
-}
+#layer-body              { z-index: 1; animation: breathe 4s ease-in-out infinite; }
+#layer-hair-back         { z-index: 2; animation: sway-back 5s ease-in-out infinite; }
+#layer-head              { z-index: 3; animation: head-tilt 7s ease-in-out infinite; }
+#layer-hair-front        { z-index: 5; animation: sway-front 6s ease-in-out infinite; }
+#layer-mouth             { z-index: 4; display: none; }
+#layer-mouth.visible     { display: block; }
+#layer-orb               { z-index: 0; animation: orb-float 3s ease-in-out infinite; }
 
-#layer-hair-back {
-  z-index: 2;
-  animation: sway-back 5s ease-in-out infinite;
-}
-
-#layer-head {
-  z-index: 3;
-  animation: head-tilt 7s ease-in-out infinite;
-}
-
-.face {
-  transition: opacity 0.35s ease;
-}
-.face.switching {
-  opacity: 0;
-}
-
-#layer-hair-front {
-  z-index: 5;
-  animation: sway-front 6s ease-in-out infinite;
-}
-
-#layer-mouth {
-  z-index: 4;
-  display: none;
-}
-#layer-mouth.visible {
-  display: block;
-}
-
-#layer-orb {
-  z-index: 0;
-  animation: orb-float 3s ease-in-out infinite;
-}
+.face { transition: opacity 0.4s ease; }
+.face.switching { opacity: 0; }
 
 /* ---- animations ---- */
 
@@ -143,20 +119,20 @@ html, body {
 
 @keyframes sway-back {
   0%, 100% { transform: rotate(0deg); }
-  25%      { transform: rotate(-2.5deg); }
-  75%      { transform: rotate(2.5deg); }
+  25%      { transform: rotate(-2deg); }
+  75%      { transform: rotate(2deg); }
 }
 
 @keyframes sway-front {
   0%, 100% { transform: rotate(0deg); }
-  30%      { transform: rotate(2deg); }
-  70%      { transform: rotate(-2deg); }
+  30%      { transform: rotate(1.5deg); }
+  70%      { transform: rotate(-1.5deg); }
 }
 
 @keyframes head-tilt {
   0%, 100% { transform: rotate(0deg); }
-  40%      { transform: rotate(0.6deg); }
-  80%      { transform: rotate(-0.4deg); }
+  40%      { transform: rotate(0.5deg); }
+  80%      { transform: rotate(-0.3deg); }
 }
 
 @keyframes orb-float {
@@ -175,63 +151,96 @@ html, body {
   animation: mouth-flap 0.2s steps(1) infinite;
 }
 
-/* ---- dialog box ---- */
+/* ===== LAYER 3: UI Layer ===== */
 
-#dialog-box {
+#ui-layer {
   position: absolute;
-  bottom: 24px;
-  left: 50%;
-  translate: -50% 0;
-  width: 86%;
-  max-width: 700px;
-  min-height: 72px;
-  background: linear-gradient(180deg, rgba(255,252,248,0.92) 0%, rgba(250,245,238,0.88) 100%);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(200,160,130,0.25);
-  border-radius: 18px;
-  padding: 16px 22px;
+  inset: auto 0 0 0;
+  bottom: 0;
   z-index: 10;
-  box-shadow:
-    0 4px 24px rgba(0,0,0,0.12),
-    0 1px 3px rgba(0,0,0,0.06),
-    inset 0 1px 0 rgba(255,255,255,0.5);
-  animation: dialog-appear 0.45s ease-out;
 }
 
-@keyframes dialog-appear {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 16px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
+/* ---- Dialog Box ---- */
+
+#dialog-box {
+  position: relative;
+  margin: 0 5vw;
+  min-height: 22vh;
+  max-height: 28vh;
+  background: rgba(10, 10, 25, 0.78);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px 12px 0 0;
+  padding: 24px 28px 20px;
+  box-shadow:
+    0 -2px 20px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  animation: dialog-rise 0.5s ease-out;
+}
+
+@keyframes dialog-rise {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Name Tag (protruding) ---- */
+
+#name-tag {
+  position: absolute;
+  top: -18px;
+  left: 18px;
+  background: rgba(15, 15, 35, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 4px 16px;
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 #character-name {
-  display: block;
-  color: #c47a5a;
-  font-size: 13px;
+  color: rgba(220, 200, 255, 0.95);
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 6px;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
+#character-name:empty::after {
+  content: "???";
+  color: rgba(255,255,255,0.3);
+}
+
+/* ---- Dialog Text ---- */
+
 #dialog-text {
-  color: #3d2c26;
-  font-size: 16px;
-  line-height: 1.7;
-  min-height: 24px;
+  color: #e8e8f0;
+  font-size: 17px;
+  line-height: 1.85;
+  overflow-y: auto;
+  flex: 1;
+  word-break: break-word;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+#dialog-text::-webkit-scrollbar {
+  width: 4px;
+}
+#dialog-text::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
 }
 
 #dialog-text .cursor {
   display: inline-block;
   width: 2px;
   height: 18px;
-  background: #c47a5a;
+  background: rgba(200, 180, 255, 0.8);
   vertical-align: text-bottom;
-  margin-left: 1px;
+  margin-left: 2px;
   animation: blink 0.6s steps(1) infinite;
 }
 
@@ -240,70 +249,69 @@ html, body {
   50%      { opacity: 0; }
 }
 
-/* ---- input area ---- */
+/* ---- Input Row ---- */
 
-#input-area {
-  position: absolute;
-  bottom: 118px;
-  left: 50%;
-  translate: -50% 0;
+#input-row {
   display: flex;
-  gap: 10px;
-  width: 86%;
-  max-width: 700px;
-  z-index: 10;
+  align-items: center;
+  gap: 12px;
+  margin: 0 5vw;
+  padding: 12px 26px;
+  background: rgba(10, 10, 25, 0.65);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 #user-input {
   flex: 1;
-  padding: 12px 16px;
-  border: 1px solid rgba(180,140,120,0.3);
-  border-radius: 12px;
-  background: rgba(255,252,248,0.82);
-  backdrop-filter: blur(8px);
-  color: #3d2c26;
-  font-size: 15px;
+  border: none;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: #e8e8f0;
+  font-size: 16px;
+  padding: 8px 0;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.25s;
+  font-family: inherit;
 }
 
 #user-input::placeholder {
-  color: #b8a094;
+  color: rgba(255, 255, 255, 0.28);
 }
 
 #user-input:focus {
-  border-color: rgba(200,130,100,0.6);
-  box-shadow: 0 0 0 3px rgba(220,160,120,0.15);
+  border-bottom-color: rgba(180, 150, 255, 0.65);
 }
 
 #user-input:disabled {
-  opacity: 0.45;
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 #send-btn {
-  padding: 12px 26px;
+  background: none;
   border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #d4946e, #c47a5a);
-  color: white;
-  font-size: 15px;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
-  box-shadow: 0 2px 10px rgba(196,122,90,0.3);
+  padding: 6px;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 #send-btn:hover {
-  opacity: 0.92;
-  box-shadow: 0 4px 16px rgba(196,122,90,0.4);
+  color: rgba(200, 170, 255, 0.95);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 #send-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.9);
 }
 
 #send-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.2;
   cursor: not-allowed;
-  box-shadow: none;
 }
