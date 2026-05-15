@@ -62,12 +62,17 @@ class GalgamePlugin(Star):
         return self.context.get_provider_by_id(prov_id)
 
     def _build_system_prompt(self):
-        name = self.config.get("character_name", "小星")
-        role = self.config.get("character_role", "")
+        persona_id = self.config.get("persona", "")
+        persona_prompt = ""
+        if persona_id:
+            persona = self.context.persona_manager.get_persona(persona_id)
+            if persona:
+                persona_prompt = persona.system_prompt
+
         extra = self.config.get("system_prompt_extra", "")
         emotions = ", ".join(EMOTION_TAGS)
 
-        prompt = f"""你是{name}，{role}
+        prompt = f"""{persona_prompt}
 
 回复规则：
 1. 用口语化、亲切的中文回复，像朋友聊天一样自然
