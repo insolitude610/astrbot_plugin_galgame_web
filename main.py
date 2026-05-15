@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import os
+import pathlib
 import re
 import time
 import uuid
@@ -17,18 +18,24 @@ PLUGIN_NAME = "astrbot_plugin_galgame_web"
 EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
 
+SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
+SESSION_TTL = 86400 * 7  # 7 days
+
 
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
+        SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        self._gc_sessions()
+        self._load_all_sessions()
 
         context.register_web_api(
             f"/{PLUGIN_NAME}/session/init",
             self._api_session_init,
             ["POST"],
-            "Initialize a new galgame session",
+            "Initialize a new galgame session (or resume with replay_id)",
         )
         context.register_web_api(
             f"/{PLUGIN_NAME}/send",
@@ -54,6 +61,72 @@ class GalgamePlugin(Star):
             ["POST"],
             "Notify rapid click/keyboard activity",
         )
+
+    # ---- persistence helpers ----
+
+    def _session_path(self, session_id: str) -> pathlib.Path:
+        return SESSIONS_DIR / f"{session_id}.json"
+
+    def _save_session(self, session_id: str):
+        session = self._sessions.get(session_id)
+        if not session:
+            return
+        data = {
+            "history": session["history"],
+            "current_emotion": session["current_emotion"],
+            "created_at": session["created_at"],
+        }
+        try:
+            with open(self._session_path(session_id), "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            logger.warning(f"Failed to save session {session_id}: {e}")
+
+    def _load_session(self, session_id: str) -> dict | None:
+        path = self._session_path(session_id)
+        if not path.exists():
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return {
+                "history": data.get("history", []),
+                "current_emotion": data.get("current_emotion", "neutral"),
+                "pending_rapid_clicks": 0,
+                "sse_queue": asyncio.Queue(),
+                "created_at": data.get("created_at", time.time()),
+            }
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(f"Failed to load session {session_id}: {e}")
+            return None
+
+    def _load_all_sessions(self):
+        count = 0
+        for path in SESSIONS_DIR.glob("*.json"):
+            sid = path.stem
+            if sid in self._sessions:
+                continue
+            session = self._load_session(sid)
+            if session:
+                self._sessions[sid] = session
+                count += 1
+        if count:
+            logger.info(f"Loaded {count} persisted sessions")
+
+    def _gc_sessions(self):
+        now = time.time()
+        removed = 0
+        for path in SESSIONS_DIR.glob("*.json"):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if now - data.get("created_at", 0) > SESSION_TTL:
+                    path.unlink()
+                    removed += 1
+            except (OSError, json.JSONDecodeError):
+                pass
+        if removed:
+            logger.info(f"GC removed {removed} expired sessions")
 
     def _get_config_tts_provider(self):
         prov_id = self.config.get("tts_provider", "")
@@ -89,6 +162,18 @@ class GalgamePlugin(Star):
         return prompt
 
     async def _api_session_init(self):
+        data = await request.get_json() or {}
+        resume_id = data.get("resume_id", "").strip()
+
+        if resume_id and resume_id in self._sessions:
+            return {"session_id": resume_id}
+
+        if resume_id:
+            session = self._load_session(resume_id)
+            if session:
+                self._sessions[resume_id] = session
+                return {"session_id": resume_id}
+
         session_id = uuid.uuid4().hex
         self._sessions[session_id] = {
             "history": [],
@@ -97,6 +182,7 @@ class GalgamePlugin(Star):
             "sse_queue": asyncio.Queue(),
             "created_at": time.time(),
         }
+        self._save_session(session_id)
         return {"session_id": session_id}
 
     async def _api_send(self):
@@ -168,8 +254,10 @@ class GalgamePlugin(Star):
             session["history"].append({"role": "assistant", "content": clean_text})
             session["current_emotion"] = current_emotion
 
-            if len(session["history"]) > 20:
-                session["history"] = session["history"][-20:]
+            if len(session["history"]) > 40:
+                session["history"] = session["history"][-40:]
+
+            self._save_session(session_id)
 
             await queue.put({"type": "emotion", "value": current_emotion})
 
@@ -266,8 +354,10 @@ class GalgamePlugin(Star):
         )
 
     async def terminate(self):
-        for session in self._sessions.values():
+        for sid in list(self._sessions.keys()):
+            session = self._sessions[sid]
             queue = session.get("sse_queue")
             if queue:
                 await queue.put({"type": "end"})
+            self._save_session(sid)
         self._sessions.clear()
