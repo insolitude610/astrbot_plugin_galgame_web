@@ -12,7 +12,7 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.star import Context, Star
 
-PLUGIN_NAME = "astrbot_plugin_galgame"
+PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
 EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")

@@ -14,7 +14,7 @@ let typewriterTimer = null;
 let mouthTimer = null;
 let isAudioPlaying = false;
 
-const PLUGIN_NAME = "astrbot_plugin_galgame";
+const PLUGIN_NAME = "astrbot_plugin_galgame_web";
 
 /* ---- DOM refs ---- */
 const el = {
