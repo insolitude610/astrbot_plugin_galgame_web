@@ -20,6 +20,63 @@ EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
+ASSETS_DIR = pathlib.Path(__file__).parent / "pages" / "galgame" / "assets"
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+
+EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
+LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "orb"]
+
+
+def _list_asset_files() -> list[str]:
+    if not ASSETS_DIR.is_dir():
+        return []
+    return sorted(
+        f.name
+        for f in ASSETS_DIR.iterdir()
+        if f.is_file() and f.suffix.lower() in IMAGE_EXTS
+    )
+
+
+def _find_asset_for(label: str, files: list[str]) -> str:
+    label_lower = label.lower()
+    for fname in files:
+        stem = pathlib.Path(fname).stem.lower()
+        if stem == label_lower:
+            return fname
+    for fname in files:
+        stem = pathlib.Path(fname).stem.lower()
+        if label_lower in stem or stem in label_lower:
+            return fname
+    return ""
+
+
+def _resolve_assets(config: dict, files: list[str]) -> dict:
+    background = config.get("background", "")
+    if not background:
+        background = _find_asset_for("background", files) or _find_asset_for("bg", files)
+
+    expressions = {}
+    raw_expr = config.get("expressions", {}) or {}
+    for key in EXPRESSION_KEYS:
+        val = raw_expr.get(key, "")
+        if not val:
+            val = _find_asset_for(key, files)
+        expressions[key] = val
+
+    layers = {}
+    raw_layers = config.get("layers", {}) or {}
+    for key in LAYER_KEYS:
+        val = raw_layers.get(key, "")
+        if not val:
+            val = _find_asset_for(key, files)
+        layers[key] = val
+
+    return {
+        "background": background,
+        "expressions": expressions,
+        "layers": layers,
+    }
+
 
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
@@ -53,6 +110,12 @@ class GalgamePlugin(Star):
             self._api_config,
             ["GET"],
             "Get plugin configuration for the frontend",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/list",
+            self._api_assets_list,
+            ["GET"],
+            "List available image files in the assets directory",
         )
         context.register_web_api(
             f"/{PLUGIN_NAME}/rapid_action",
@@ -323,16 +386,22 @@ class GalgamePlugin(Star):
         )
 
     async def _api_config(self):
+        files = _list_asset_files()
+        resolved = _resolve_assets(self.config, files)
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
             "rapid_window_seconds": self.config.get("rapid_window_seconds", 3),
             "tts_provider": self.config.get("tts_provider", ""),
-            "expressions": self.config.get("expressions", {}),
-            "layers": self.config.get("layers", {}),
+            "expressions": resolved["expressions"],
+            "layers": resolved["layers"],
             "character_name": self.config.get("character_name", ""),
-            "background": self.config.get("background", ""),
+            "background": resolved["background"],
         }
+
+    async def _api_assets_list(self):
+        files = _list_asset_files()
+        return {"files": files, "assets_dir": str(ASSETS_DIR)}
 
     async def _api_rapid_action(self):
         data = await request.get_json()

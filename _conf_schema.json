@@ -36,7 +36,7 @@
     "description": "场景背景图",
     "type": "string",
     "default": "",
-    "hint": "assets/ 目录下的背景图文件名，留空则显示纯色背景"
+    "hint": "assets/ 目录下的背景图文件名。留空则自动匹配 background.png / bg.png"
   },
   "rapid_click_threshold": {
     "description": "快速点击数阈值",
@@ -65,7 +65,7 @@
   "expressions": {
     "description": "表情立绘路径",
     "type": "object",
-    "hint": "对应 assets/ 目录下的 PNG 文件。至少填写 neutral",
+    "hint": "assets/ 目录下的 PNG 文件。留空则自动匹配 neutral.png / happy.png 等，按命名约定即可零配置",
     "items": {
       "neutral":   {"description": "普通表情", "type": "string", "default": ""},
       "happy":     {"description": "开心表情", "type": "string", "default": ""},
@@ -79,6 +79,7 @@
   "layers": {
     "description": "分层立绘路径（仅 layered 模式生效）",
     "type": "object",
+    "hint": "留空则自动匹配 body.png / head.png 等。按命名约定即可零配置",
     "items": {
       "body":        {"description": "身体层", "type": "string", "default": ""},
       "hair_back":   {"description": "头发后层", "type": "string", "default": ""},

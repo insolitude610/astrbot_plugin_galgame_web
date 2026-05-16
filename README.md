@@ -18,6 +18,7 @@
 - **SSE 实时通信** —— 文本逐段推送、情绪即时切换、音频流式播放
 - **会话持久化** —— 对话历史自动存盘，重启/重载后保留；浏览器 localStorage 记录 session_id，关掉页面再打开可继续对话
 - **可配置场景背景图** —— 插件设置页直接指定背景图
+- **零配置立绘检测** —— 将 PNG 按命名约定放入 assets 目录即可自动匹配，无需手动填写路径
 
 ## 快速开始
 
@@ -37,9 +38,9 @@
 | 角色人格 | 选择已在 AstrBot 配置好的 Persona | 可先用 AstrBot 预设或自建 |
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o 等 |
 | TTS Provider | 语音合成 | Edge TTS（免费） |
-| 场景背景图 | `assets/` 下的背景图文件名 | `bg.png` |
-| 表情立绘 | 各情绪对应的 PNG 文件名 | 至少填写 neutral |
-| 分层立绘 | 身体/头发/脸部/嘴部等文件名 | layered 模式 |
+| 场景背景图 | `assets/` 下的背景图文件名 | 留空自动匹配 `background.png` / `bg.png` |
+| 表情立绘 | 各情绪对应的 PNG 文件名 | 留空自动匹配 `neutral.png` 等 |
+| 分层立绘 | 身体/头发/脸部/嘴部等文件名 | 留空自动匹配 `body.png` 等 |
 | 会话保留天数 | 超过该天数未活跃的会话自动清理 | 默认 7 天，设 0 永不清理 |
 | 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
 
@@ -47,7 +48,20 @@
 
 参考 [立绘指南](#立绘指南) 使用 AI 生成角色立绘。
 
-将 PNG 文件放入 `pages/galgame/assets/` 目录，然后在配置中填写文件名。
+将 PNG 文件放入 `pages/galgame/assets/` 目录，按下方命名约定即可**零配置**自动识别。
+
+| 情绪 | 文件名 | | 图层 | 文件名 |
+|------|--------|-|------|--------|
+| 普通 | `neutral.png` | | 身体 | `body.png` |
+| 开心 | `happy.png` | | 头发后 | `hair_back.png` |
+| 悲伤 | `sad.png` | | 头部 | `head.png` |
+| 生气 | `angry.png` | | 头发前 | `hair_front.png` |
+| 惊讶 | `surprised.png` | | 张嘴 | `mouth_open.png` |
+| 害羞 | `blush.png` | | 闭嘴 | `mouth_closed.png` |
+| 思考 | `thinking.png` | | 球体 | `orb.png` |
+
+> 背景图命名为 `background.png` 或 `bg.png` 即可自动识别。
+> 如需使用非标准文件名，在插件配置中手动填写即可覆盖自动检测结果。
 
 ### 使用
 
@@ -157,6 +171,11 @@ AstrBot Core
 - CSS 动画：呼吸、头发飘动、头微倾、球体漂浮、嘴部开合、表情淡入淡出
 
 ## 变更记录
+
+### v0.2.1
+
+- **立绘路径自动检测** —— 将 PNG 按命名约定（`neutral.png` / `body.png` 等）放入 `assets/` 目录即可零配置使用，无需手动逐个填写文件路径
+- 新增 `/assets/list` API 端点，前端可枚举 assets 目录下的图片文件
 
 ### v0.2.0
 
