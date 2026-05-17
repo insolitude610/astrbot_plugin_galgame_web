@@ -318,14 +318,21 @@ html, body {
 
 #settings-link {
   position: fixed;
-  top: 10px;
+  top: 12px;
   right: 14px;
-  z-index: 100;
-  font-size: 22px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
   color: rgba(255,255,255,.5);
   text-decoration: none;
-  transition: color .2s;
+  transition: color .2s, background .2s;
 }
 #settings-link:hover {
+  background: rgba(255,255,255,.15);
   color: rgba(255,255,255,.85);
 }
