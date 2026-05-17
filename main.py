@@ -26,6 +26,9 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "orb"]
 
+PLATFORM_ID = "webchat"
+GALGAME_UMO_PREFIX = "webchat!galgame!"
+
 
 def _list_asset_files() -> list[str]:
     if not ASSETS_DIR.is_dir():
@@ -86,6 +89,7 @@ class GalgamePlugin(Star):
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._gc_sessions()
         self._load_all_sessions()
+        asyncio.ensure_future(self._sync_sessions_to_db())
 
         context.register_web_api(
             f"/{PLUGIN_NAME}/session/init",
@@ -126,6 +130,46 @@ class GalgamePlugin(Star):
 
     # ---- persistence helpers ----
 
+    def _build_umo(self, session_id: str) -> str:
+        return f"{PLATFORM_ID}:FriendMessage:{GALGAME_UMO_PREFIX}{session_id}"
+
+    async def _init_astrbot_conv(self, session_id: str, session: dict):
+        umo = self._build_umo(session_id)
+        persona_id = self.config.get("persona", "") or None
+        try:
+            conv_id = await self.context.conversation_manager.new_conversation(
+                unified_msg_origin=umo,
+                platform_id=PLATFORM_ID,
+                content=session.get("history", []),
+                persona_id=persona_id,
+            )
+            session["umo"] = umo
+            session["conv_id"] = conv_id
+        except Exception as e:
+            logger.warning(f"Failed to create AstrBot conversation for {session_id}: {e}")
+
+    async def _sync_conv_to_db(self, session: dict):
+        umo = session.get("umo")
+        conv_id = session.get("conv_id")
+        history = session.get("history", [])
+        if not umo or not conv_id:
+            return
+        try:
+            await self.context.conversation_manager.update_conversation(
+                unified_msg_origin=umo,
+                conversation_id=conv_id,
+                history=history,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to sync conversation to DB: {e}")
+
+    async def _delete_astrbot_conv(self, session_id: str):
+        umo = self._build_umo(session_id)
+        try:
+            await self.context.conversation_manager.delete_conversations_by_user_id(umo)
+        except Exception as e:
+            logger.warning(f"Failed to delete AstrBot conversation for {session_id}: {e}")
+
     def _session_path(self, session_id: str) -> pathlib.Path:
         return SESSIONS_DIR / f"{session_id}.json"
 
@@ -134,6 +178,8 @@ class GalgamePlugin(Star):
         if not session:
             return
         data = {
+            "umo": session.get("umo", ""),
+            "conv_id": session.get("conv_id", ""),
             "history": session["history"],
             "current_emotion": session["current_emotion"],
             "created_at": session["created_at"],
@@ -152,6 +198,8 @@ class GalgamePlugin(Star):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return {
+                "umo": data.get("umo", ""),
+                "conv_id": data.get("conv_id", ""),
                 "history": data.get("history", []),
                 "current_emotion": data.get("current_emotion", "neutral"),
                 "pending_rapid_clicks": 0,
@@ -175,6 +223,21 @@ class GalgamePlugin(Star):
         if count:
             logger.info(f"Loaded {count} persisted sessions")
 
+    async def _sync_sessions_to_db(self):
+        for sid, session in list(self._sessions.items()):
+            if not session.get("conv_id"):
+                await self._init_astrbot_conv(sid, session)
+                self._save_session(sid)
+            else:
+                try:
+                    await self.context.conversation_manager.get_conversation(
+                        unified_msg_origin=session["umo"],
+                        conversation_id=session["conv_id"],
+                        create_if_not_exists=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to ensure conversation exists for {sid}: {e}")
+
     def _gc_sessions(self):
         retain_days = self.config.get("session_retain_days", 7)
         if retain_days <= 0:
@@ -189,6 +252,8 @@ class GalgamePlugin(Star):
                 if now - data.get("created_at", 0) > ttl:
                     path.unlink()
                     removed += 1
+                    sid = path.stem
+                    asyncio.ensure_future(self._delete_astrbot_conv(sid))
             except (OSError, json.JSONDecodeError):
                 pass
         if removed:
@@ -241,13 +306,17 @@ class GalgamePlugin(Star):
                 return {"session_id": resume_id}
 
         session_id = uuid.uuid4().hex
-        self._sessions[session_id] = {
+        session = {
+            "umo": "",
+            "conv_id": "",
             "history": [],
             "current_emotion": "neutral",
             "pending_rapid_clicks": 0,
             "sse_queue": asyncio.Queue(),
             "created_at": time.time(),
         }
+        self._sessions[session_id] = session
+        await self._init_astrbot_conv(session_id, session)
         self._save_session(session_id)
         return {"session_id": session_id}
 
@@ -279,6 +348,18 @@ class GalgamePlugin(Star):
 
         messages = list(session["history"])
         messages.append({"role": "user", "content": text})
+
+        conv_id = session.get("conv_id", "")
+        try:
+            await self.context.message_history_manager.insert(
+                platform_id=PLATFORM_ID,
+                user_id=conv_id,
+                content={"type": "user", "message": text},
+                sender_id="user",
+                sender_name="用户",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save user message to history: {e}")
 
         try:
             llm_prov_id = self.config.get("llm_provider", "")
@@ -324,6 +405,23 @@ class GalgamePlugin(Star):
                 session["history"] = session["history"][-40:]
 
             self._save_session(session_id)
+
+            character_name = self.config.get("character_name", "角色")
+            try:
+                await self.context.message_history_manager.insert(
+                    platform_id=PLATFORM_ID,
+                    user_id=conv_id,
+                    content={"type": "bot", "message": clean_text},
+                    sender_id="bot",
+                    sender_name=character_name,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save bot message to history: {e}")
+
+            try:
+                await self._sync_conv_to_db(session)
+            except Exception as e:
+                logger.warning(f"Failed to sync conversation to DB: {e}")
 
             await queue.put({"type": "emotion", "value": current_emotion})
 
