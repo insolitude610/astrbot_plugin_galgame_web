@@ -19,6 +19,7 @@
 - **会话持久化** —— 对话历史自动存盘，重启/重载后保留；浏览器 localStorage 记录 session_id，关掉页面再打开可继续对话
 - **可配置场景背景图** —— 插件设置页直接指定背景图
 - **零配置立绘检测** —— 将 PNG 按命名约定放入 assets 目录即可自动匹配，无需手动填写路径
+- **对话记录查看** —— 聊天自动写入 AstrBot 数据库，在 Dashboard `对话管理` 页面可查看、搜索、编辑、导出全部历史记录
 
 ## 快速开始
 
@@ -100,6 +101,20 @@
 > 如需关闭自动清理，将"会话保留天数"设为 `0`。
 > 如需跨设备同步，可自行备份 `sessions/` 目录。
 
+## 对话记录查看
+
+Galgame 的每轮对话都会自动写入 AstrBot 的 `conversations` 和 `platform_message_history` 两张表，使用平台标识 `webchat`，UMO 前缀 `webchat!galgame!`。
+
+在 AstrBot Dashboard 中打开 **对话管理** 页面（`#/conversation`），即可：
+
+- 查看全部 Galgame 对话记录（与 webchat/QQ 等平台的对话并列展示）
+- 点击任意对话查看完整聊天历史（气泡式 UI）
+- 支持 JSON 编辑器模式，可手动修改对话内容
+- 支持批量导出为 JSONL 格式
+- 搜索、分页、按平台/消息类型筛选
+
+> Galgame 对话以 `webchat!galgame!` 前缀的 UMO 开头，方便在列表中快速识别。
+
 ## 立绘指南
 
 ### 推荐生成方式
@@ -162,8 +177,9 @@ AstrBot Dashboard (Quart)
   ↕ register_web_api
 插件后端 main.py
   ↕ context.llm_generate / context.get_provider_by_id
+  ↕ conversation_mgr / message_history_mgr
 AstrBot Core
-  └─ LLM + TTS + Persona + 会话管理
+  └─ LLM + TTS + Persona + 会话管理 + SQLite DB
 ```
 
 - 前端：纯 HTML/CSS/JS，零外部依赖
