@@ -510,8 +510,22 @@ class GalgamePlugin(Star):
         }
 
     async def _api_assets_list(self):
-        files = _list_asset_files()
-        return {"files": files, "assets_dir": str(ASSETS_DIR)}
+        entries = []
+        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        for f in sorted(ASSETS_DIR.iterdir()):
+            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS:
+                continue
+            try:
+                with open(f, "rb") as fh:
+                    raw = fh.read()
+                b64 = base64.b64encode(raw).decode()
+                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                        ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+                mt = mime.get(f.suffix.lower(), "image/png")
+                entries.append({"name": f.name, "data": f"data:{mt};base64,{b64}"})
+            except Exception as e:
+                logger.warning(f"Failed to read asset {f.name}: {e}")
+        return {"files": entries, "assets_dir": str(ASSETS_DIR)}
 
     async def _api_assets_upload(self):
         data = await request.get_json() or {}
