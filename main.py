@@ -134,6 +134,12 @@ class GalgamePlugin(Star):
             "Delete an image file from the assets directory",
         )
         context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/file",
+            self._api_assets_file,
+            ["GET"],
+            "Serve an image file from the assets directory",
+        )
+        context.register_web_api(
             f"/{PLUGIN_NAME}/rapid_action",
             self._api_rapid_action,
             ["POST"],
@@ -513,18 +519,8 @@ class GalgamePlugin(Star):
         entries = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         for f in sorted(ASSETS_DIR.iterdir()):
-            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS:
-                continue
-            try:
-                with open(f, "rb") as fh:
-                    raw = fh.read()
-                b64 = base64.b64encode(raw).decode()
-                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                        ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
-                mt = mime.get(f.suffix.lower(), "image/png")
-                entries.append({"name": f.name, "data": f"data:{mt};base64,{b64}"})
-            except Exception as e:
-                logger.warning(f"Failed to read asset {f.name}: {e}")
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
+                entries.append({"name": f.name})
         return {"files": entries, "assets_dir": str(ASSETS_DIR)}
 
     async def _api_assets_upload(self):
@@ -569,6 +565,18 @@ class GalgamePlugin(Star):
         target.unlink()
         logger.info(f"Deleted asset: {safe_name}")
         return {"deleted": safe_name}
+
+    async def _api_assets_file(self):
+        filename = request.args.get("name", "")
+        safe_name = pathlib.Path(filename).name
+        target = ASSETS_DIR / safe_name
+        if not target.exists() or not target.is_file():
+            return {"error": "file not found"}, 404
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                    ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        content_type = mime_map.get(target.suffix.lower(), "application/octet-stream")
+        raw = target.read_bytes()
+        return Response(raw, content_type=content_type)
 
     async def _api_rapid_action(self):
         data = await request.get_json()
