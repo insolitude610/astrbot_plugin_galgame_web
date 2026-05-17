@@ -241,7 +241,7 @@ function renderGrid() {
     const mappings = findMappings(stem);
     html += `
 <div class="card">
-  <img class="card-img" src="${f.data}" alt="${f.name}" loading="lazy" />
+  <img class="card-img" src="/api/plugin/${PLUGIN}/assets/file?name=${encodeURIComponent(f.name)}" alt="${f.name}" loading="lazy" />
   <div class="card-body">
     <div class="card-name">${f.name}</div>
     <div class="card-mappings">${mappings || "无匹配"}</div>
