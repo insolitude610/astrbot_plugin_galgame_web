@@ -220,17 +220,22 @@ async function loadFiles() {
   loading.style.display = "block";
   try {
     const data = await bridge.apiGet("assets/list");
+    console.log("[settings] list response:", data);
     const rawFiles = data.files || [];
     if (rawFiles.length > 0) {
       const names = rawFiles.map(f => f.name);
+      console.log("[settings] batch request names:", names);
       const batchData = await bridge.apiPost("assets/batch", { names });
+      console.log("[settings] batch response:", batchData);
       files = batchData.files || [];
     } else {
+      console.log("[settings] no files in list");
       files = [];
     }
     renderGrid();
     renderMapping();
   } catch (e) {
+    console.error("[settings] loadFiles error:", e);
     setStatus("加载失败: " + e.message, "error");
   }
   loading.style.display = "none";
