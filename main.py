@@ -22,6 +22,7 @@ SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
 ASSETS_DIR = pathlib.Path(__file__).parent / "pages" / "galgame" / "assets"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "orb"]
@@ -79,6 +80,16 @@ def _resolve_assets(config: dict, files: list[str]) -> dict:
         "expressions": expressions,
         "layers": layers,
     }
+
+
+def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
+    stem = pathlib.Path(name).name
+    if not stem or stem != name.split("/")[-1].split("\\")[-1]:
+        return None
+    resolved = (base_dir / stem).resolve()
+    if not str(resolved).startswith(str(base_dir.resolve())):
+        return None
+    return resolved
 
 
 class GalgamePlugin(Star):
@@ -530,7 +541,7 @@ class GalgamePlugin(Star):
                 logger.info(f"[assets] list found: {f.name}")
                 entries.append({"name": f.name})
         logger.info(f"[assets] list return {len(entries)} files: {[e['name'] for e in entries]}")
-        return {"files": entries, "assets_dir": str(ASSETS_DIR)}
+        return {"files": entries}
 
     async def _api_assets_upload(self):
         data = await request.get_json() or {}
@@ -545,20 +556,24 @@ class GalgamePlugin(Star):
             b64_data = f.get("data", "")
             if not name or not b64_data:
                 continue
-            safe_name = pathlib.Path(name).name
-            if pathlib.Path(safe_name).suffix.lower() not in IMAGE_EXTS:
-                continue
             if "," in b64_data:
                 b64_data = b64_data.split(",", 1)[1]
+            if len(b64_data) > MAX_UPLOAD_BYTES * 2:
+                logger.warning(f"[assets] upload rejected oversize: {name}")
+                continue
+            safe_path = _safe_path(name, ASSETS_DIR)
+            if not safe_path or safe_path.suffix.lower() not in IMAGE_EXTS:
+                continue
             try:
                 raw = base64.b64decode(b64_data)
-                dest = ASSETS_DIR / safe_name
-                with open(dest, "wb") as fout:
+                if len(raw) > MAX_UPLOAD_BYTES:
+                    continue
+                with open(safe_path, "wb") as fout:
                     fout.write(raw)
-                uploaded.append(safe_name)
-                logger.info(f"Uploaded asset: {safe_name}")
+                uploaded.append(safe_path.name)
+                logger.info(f"Uploaded asset: {safe_path.name}")
             except Exception as e:
-                logger.warning(f"Failed to save {safe_name}: {e}")
+                logger.warning(f"Failed to save {name}: {e}")
         if not uploaded:
             return {"error": "no valid image files uploaded"}, 400
         return {"uploaded": uploaded}
@@ -568,24 +583,22 @@ class GalgamePlugin(Star):
         filename = data.get("filename", "")
         if not filename:
             return {"error": "no filename"}, 400
-        safe_name = pathlib.Path(filename).name
-        target = ASSETS_DIR / safe_name
-        if not target.exists() or not target.is_file():
+        safe_path = _safe_path(filename, ASSETS_DIR)
+        if not safe_path or not safe_path.exists() or not safe_path.is_file():
             return {"error": "file not found"}, 404
-        target.unlink()
-        logger.info(f"Deleted asset: {safe_name}")
-        return {"deleted": safe_name}
+        safe_path.unlink()
+        logger.info(f"Deleted asset: {safe_path.name}")
+        return {"deleted": safe_path.name}
 
     async def _api_assets_file(self):
         filename = request.args.get("name", "")
-        safe_name = pathlib.Path(filename).name
-        target = ASSETS_DIR / safe_name
-        if not target.exists() or not target.is_file():
+        safe_path = _safe_path(filename, ASSETS_DIR)
+        if not safe_path or not safe_path.exists() or not safe_path.is_file():
             return {"error": "file not found"}, 404
         mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                     ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
-        content_type = mime_map.get(target.suffix.lower(), "application/octet-stream")
-        raw = target.read_bytes()
+        content_type = mime_map.get(safe_path.suffix.lower(), "application/octet-stream")
+        raw = safe_path.read_bytes()
         return Response(raw, content_type=content_type)
 
     async def _api_assets_batch(self):
@@ -598,20 +611,21 @@ class GalgamePlugin(Star):
                     ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
         result = []
         for name in names:
-            safe_name = pathlib.Path(name).name
-            target = ASSETS_DIR / safe_name
-            logger.info(f"[assets] batch lookup: {safe_name} -> {target} exists={target.exists()} is_file={target.is_file() if target.exists() else 'N/A'}")
-            if not target.exists() or not target.is_file():
-                logger.warning(f"[assets] batch skip missing: {safe_name}")
+            safe_path = _safe_path(name, ASSETS_DIR)
+            if not safe_path or not safe_path.exists() or not safe_path.is_file():
+                logger.warning(f"[assets] batch skip missing: {name}")
                 continue
             try:
-                raw = target.read_bytes()
+                if safe_path.stat().st_size > MAX_UPLOAD_BYTES:
+                    logger.warning(f"[assets] batch skip oversize: {safe_path.name}")
+                    continue
+                raw = safe_path.read_bytes()
                 b64 = base64.b64encode(raw).decode()
-                mt = mime_map.get(target.suffix.lower(), "image/png")
-                logger.info(f"[assets] batch encoded: {safe_name} size={len(raw)} b64_len={len(b64)}")
-                result.append({"name": safe_name, "data": f"data:{mt};base64,{b64}"})
+                mt = mime_map.get(safe_path.suffix.lower(), "image/png")
+                logger.info(f"[assets] batch encoded: {safe_path.name} size={len(raw)} b64_len={len(b64)}")
+                result.append({"name": safe_path.name, "data": f"data:{mt};base64,{b64}"})
             except Exception as e:
-                logger.warning(f"[assets] batch read failed {safe_name}: {e}")
+                logger.warning(f"[assets] batch read failed {name}: {e}")
         logger.info(f"[assets] batch return {len(result)} files")
         return {"files": result}
 
