@@ -194,6 +194,7 @@ AstrBot Core
 - **配置页提示优化** —— 表情/分层立绘字段标注「留空=自动」，引导使用管理页面上传，无需逐个填写
 - 新增 `POST /assets/upload`、`POST /assets/delete`、`POST /assets/batch` API
 - 修复管理页图片预览不显示的问题
+- **安全加固** —— 文件上传大小限制（10MB）、路径遍历防护、移除 API 返回值中的服务端路径泄露
 
 ### v0.2.2
 
