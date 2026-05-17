@@ -243,33 +243,61 @@ async function loadFiles() {
 
 function renderGrid() {
   const container = document.getElementById("grid-container");
+  container.innerHTML = "";
   if (files.length === 0) {
     container.innerHTML = '<div class="loading">暂无图片，上传 PNG 文件开始</div>';
     return;
   }
 
-  let html = '<div class="grid">';
+  const grid = document.createElement("div");
+  grid.className = "grid";
+
   for (const f of files) {
     const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
     const mappings = findMappings(stem);
-    html += `
-<div class="card">
-  <img class="card-img" src="${f.data}" alt="${f.name}" loading="lazy" />
-  <div class="card-body">
-    <div class="card-name">${f.name}</div>
-    <div class="card-mappings">${mappings || "无匹配"}</div>
-    <div class="card-actions">
-      <button class="btn btn-danger" data-file="${f.name}">删除</button>
-    </div>
-  </div>
-</div>`;
-  }
-  html += '</div>';
-  container.innerHTML = html;
 
-  container.querySelectorAll(".btn-danger").forEach(btn => {
-    btn.onclick = () => deleteFile(btn.dataset.file);
-  });
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const img = document.createElement("img");
+    img.className = "card-img";
+    img.alt = f.name;
+    img.loading = "lazy";
+    if (f.data) {
+      img.src = f.data;
+      console.log("[settings] img src set: " + f.name + " len=" + f.data.length);
+    } else {
+      console.warn("[settings] no data for: " + f.name);
+    }
+    card.appendChild(img);
+
+    const body = document.createElement("div");
+    body.className = "card-body";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "card-name";
+    nameEl.textContent = f.name;
+    body.appendChild(nameEl);
+
+    const mapEl = document.createElement("div");
+    mapEl.className = "card-mappings";
+    mapEl.textContent = mappings || "无匹配";
+    body.appendChild(mapEl);
+
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn btn-danger";
+    delBtn.textContent = "删除";
+    delBtn.onclick = () => deleteFile(f.name);
+    actions.appendChild(delBtn);
+    body.appendChild(actions);
+
+    card.appendChild(body);
+    grid.appendChild(card);
+  }
+
+  container.appendChild(grid);
 }
 
 function findMappings(stem) {
