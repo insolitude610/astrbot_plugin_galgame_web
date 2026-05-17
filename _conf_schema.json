@@ -63,31 +63,31 @@
     "hint": "single=单张立绘+表情差分；layered=多层PNG各自独立动画"
   },
   "expressions": {
-    "description": "表情立绘路径",
+    "description": "表情立绘 — 全部留空即可，插件自动检测 assets/ 目录",
     "type": "object",
-    "hint": "assets/ 目录下的 PNG 文件。留空则自动匹配 neutral.png / happy.png 等，按命名约定即可零配置",
+    "hint": "将 PNG 上传到立绘管理页面(页面右上角⚙)即可零配置使用。手动填写可覆盖自动检测结果",
     "items": {
-      "neutral":   {"description": "普通表情", "type": "string", "default": ""},
-      "happy":     {"description": "开心表情", "type": "string", "default": ""},
-      "sad":       {"description": "悲伤表情", "type": "string", "default": ""},
-      "angry":     {"description": "生气表情", "type": "string", "default": ""},
-      "surprised": {"description": "惊讶表情", "type": "string", "default": ""},
-      "blush":     {"description": "害羞表情", "type": "string", "default": ""},
-      "thinking":  {"description": "思考表情", "type": "string", "default": ""}
+      "neutral":   {"description": "普通 (留空=自动)", "type": "string", "default": ""},
+      "happy":     {"description": "开心 (留空=自动)", "type": "string", "default": ""},
+      "sad":       {"description": "悲伤 (留空=自动)", "type": "string", "default": ""},
+      "angry":     {"description": "生气 (留空=自动)", "type": "string", "default": ""},
+      "surprised": {"description": "惊讶 (留空=自动)", "type": "string", "default": ""},
+      "blush":     {"description": "害羞 (留空=自动)", "type": "string", "default": ""},
+      "thinking":  {"description": "思考 (留空=自动)", "type": "string", "default": ""}
     }
   },
   "layers": {
-    "description": "分层立绘路径（仅 layered 模式生效）",
+    "description": "分层立绘 — 全部留空即可，插件自动检测 assets/ 目录",
     "type": "object",
-    "hint": "留空则自动匹配 body.png / head.png 等。按命名约定即可零配置",
+    "hint": "将 PNG 上传到立绘管理页面(页面右上角⚙)即可零配置使用。手动填写可覆盖自动检测结果",
     "items": {
-      "body":        {"description": "身体层", "type": "string", "default": ""},
-      "hair_back":   {"description": "头发后层", "type": "string", "default": ""},
-      "head":        {"description": "头部层（含五官）", "type": "string", "default": ""},
-      "hair_front":  {"description": "头发前层", "type": "string", "default": ""},
-      "mouth_open":  {"description": "张嘴差分", "type": "string", "default": ""},
-      "mouth_closed":{"description": "闭嘴差分", "type": "string", "default": ""},
-      "orb":         {"description": "漂浮球体", "type": "string", "default": ""}
+      "body":        {"description": "身体 (留空=自动)", "type": "string", "default": ""},
+      "hair_back":   {"description": "头发后 (留空=自动)", "type": "string", "default": ""},
+      "head":        {"description": "头部 (留空=自动)", "type": "string", "default": ""},
+      "hair_front":  {"description": "头发前 (留空=自动)", "type": "string", "default": ""},
+      "mouth_open":  {"description": "张嘴 (留空=自动)", "type": "string", "default": ""},
+      "mouth_closed":{"description": "闭嘴 (留空=自动)", "type": "string", "default": ""},
+      "orb":         {"description": "球体 (留空=自动)", "type": "string", "default": ""}
     }
   }
 }
