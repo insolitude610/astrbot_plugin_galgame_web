@@ -237,16 +237,16 @@ function renderGrid() {
 
   let html = '<div class="grid">';
   for (const f of files) {
-    const stem = f.replace(/\.[^.]+$/, "").toLowerCase();
+    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
     const mappings = findMappings(stem);
     html += `
 <div class="card">
-  <img class="card-img" src="./assets/${f}" alt="${f}" loading="lazy" />
+  <img class="card-img" src="${f.data}" alt="${f.name}" loading="lazy" />
   <div class="card-body">
-    <div class="card-name">${f}</div>
+    <div class="card-name">${f.name}</div>
     <div class="card-mappings">${mappings || "无匹配"}</div>
     <div class="card-actions">
-      <button class="btn btn-danger" data-file="${f}">删除</button>
+      <button class="btn btn-danger" data-file="${f.name}">删除</button>
     </div>
   </div>
 </div>`;
@@ -280,34 +280,35 @@ function findMappings(stem) {
 }
 
 function renderMapping() {
-  const stems = new Set(files.map(f => f.replace(/\.[^.]+$/, "").toLowerCase()));
+  const names = files.map(f => f.name);
+  const stems = new Set(names.map(n => n.replace(/\.[^.]+$/, "").toLowerCase()));
   let html = "<tr><th>类型</th><th>键名</th><th>匹配文件</th></tr>";
 
   for (const k of EMOTION_KEYS) {
-    const found = findFileFor(k, stems);
+    const found = findFileFor(k, stems, names);
     html += `<tr><td>表情</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
   }
   for (const k of LAYER_KEYS) {
-    const found = findFileFor(k, stems);
+    const found = findFileFor(k, stems, names);
     html += `<tr><td>图层</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
   }
-  const bg = findFileForBg(stems);
+  const bg = findFileForBg(stems, names);
   html += `<tr><td>背景</td><td>background</td><td class="${bg ? 'matched' : 'missing'}">${bg || '未匹配'}</td></tr>`;
 
   document.getElementById("mapping-table").innerHTML = html;
 }
 
-function findFileFor(key, stems) {
-  if (stems.has(key)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === key) || key + ".png";
+function findFileFor(key, stems, names) {
+  if (stems.has(key)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === key) || key + ".png";
   for (const s of stems) {
-    if (s.includes(key) || key.includes(s)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === s) || s + ".png";
+    if (s.includes(key) || key.includes(s)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === s) || s + ".png";
   }
   return null;
 }
 
-function findFileForBg(stems) {
+function findFileForBg(stems, names) {
   for (const k of BG_KEYS) {
-    if (stems.has(k)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === k) || k + ".png";
+    if (stems.has(k)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === k) || k + ".png";
   }
   return null;
 }
