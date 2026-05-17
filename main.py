@@ -514,21 +514,31 @@ class GalgamePlugin(Star):
         return {"files": files, "assets_dir": str(ASSETS_DIR)}
 
     async def _api_assets_upload(self):
-        upload_files = await request.files
+        data = await request.get_json() or {}
+        files_data = data.get("files", [])
+        if not files_data:
+            return {"error": "no files"}, 400
         uploaded = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        for key in upload_files:
-            file_storage = upload_files[key]
-            filename = file_storage.filename
-            if not filename:
+        for f in files_data:
+            name = f.get("name", "")
+            b64_data = f.get("data", "")
+            if not name or not b64_data:
                 continue
-            safe_name = pathlib.Path(filename).name
+            safe_name = pathlib.Path(name).name
             if pathlib.Path(safe_name).suffix.lower() not in IMAGE_EXTS:
                 continue
-            dest = ASSETS_DIR / safe_name
-            file_storage.save(str(dest))
-            uploaded.append(safe_name)
-            logger.info(f"Uploaded asset: {safe_name}")
+            if "," in b64_data:
+                b64_data = b64_data.split(",", 1)[1]
+            try:
+                raw = base64.b64decode(b64_data)
+                dest = ASSETS_DIR / safe_name
+                with open(dest, "wb") as fout:
+                    fout.write(raw)
+                uploaded.append(safe_name)
+                logger.info(f"Uploaded asset: {safe_name}")
+            except Exception as e:
+                logger.warning(f"Failed to save {safe_name}: {e}")
         if not uploaded:
             return {"error": "no valid image files uploaded"}, 400
         return {"uploaded": uploaded}

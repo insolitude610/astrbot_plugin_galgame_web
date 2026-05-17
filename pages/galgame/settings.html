@@ -187,23 +187,23 @@ function handleFileSelect(e) {
 }
 
 async function uploadFiles(fileList) {
-  const form = new FormData();
-  let count = 0;
+  const filesToUpload = [];
   for (const f of fileList) {
     if (f.type.startsWith("image/")) {
-      form.append("file_" + count, f);
-      count++;
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+      filesToUpload.push({ name: f.name, data: base64 });
     }
   }
-  if (count === 0) return;
+  if (filesToUpload.length === 0) return;
 
   setStatus("上传中...");
   try {
-    const resp = await fetch(`/api/plugin/${PLUGIN}/assets/upload`, {
-      method: "POST",
-      body: form,
-    });
-    const data = await resp.json();
+    const data = await bridge.apiPost("assets/upload", { files: filesToUpload });
     if (data.uploaded) {
       setStatus(`上传完成: ${data.uploaded.join(", ")}`, "success");
       await loadFiles();
