@@ -172,6 +172,11 @@ AstrBot Core
 
 ## 变更记录
 
+### v0.2.2
+
+- **对话接入 AstrBot 消息系统** —— Galgame 对话自动写入 `conversations` 和 `platform_message_history` 表，在 Dashboard `#/conversation` 页面可查看/编辑/导出全部聊天记录
+- 旧会话 JSON 文件自动迁移至数据库，无缝兼容
+
 ### v0.2.1
 
 - **立绘路径自动检测** —— 将 PNG 按命名约定（`neutral.png` / `body.png` 等）放入 `assets/` 目录即可零配置使用，无需手动逐个填写文件路径
