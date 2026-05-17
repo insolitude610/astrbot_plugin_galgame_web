@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+pages/galgame/assets/*.png
+pages/galgame/assets/*.jpg
+pages/galgame/assets/*.jpeg
+pages/galgame/assets/*.webp
+pages/galgame/assets/*.bmp
+pages/galgame/assets/*.gif
