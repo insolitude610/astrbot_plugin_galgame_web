@@ -524,14 +524,18 @@ class GalgamePlugin(Star):
     async def _api_assets_list(self):
         entries = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[assets] list scanning dir: {ASSETS_DIR}")
         for f in sorted(ASSETS_DIR.iterdir()):
             if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
+                logger.info(f"[assets] list found: {f.name}")
                 entries.append({"name": f.name})
+        logger.info(f"[assets] list return {len(entries)} files: {[e['name'] for e in entries]}")
         return {"files": entries, "assets_dir": str(ASSETS_DIR)}
 
     async def _api_assets_upload(self):
         data = await request.get_json() or {}
         files_data = data.get("files", [])
+        logger.info(f"[assets] upload received {len(files_data)} items")
         if not files_data:
             return {"error": "no files"}, 400
         uploaded = []
@@ -587,6 +591,7 @@ class GalgamePlugin(Star):
     async def _api_assets_batch(self):
         data = await request.get_json() or {}
         names = data.get("names", [])
+        logger.info(f"[assets] batch requested: {names}")
         if not names:
             return {"error": "no names"}, 400
         mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
@@ -595,15 +600,19 @@ class GalgamePlugin(Star):
         for name in names:
             safe_name = pathlib.Path(name).name
             target = ASSETS_DIR / safe_name
+            logger.info(f"[assets] batch lookup: {safe_name} -> {target} exists={target.exists()} is_file={target.is_file() if target.exists() else 'N/A'}")
             if not target.exists() or not target.is_file():
+                logger.warning(f"[assets] batch skip missing: {safe_name}")
                 continue
             try:
                 raw = target.read_bytes()
                 b64 = base64.b64encode(raw).decode()
                 mt = mime_map.get(target.suffix.lower(), "image/png")
+                logger.info(f"[assets] batch encoded: {safe_name} size={len(raw)} b64_len={len(b64)}")
                 result.append({"name": safe_name, "data": f"data:{mt};base64,{b64}"})
             except Exception as e:
-                logger.warning(f"Failed to read asset {safe_name}: {e}")
+                logger.warning(f"[assets] batch read failed {safe_name}: {e}")
+        logger.info(f"[assets] batch return {len(result)} files")
         return {"files": result}
 
     async def _api_rapid_action(self):
