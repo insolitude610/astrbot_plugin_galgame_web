@@ -140,6 +140,12 @@ class GalgamePlugin(Star):
             "Serve an image file from the assets directory",
         )
         context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/batch",
+            self._api_assets_batch,
+            ["POST"],
+            "Get base64 data for multiple asset files",
+        )
+        context.register_web_api(
             f"/{PLUGIN_NAME}/rapid_action",
             self._api_rapid_action,
             ["POST"],
@@ -577,6 +583,28 @@ class GalgamePlugin(Star):
         content_type = mime_map.get(target.suffix.lower(), "application/octet-stream")
         raw = target.read_bytes()
         return Response(raw, content_type=content_type)
+
+    async def _api_assets_batch(self):
+        data = await request.get_json() or {}
+        names = data.get("names", [])
+        if not names:
+            return {"error": "no names"}, 400
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                    ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        result = []
+        for name in names:
+            safe_name = pathlib.Path(name).name
+            target = ASSETS_DIR / safe_name
+            if not target.exists() or not target.is_file():
+                continue
+            try:
+                raw = target.read_bytes()
+                b64 = base64.b64encode(raw).decode()
+                mt = mime_map.get(target.suffix.lower(), "image/png")
+                result.append({"name": safe_name, "data": f"data:{mt};base64,{b64}"})
+            except Exception as e:
+                logger.warning(f"Failed to read asset {safe_name}: {e}")
+        return {"files": result}
 
     async def _api_rapid_action(self):
         data = await request.get_json()
