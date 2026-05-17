@@ -315,3 +315,17 @@ html, body {
   opacity: 0.2;
   cursor: not-allowed;
 }
+
+#settings-link {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  z-index: 100;
+  font-size: 22px;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  transition: color .2s;
+}
+#settings-link:hover {
+  color: rgba(255,255,255,.85);
+}

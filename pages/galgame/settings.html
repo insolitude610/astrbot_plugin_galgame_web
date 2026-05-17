@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>立绘管理 - AI Galgame 虚拟伙伴</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+  padding: 24px;
+}
+h1 { font-size: 22px; margin-bottom: 8px; }
+.sub { color: #888; margin-bottom: 24px; font-size: 13px; }
+
+/* upload zone */
+.upload-zone {
+  border: 2px dashed #555;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: #8b5cf6;
+  background: rgba(139,92,246,.08);
+}
+.upload-zone p { color: #aaa; font-size: 14px; }
+.upload-zone .icon { font-size: 36px; margin-bottom: 8px; }
+#file-input { display: none; }
+
+/* action bar */
+.action-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: opacity .2s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: #8b5cf6; color: #fff; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
+.status { font-size: 13px; color: #4ade80; }
+.status.error { color: #ef4444; }
+
+/* grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.card {
+  background: #16213e;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #333;
+  transition: border-color .2s;
+}
+.card:hover { border-color: #555; }
+.card-img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: contain;
+  background: #111;
+  display: block;
+}
+.card-body {
+  padding: 10px 12px;
+}
+.card-name {
+  font-size: 12px;
+  color: #ccc;
+  word-break: break-all;
+  margin-bottom: 6px;
+}
+.card-mappings {
+  font-size: 11px;
+  color: #8b5cf6;
+  line-height: 1.5;
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.card-actions .btn { padding: 3px 10px; font-size: 11px; }
+
+/* mapping table */
+.mapping-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.mapping-table th {
+  text-align: left;
+  color: #888;
+  padding: 8px 12px;
+  border-bottom: 1px solid #333;
+  font-weight: 500;
+}
+.mapping-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #222;
+}
+.mapping-table .matched { color: #4ade80; }
+.mapping-table .missing { color: #ef4444; }
+.mapping-table .manual { color: #facc15; }
+
+.loading { text-align: center; padding: 40px; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>立绘资源管理</h1>
+<p class="sub">拖拽上传 PNG 图片，按命名约定自动匹配情绪/图层。文件存储在 <code>pages/galgame/assets/</code></p>
+
+<div class="upload-zone" id="upload-zone">
+  <div class="icon">&#128206;</div>
+  <p>拖拽 PNG 文件到此处，或点击选择文件</p>
+  <input type="file" id="file-input" multiple accept="image/png,image/jpeg,image/webp,image/bmp,image/gif" />
+</div>
+
+<div class="action-bar">
+  <button class="btn btn-primary" id="refresh-btn">刷新列表</button>
+  <span class="status" id="status"></span>
+</div>
+
+<div id="grid-container">
+  <div class="loading" id="loading">加载中...</div>
+</div>
+
+<h3 style="margin-top: 32px;">文件映射状态</h3>
+<table class="mapping-table" id="mapping-table"></table>
+
+<script src="/api/plugin/page/bridge-sdk.js"></script>
+<script>
+const PLUGIN = "astrbot_plugin_galgame_web";
+const EMOTION_KEYS = ["neutral","happy","sad","angry","surprised","blush","thinking"];
+const LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
+const BG_KEYS = ["background","bg"];
+
+let bridge = null;
+let files = [];
+
+async function init() {
+  bridge = window.AstrBotPluginPage;
+  await bridge.ready();
+
+  document.getElementById("refresh-btn").onclick = loadFiles;
+  document.getElementById("file-input").onchange = handleFileSelect;
+  setupDragDrop();
+
+  await loadFiles();
+}
+
+function setupDragDrop() {
+  const zone = document.getElementById("upload-zone");
+  zone.onclick = () => document.getElementById("file-input").click();
+
+  zone.ondragover = e => { e.preventDefault(); zone.classList.add("dragover"); };
+  zone.ondragleave = () => zone.classList.remove("dragover");
+  zone.ondrop = e => {
+    e.preventDefault();
+    zone.classList.remove("dragover");
+    uploadFiles(e.dataTransfer.files);
+  };
+}
+
+function handleFileSelect(e) {
+  uploadFiles(e.target.files);
+  e.target.value = "";
+}
+
+async function uploadFiles(fileList) {
+  const form = new FormData();
+  let count = 0;
+  for (const f of fileList) {
+    if (f.type.startsWith("image/")) {
+      form.append("file_" + count, f);
+      count++;
+    }
+  }
+  if (count === 0) return;
+
+  setStatus("上传中...");
+  try {
+    const resp = await fetch(`/api/plugin/${PLUGIN}/assets/upload`, {
+      method: "POST",
+      body: form,
+    });
+    const data = await resp.json();
+    if (data.uploaded) {
+      setStatus(`上传完成: ${data.uploaded.join(", ")}`, "success");
+      await loadFiles();
+    } else {
+      setStatus(data.error || "上传失败", "error");
+    }
+  } catch (e) {
+    setStatus("上传失败: " + e.message, "error");
+  }
+}
+
+async function loadFiles() {
+  setStatus("");
+  document.getElementById("loading").style.display = "block";
+  try {
+    const data = await bridge.apiGet("assets/list");
+    files = data.files || [];
+    renderGrid();
+    renderMapping();
+  } catch (e) {
+    setStatus("加载失败: " + e.message, "error");
+  }
+  document.getElementById("loading").style.display = "none";
+}
+
+function renderGrid() {
+  const container = document.getElementById("grid-container");
+  if (files.length === 0) {
+    container.innerHTML = '<div class="loading">暂无图片，上传 PNG 文件开始</div>';
+    return;
+  }
+
+  let html = '<div class="grid">';
+  for (const f of files) {
+    const stem = f.replace(/\.[^.]+$/, "").toLowerCase();
+    const mappings = findMappings(stem);
+    html += `
+<div class="card">
+  <img class="card-img" src="./assets/${f}" alt="${f}" loading="lazy" />
+  <div class="card-body">
+    <div class="card-name">${f}</div>
+    <div class="card-mappings">${mappings || "无匹配"}</div>
+    <div class="card-actions">
+      <button class="btn btn-danger" data-file="${f}">删除</button>
+    </div>
+  </div>
+</div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+
+  container.querySelectorAll(".btn-danger").forEach(btn => {
+    btn.onclick = () => deleteFile(btn.dataset.file);
+  });
+}
+
+function findMappings(stem) {
+  const matches = [];
+  for (const k of EMOTION_KEYS) {
+    if (stem === k || stem.includes(k) || k.includes(stem)) {
+      matches.push(`表情:${k}`);
+    }
+  }
+  for (const k of LAYER_KEYS) {
+    if (stem === k || stem.includes(k) || k.includes(stem)) {
+      matches.push(`图层:${k}`);
+    }
+  }
+  for (const k of BG_KEYS) {
+    if (stem === k || stem.includes(k)) {
+      matches.push("背景");
+    }
+  }
+  return matches.join(" · ");
+}
+
+function renderMapping() {
+  const stems = new Set(files.map(f => f.replace(/\.[^.]+$/, "").toLowerCase()));
+  let html = "<tr><th>类型</th><th>键名</th><th>匹配文件</th></tr>";
+
+  for (const k of EMOTION_KEYS) {
+    const found = findFileFor(k, stems);
+    html += `<tr><td>表情</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
+  }
+  for (const k of LAYER_KEYS) {
+    const found = findFileFor(k, stems);
+    html += `<tr><td>图层</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
+  }
+  const bg = findFileForBg(stems);
+  html += `<tr><td>背景</td><td>background</td><td class="${bg ? 'matched' : 'missing'}">${bg || '未匹配'}</td></tr>`;
+
+  document.getElementById("mapping-table").innerHTML = html;
+}
+
+function findFileFor(key, stems) {
+  if (stems.has(key)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === key) || key + ".png";
+  for (const s of stems) {
+    if (s.includes(key) || key.includes(s)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === s) || s + ".png";
+  }
+  return null;
+}
+
+function findFileForBg(stems) {
+  for (const k of BG_KEYS) {
+    if (stems.has(k)) return files.find(f => f.replace(/\.[^.]+$/, "").toLowerCase() === k) || k + ".png";
+  }
+  return null;
+}
+
+async function deleteFile(filename) {
+  if (!confirm(`确定删除 ${filename}？`)) return;
+  setStatus("删除中...");
+  try {
+    const data = await bridge.apiPost("assets/delete", { filename });
+    if (data.deleted) {
+      setStatus(`已删除: ${data.deleted}`, "success");
+      await loadFiles();
+    } else {
+      setStatus(data.error || "删除失败", "error");
+    }
+  } catch (e) {
+    setStatus("删除失败: " + e.message, "error");
+  }
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status" + (type === "error" ? " error" : "");
+  if (msg) setTimeout(() => { if (el.textContent === msg) setStatus(""); }, 4000);
+}
+
+init();
+</script>
+</body>
+</html>

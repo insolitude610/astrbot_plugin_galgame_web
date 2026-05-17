@@ -122,6 +122,18 @@ class GalgamePlugin(Star):
             "List available image files in the assets directory",
         )
         context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/upload",
+            self._api_assets_upload,
+            ["POST"],
+            "Upload image files to the assets directory",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/delete",
+            self._api_assets_delete,
+            ["POST"],
+            "Delete an image file from the assets directory",
+        )
+        context.register_web_api(
             f"/{PLUGIN_NAME}/rapid_action",
             self._api_rapid_action,
             ["POST"],
@@ -500,6 +512,39 @@ class GalgamePlugin(Star):
     async def _api_assets_list(self):
         files = _list_asset_files()
         return {"files": files, "assets_dir": str(ASSETS_DIR)}
+
+    async def _api_assets_upload(self):
+        upload_files = await request.files
+        uploaded = []
+        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        for key in upload_files:
+            file_storage = upload_files[key]
+            filename = file_storage.filename
+            if not filename:
+                continue
+            safe_name = pathlib.Path(filename).name
+            if pathlib.Path(safe_name).suffix.lower() not in IMAGE_EXTS:
+                continue
+            dest = ASSETS_DIR / safe_name
+            file_storage.save(str(dest))
+            uploaded.append(safe_name)
+            logger.info(f"Uploaded asset: {safe_name}")
+        if not uploaded:
+            return {"error": "no valid image files uploaded"}, 400
+        return {"uploaded": uploaded}
+
+    async def _api_assets_delete(self):
+        data = await request.get_json() or {}
+        filename = data.get("filename", "")
+        if not filename:
+            return {"error": "no filename"}, 400
+        safe_name = pathlib.Path(filename).name
+        target = ASSETS_DIR / safe_name
+        if not target.exists() or not target.is_file():
+            return {"error": "file not found"}, 404
+        target.unlink()
+        logger.info(f"Deleted asset: {safe_name}")
+        return {"deleted": safe_name}
 
     async def _api_rapid_action(self):
         data = await request.get_json()
