@@ -227,17 +227,25 @@ class GalgamePlugin(Star):
             return
         parts = key.split("_", 1)
         prefix, base = parts[0], parts[1]
-        if prefix in ("single", "expr") and base in EXPRESSION_KEYS:
-            self.config["expressions"][base] = filename
-        elif prefix == "layer" and base in LAYER_KEYS:
-            self.config["layers"][base] = filename
-        elif prefix == "bg":
-            self.config["background"] = filename
+        try:
+            if prefix in ("single", "expr") and base in EXPRESSION_KEYS:
+                if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
+                    self.config["expressions"][base] = filename
+            elif prefix == "layer" and base in LAYER_KEYS:
+                if isinstance(self.config.get("layers"), dict) and base in self.config["layers"]:
+                    self.config["layers"][base] = filename
+            elif prefix == "bg" and "background" in self.config:
+                self.config["background"] = filename
+        except Exception:
+            logger.exception(f"_register_asset failed for key={key}")
         for ext in IMAGE_EXTS:
             old_path = ASSETS_DIR / f"{base}{ext}"
             if old_path.exists() and old_path.is_file() and old_path.name != filename:
-                old_path.unlink()
-                logger.info(f"Removed old non-prefixed file: {old_path.name}")
+                try:
+                    old_path.unlink()
+                    logger.info(f"Removed old non-prefixed file: {old_path.name}")
+                except OSError:
+                    pass
 
     def _build_umo(self, session_id: str) -> str:
         return f"{PLATFORM_ID}:FriendMessage:{GALGAME_UMO_PREFIX}{session_id}"
@@ -404,33 +412,43 @@ class GalgamePlugin(Star):
         return prompt
 
     async def _api_session_init(self):
-        data = await request.get_json() or {}
-        resume_id = data.get("resume_id", "").strip()
+        try:
+            data = await request.get_json() or {}
+            resume_id = data.get("resume_id", "").strip()
 
-        if resume_id and resume_id in self._sessions:
-            return {"session_id": resume_id}
-
-        if resume_id:
-            session = self._load_session(resume_id)
-            if session:
-                self._sessions[resume_id] = session
+            if resume_id and resume_id in self._sessions:
                 return {"session_id": resume_id}
 
-        session_id = uuid.uuid4().hex
-        session = {
-            "umo": "",
-            "conv_id": "",
-            "history": [],
-            "current_emotion": "neutral",
-            "pending_rapid_clicks": 0,
-            "sse_queue": asyncio.Queue(),
-            "created_at": time.time(),
-            "_lock": asyncio.Lock(),
-        }
-        self._sessions[session_id] = session
-        await self._init_astrbot_conv(session_id, session)
-        self._save_session(session_id)
-        return {"session_id": session_id}
+            if resume_id:
+                session = self._load_session(resume_id)
+                if session:
+                    self._sessions[resume_id] = session
+                    return {"session_id": resume_id}
+
+            session_id = uuid.uuid4().hex
+            session = {
+                "umo": "",
+                "conv_id": "",
+                "history": [],
+                "current_emotion": "neutral",
+                "pending_rapid_clicks": 0,
+                "sse_queue": asyncio.Queue(),
+                "created_at": time.time(),
+                "_lock": asyncio.Lock(),
+            }
+            self._sessions[session_id] = session
+            try:
+                await self._init_astrbot_conv(session_id, session)
+            except Exception:
+                logger.exception(f"Failed to init conversation for {session_id}")
+            try:
+                self._save_session(session_id)
+            except Exception:
+                logger.exception(f"Failed to save session {session_id}")
+            return {"session_id": session_id}
+        except Exception:
+            logger.exception("session/init failed")
+            return {"error": "internal error"}, 500
 
     async def _api_send(self):
         data = await request.get_json()
