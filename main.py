@@ -140,7 +140,7 @@ def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
 
 class GalgameWebHandler(BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:6185"
-    static_dir: pathlib.Path = pathlib.Path(__file__).parent / "pages" / "galgame"
+    static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame_web" / "galgame"
 
     MIME = {
         ".html": "text/html; charset=utf-8",
@@ -333,12 +333,6 @@ class GalgamePlugin(Star):
             self._api_rapid_action,
             ["POST"],
             "Notify rapid click/keyboard activity",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/page/<path:filename>",
-            self._api_page_serve,
-            ["GET"],
-            "Serve standalone web UI static files",
         )
 
     # ---- standalone web server ----
@@ -958,41 +952,16 @@ class GalgamePlugin(Star):
 
         return {"status": "ok"}
 
-    async def _api_page_serve(self, filename: str):
-        base_dir = pathlib.Path(__file__).parent / "pages" / "galgame"
-        safe_path = _safe_path(filename, base_dir)
-        if not safe_path or not safe_path.is_file():
-            return await make_response("not found", 404)
-
-        mime = {
-            ".html": "text/html; charset=utf-8",
-            ".css": "text/css",
-            ".js": "text/javascript",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".webp": "image/webp",
-            ".gif": "image/gif",
-            ".svg": "image/svg+xml",
-            ".ico": "image/x-icon",
-            ".json": "application/json",
-        }
-        content_type = mime.get(safe_path.suffix.lower(), "application/octet-stream")
-        data = safe_path.read_bytes()
-        return await make_response(data, {"Content-Type": content_type})
-
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
         web_port = int(self.config.get("web_port", 0) or 0)
         if web_port > 0:
             url = f"http://localhost:{web_port}"
         else:
-            url = f"/api/plug/{PLUGIN_NAME}/page/index.html （在 Dashboard 地址后追加）"
+            url = "（未启用独立 WebUI，请在插件设置中设置 web_port）"
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
-            "打开方式：\n"
-            f"浏览器访问：{url}\n\n"
-            "或在 Dashboard 中：插件 → AI Galgame 虚拟伙伴 → Galgame 页面"
+            f"浏览器访问：{url}"
         )
 
     async def terminate(self):
