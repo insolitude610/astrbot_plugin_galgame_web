@@ -43,7 +43,17 @@ function assetUrl(filename) {
 
 /* ---- init ---- */
 async function init() {
-  const context = await bridge.ready();
+  try {
+    if (!bridge || !bridge.ready) {
+      el.dialogText.textContent = "Bridge 未加载，请刷新页面。";
+      return;
+    }
+    await bridge.ready();
+  } catch (err) {
+    console.error("Bridge ready failed:", err);
+    el.dialogText.textContent = "Bridge 初始化失败，请刷新页面。";
+    return;
+  }
 
   try {
     const config = await bridge.apiGet("config");
@@ -56,12 +66,17 @@ async function init() {
   try {
     const savedId = localStorage.getItem("galgame_session_id") || "";
     const resp = await bridge.apiPost("session/init", { resume_id: savedId });
-    sessionId = resp.session_id;
-    localStorage.setItem("galgame_session_id", sessionId);
-    subscribeSSE();
+    if (!resp || !resp.session_id) {
+      console.error("session/init returned:", resp);
+      el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
+    } else {
+      sessionId = resp.session_id;
+      localStorage.setItem("galgame_session_id", sessionId);
+      subscribeSSE();
+    }
   } catch (err) {
     console.error("Failed to init session:", err);
-    el.dialogText.textContent = "初始化失败，请刷新页面。";
+    el.dialogText.textContent = "初始化失败(" + (err.message || err) + ")，请刷新页面。";
   }
 
   setupInput();
