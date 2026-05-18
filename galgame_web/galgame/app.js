@@ -16,9 +16,6 @@ var typewriterTimer = null;
 var mouthTimer = null;
 var isAudioPlaying = false;
 var sseSource = null;
-var bridgeSseSubId = null;
-
-var useBridge = (typeof window.AstrBotPluginPage !== "undefined" && window.AstrBotPluginPage);
 
 /* ---- DOM refs ---- */
 var el = {
@@ -39,12 +36,9 @@ var el = {
   ttsAudio: document.getElementById("tts-audio"),
 };
 
-/* ---- API helpers (bridge or direct) ---- */
+/* ---- API helpers ---- */
 
 function apiGet(endpoint, params) {
-  if (useBridge) {
-    return window.AstrBotPluginPage.apiGet(endpoint, params);
-  }
   var url = API_BASE + "/" + endpoint;
   if (params) {
     url += "?" + new URLSearchParams(params).toString();
@@ -56,9 +50,6 @@ function apiGet(endpoint, params) {
 }
 
 function apiPost(endpoint, body) {
-  if (useBridge) {
-    return window.AstrBotPluginPage.apiPost(endpoint, body);
-  }
   return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -77,72 +68,46 @@ function assetUrl(filename) {
 /* ---- SSE ---- */
 
 function subscribeSSE() {
-  unsubscribeSSE();
-
-  if (useBridge) {
-    bridgeSseSubId = window.AstrBotPluginPage.subscribeSSE(
-      "stream",
-      {
-        onMessage: function (event) {
-          handleSseMsg(event.parsed);
-        },
-        onError: function () {
-          console.warn("SSE connection error, will retry...");
-          setTimeout(subscribeSSE, 3000);
-        },
-      },
-      { session_id: sessionId },
-    );
-  } else {
-    var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
-    sseSource = new EventSource(url);
-    sseSource.addEventListener("message", function (event) {
-      var msg = null;
-      try { msg = JSON.parse(event.data); } catch (_) { return; }
-      handleSseMsg(msg);
-    });
-    sseSource.onerror = function () {
-      sseSource.close();
-      sseSource = null;
-      console.warn("SSE connection error, will retry...");
-      setTimeout(subscribeSSE, 3000);
-    };
-  }
-}
-
-function unsubscribeSSE() {
-  if (bridgeSseSubId) {
-    try { window.AstrBotPluginPage.unsubscribeSSE(bridgeSseSubId); } catch (_) {}
-    bridgeSseSubId = null;
-  }
   if (sseSource) {
     sseSource.close();
     sseSource = null;
   }
-}
 
-function handleSseMsg(msg) {
-  if (!msg) return;
-  switch (msg.type) {
-    case "emotion":
-      switchExpression(msg.value);
-      break;
-    case "text":
-      typewriterAppend(msg.value);
-      break;
-    case "audio":
-      playTTSAudio(msg.value);
-      break;
-    case "end":
-      finishResponse();
-      break;
-    case "error":
-      showError(msg.message);
-      break;
-  }
+  var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
+  sseSource = new EventSource(url);
+
+  sseSource.addEventListener("message", function (event) {
+    var msg = null;
+    try { msg = JSON.parse(event.data); } catch (_) { return; }
+    if (!msg) return;
+    switch (msg.type) {
+      case "emotion":
+        switchExpression(msg.value);
+        break;
+      case "text":
+        typewriterAppend(msg.value);
+        break;
+      case "audio":
+        playTTSAudio(msg.value);
+        break;
+      case "end":
+        finishResponse();
+        break;
+      case "error":
+        showError(msg.message);
+        break;
+    }
+  });
+
+  sseSource.onerror = function () {
+    sseSource.close();
+    sseSource = null;
+    el.dialogText.textContent = "连接已断开，请刷新页面。";
+  };
 }
 
 /* ---- init ---- */
+
 async function init() {
   try {
     var config = await apiGet("config");
@@ -154,8 +119,7 @@ async function init() {
 
   applyBackground();
 
-  var savedId = "";
-  try { savedId = localStorage.getItem("galgame_session_id") || ""; } catch (_) {}
+  var savedId = localStorage.getItem("galgame_session_id") || "";
   try {
     var resp = await apiPost("session/init", { resume_id: savedId });
     if (!resp || !resp.session_id) {
@@ -163,7 +127,7 @@ async function init() {
       el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
     } else {
       sessionId = resp.session_id;
-      try { localStorage.setItem("galgame_session_id", sessionId); } catch (_) {}
+      localStorage.setItem("galgame_session_id", sessionId);
       subscribeSSE();
     }
   } catch (err) {
@@ -437,5 +401,5 @@ init();
 window.addEventListener("beforeunload", function () {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
-  unsubscribeSSE();
+  if (sseSource) { sseSource.close(); sseSource = null; }
 });
