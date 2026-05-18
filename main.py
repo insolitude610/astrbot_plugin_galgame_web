@@ -15,8 +15,16 @@ from astrbot.api.star import Context, Star
 
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
-EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
+DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
+
+def _get_emotion_tags(config: dict) -> list[str]:
+    expressions = config.get("expressions", {})
+    if expressions and isinstance(expressions, dict):
+        keys = [k for k in expressions if k]
+        if keys:
+            return keys
+    return list(DEFAULT_EMOTION_TAGS)
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
@@ -309,7 +317,8 @@ class GalgamePlugin(Star):
                 persona_prompt = persona.system_prompt
 
         extra = self.config.get("system_prompt_extra", "")
-        emotions = ", ".join(EMOTION_TAGS)
+        emotion_tags = _get_emotion_tags(self.config)
+        emotions = ", ".join(emotion_tags)
 
         prompt = f"""{persona_prompt}
 
@@ -424,10 +433,11 @@ class GalgamePlugin(Star):
             full_text = resp.completion_text or ""
 
             emotion_match = EMOTION_PATTERN.search(full_text)
+            emotion_tags = _get_emotion_tags(self.config)
             current_emotion = "neutral"
             if emotion_match:
                 tag = emotion_match.group(1).lower()
-                if tag in EMOTION_TAGS:
+                if tag in emotion_tags:
                     current_emotion = tag
 
             clean_text = EMOTION_PATTERN.sub("", full_text).strip()
