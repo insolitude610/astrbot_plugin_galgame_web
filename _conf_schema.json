@@ -63,17 +63,17 @@
     "hint": "single=单张立绘+表情差分；layered=多层PNG各自独立动画"
   },
   "expressions": {
-    "description": "表情立绘 — 全部留空即可，插件自动检测 assets/ 目录",
-    "type": "object",
-    "hint": "将 PNG 上传到立绘管理页面(页面右上角⚙)即可零配置使用。手动填写可覆盖自动检测结果",
-    "items": {
-      "neutral":   {"description": "普通 (留空=自动)", "type": "string", "default": ""},
-      "happy":     {"description": "开心 (留空=自动)", "type": "string", "default": ""},
-      "sad":       {"description": "悲伤 (留空=自动)", "type": "string", "default": ""},
-      "angry":     {"description": "生气 (留空=自动)", "type": "string", "default": ""},
-      "surprised": {"description": "惊讶 (留空=自动)", "type": "string", "default": ""},
-      "blush":     {"description": "害羞 (留空=自动)", "type": "string", "default": ""},
-      "thinking":  {"description": "思考 (留空=自动)", "type": "string", "default": ""}
+    "description": "表情立绘映射",
+    "type": "dict",
+    "hint": "key=情绪名(如happy), value=assets/目录下的文件名。可在WebUI中自由增删情绪条目。留空则使用默认7种情绪。",
+    "default": {
+      "neutral": "",
+      "happy": "",
+      "sad": "",
+      "angry": "",
+      "surprised": "",
+      "blush": "",
+      "thinking": ""
     }
   },
   "layers": {
