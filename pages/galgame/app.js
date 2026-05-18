@@ -60,7 +60,7 @@ async function apiPost(endpoint, body) {
 
 function assetUrl(filename) {
   if (!filename) return "";
-  return API_BASE + "/page/assets/" + filename;
+  return "/assets/" + filename;
 }
 
 /* ---- init ---- */
