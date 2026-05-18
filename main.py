@@ -63,12 +63,29 @@ def _list_asset_files() -> list[str]:
     )
 
 
-def _find_asset_for(label: str, files: list[str]) -> str:
+def _find_asset_for(label: str, files: list[str], prefix: str = "") -> str:
     label_lower = label.lower()
+    # 1) exact prefix match: prefix_label
+    if prefix:
+        prefixed = f"{prefix}_{label_lower}"
+        for fname in files:
+            stem = pathlib.Path(fname).stem.lower()
+            if stem == prefixed:
+                return fname
+    # 2) exact label match
     for fname in files:
         stem = pathlib.Path(fname).stem.lower()
         if stem == label_lower:
             return fname
+    # 3) word-parts contains both prefix and label
+    if prefix:
+        prefix_lower = prefix.lower()
+        for fname in files:
+            stem = pathlib.Path(fname).stem.lower()
+            parts = stem.split("_")
+            if prefix_lower in parts and label_lower in parts:
+                return fname
+    # 4) substring fallback
     for fname in files:
         stem = pathlib.Path(fname).stem.lower()
         if label_lower in stem or stem in label_lower:
@@ -77,16 +94,19 @@ def _find_asset_for(label: str, files: list[str]) -> str:
 
 
 def _resolve_assets(config: dict, files: list[str]) -> dict:
+    sprite_mode = config.get("sprite_mode", "single")
+
     background = config.get("background", "")
     if not background:
         background = _find_asset_for("background", files) or _find_asset_for("bg", files)
 
+    expr_prefix = "single" if sprite_mode == "single" else "expr"
     expressions = {}
     raw_expr = config.get("expressions", {}) or {}
     for key in EXPRESSION_KEYS:
         val = raw_expr.get(key, "")
         if not val:
-            val = _find_asset_for(key, files)
+            val = _find_asset_for(key, files, expr_prefix)
         expressions[key] = val
 
     layers = {}
@@ -94,7 +114,7 @@ def _resolve_assets(config: dict, files: list[str]) -> dict:
     for key in LAYER_KEYS:
         val = raw_layers.get(key, "")
         if not val:
-            val = _find_asset_for(key, files)
+            val = _find_asset_for(key, files, "layer")
         layers[key] = val
 
     return {
