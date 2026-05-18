@@ -221,6 +221,24 @@ class GalgamePlugin(Star):
 
     # ---- persistence helpers ----
 
+    def _register_asset(self, key: str, filename: str):
+        """Update self.config and remove old non-prefixed conflicting files."""
+        if "_" not in key:
+            return
+        parts = key.split("_", 1)
+        prefix, base = parts[0], parts[1]
+        if prefix in ("single", "expr") and base in EXPRESSION_KEYS:
+            self.config["expressions"][base] = filename
+        elif prefix == "layer" and base in LAYER_KEYS:
+            self.config["layers"][base] = filename
+        elif prefix == "bg":
+            self.config["background"] = filename
+        for ext in IMAGE_EXTS:
+            old_path = ASSETS_DIR / f"{base}{ext}"
+            if old_path.exists() and old_path.is_file() and old_path.name != filename:
+                old_path.unlink()
+                logger.info(f"Removed old non-prefixed file: {old_path.name}")
+
     def _build_umo(self, session_id: str) -> str:
         return f"{PLATFORM_ID}:FriendMessage:{GALGAME_UMO_PREFIX}{session_id}"
 
@@ -688,6 +706,7 @@ class GalgamePlugin(Star):
             with open(safe_path, "wb") as fout:
                 fout.write(raw)
             logger.info(f"Uploaded key asset: {safe_path.name}")
+            self._register_asset(key, safe_path.name)
             return {"uploaded": safe_path.name}
         except Exception as e:
             return {"error": str(e)}, 500
@@ -763,6 +782,7 @@ class GalgamePlugin(Star):
             ASSETS_DIR.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_path, dst_path)
             logger.info(f"Copied asset: {source} -> {dst_path.name}")
+            self._register_asset(dest_key, dst_path.name)
             return {"copied": dst_path.name, "source": source}
         except OSError as e:
             return {"error": str(e)}, 500
