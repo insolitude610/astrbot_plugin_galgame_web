@@ -63,18 +63,26 @@
     "hint": "single=单张立绘+表情差分；layered=多层PNG各自独立动画"
   },
   "expressions": {
-    "description": "表情立绘映射",
-    "type": "dict",
-    "hint": "key=情绪名(如happy), value=assets/目录下的文件名。可在WebUI中自由增删情绪条目。留空则使用默认7种情绪。",
-    "default": {
-      "neutral": "",
-      "happy": "",
-      "sad": "",
-      "angry": "",
-      "surprised": "",
-      "blush": "",
-      "thinking": ""
+    "description": "表情立绘路径",
+    "type": "object",
+    "hint": "key=情绪标签名, value=assets/目录下的文件名。留空=自动匹配。如需更多情绪，修改此对象中的key名即可。",
+    "items": {
+      "neutral":   {"description": "普通", "type": "string", "default": ""},
+      "happy":     {"description": "开心", "type": "string", "default": ""},
+      "sad":       {"description": "悲伤", "type": "string", "default": ""},
+      "angry":     {"description": "生气", "type": "string", "default": ""},
+      "surprised": {"description": "惊讶", "type": "string", "default": ""},
+      "blush":     {"description": "害羞", "type": "string", "default": ""},
+      "thinking":  {"description": "思考", "type": "string", "default": ""}
     }
+  },
+  "custom_emotions": {
+    "description": "自定义情绪",
+    "type": "text",
+    "default": "",
+    "editor_mode": true,
+    "editor_language": "json",
+    "hint": "JSON对象格式，用于添加额外情绪。例: {\"dokidoki\": \"\", \"cry\": \"cry.png\"}。key为情绪标签名，value为assets/下的文件名。会与上方expressions合并。"
   },
   "layers": {
     "description": "分层立绘 — 全部留空即可，插件自动检测 assets/ 目录",
