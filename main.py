@@ -5,8 +5,12 @@ import os
 import pathlib
 import re
 import shutil
+import threading
 import time
 import uuid
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 from quart import Response, request, make_response
 
@@ -134,17 +138,129 @@ def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
     return resolved
 
 
+class GalgameWebHandler(BaseHTTPRequestHandler):
+    upstream = "http://127.0.0.1:6185"
+    static_dir: pathlib.Path = pathlib.Path(__file__).parent / "pages" / "galgame"
+
+    MIME = {
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css",
+        ".js": "text/javascript",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+        ".json": "application/json",
+    }
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def do_GET(self):
+        if self.path.startswith("/api/"):
+            return self._proxy("GET")
+        return self._serve_static()
+
+    def do_POST(self):
+        if self.path.startswith("/api/"):
+            return self._proxy("POST")
+        self.send_error(404)
+
+    def _serve_static(self):
+        path = self.path.split("?")[0]
+        if path == "/":
+            path = "/index.html"
+        filename = path.lstrip("/")
+        safe = _safe_path(filename, self.static_dir)
+        if not safe or not safe.is_file():
+            self.send_error(404)
+            return
+
+        ext = safe.suffix.lower()
+        mime = self.MIME.get(ext, "application/octet-stream")
+        try:
+            data = safe.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(data)
+        except OSError:
+            self.send_error(500)
+
+    def _proxy(self, method):
+        url = self.upstream + self.path
+        body = None
+        if method == "POST":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length > 0 else None
+
+        req = urllib.request.Request(url, data=body, method=method)
+        for key, val in self.headers.items():
+            low = key.lower()
+            if low not in ("host", "connection", "content-length", "transfer-encoding"):
+                req.add_header(key, val)
+        if body and method == "POST":
+            req.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
+
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+            status = resp.status
+            ct = resp.headers.get("Content-Type", "")
+
+            self.send_response(status)
+            for key, val in resp.headers.items():
+                low = key.lower()
+                if low in ("transfer-encoding", "connection", "keep-alive"):
+                    continue
+                self.send_header(key, val)
+            self.send_header("Access-Control-Allow-Origin", "*")
+
+            if "text/event-stream" in ct:
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+                try:
+                    while True:
+                        chunk = resp.read(4096)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                except Exception:
+                    pass
+            else:
+                body_bytes = resp.read()
+                self.send_header("Content-Length", str(len(body_bytes)))
+                self.end_headers()
+                self.wfile.write(body_bytes)
+        except urllib.error.HTTPError as e:
+            self.send_error(e.code or 502)
+        except Exception:
+            self.send_error(502)
+
+
 class GalgamePlugin(Star):
-    def __init__(self, context: Context, config: dict | None = None):
+    async def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
         self._active_sse: set[str] = set()
+        self._web_server: ThreadingHTTPServer | None = None
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._gc_sessions()
         self._load_all_sessions()
         t = asyncio.ensure_future(self._sync_sessions_to_db())
         t.add_done_callback(lambda _t: logger.warning(f"sync_sessions_to_db failed: {_t.exception()}") if _t.exception() else None)
+
+        # ---- start standalone web server ----
+        web_port = int(self.config.get("web_port", 0) or 0)
+        if web_port > 0:
+            self._start_web_server(web_port)
 
         context.register_web_api(
             f"/{PLUGIN_NAME}/session/init",
@@ -224,6 +340,23 @@ class GalgamePlugin(Star):
             ["GET"],
             "Serve standalone web UI static files",
         )
+
+    # ---- standalone web server ----
+
+    def _start_web_server(self, port: int):
+        upstream_port = (
+            os.environ.get("DASHBOARD_PORT")
+            or os.environ.get("ASTRBOT_DASHBOARD_PORT")
+            or "6185"
+        )
+        GalgameWebHandler.upstream = f"http://127.0.0.1:{upstream_port}"
+        try:
+            self._web_server = ThreadingHTTPServer(("0.0.0.0", port), GalgameWebHandler)
+            thread = threading.Thread(target=self._web_server.serve_forever, daemon=True)
+            thread.start()
+            logger.info(f"Galgame WebUI started at http://localhost:{port}")
+        except OSError as e:
+            logger.warning(f"Failed to start Galgame WebUI on port {port}: {e}")
 
     # ---- persistence helpers ----
 
@@ -850,15 +983,26 @@ class GalgamePlugin(Star):
 
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
+        web_port = int(self.config.get("web_port", 0) or 0)
+        if web_port > 0:
+            url = f"http://localhost:{web_port}"
+        else:
+            url = f"/api/plug/{PLUGIN_NAME}/page/index.html （在 Dashboard 地址后追加）"
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
             "打开方式：\n"
-            "浏览器访问 Dashboard 地址后追加：\n"
-            f"/api/plug/{PLUGIN_NAME}/page/index.html\n\n"
+            f"浏览器访问：{url}\n\n"
             "或在 Dashboard 中：插件 → AI Galgame 虚拟伙伴 → Galgame 页面"
         )
 
     async def terminate(self):
+        if self._web_server:
+            try:
+                self._web_server.shutdown()
+            except Exception:
+                pass
+            self._web_server = None
+
         for sid in list(self._sessions.keys()):
             session = self._sessions[sid]
             self._active_sse.discard(sid)

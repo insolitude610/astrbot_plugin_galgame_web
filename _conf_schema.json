@@ -5,6 +5,12 @@
     "default": "",
     "hint": "在对话框上方显示的角色名称"
   },
+  "web_port": {
+    "description": "独立 WebUI 端口",
+    "type": "int",
+    "default": 6186,
+    "hint": "插件将在该端口启动独立 WebUI。浏览器访问 http://localhost:<端口> 即可打开 Galgame 界面。设为 0 则不启动独立服务器。"
+  },
   "persona": {
     "description": "角色人格",
     "type": "string",
