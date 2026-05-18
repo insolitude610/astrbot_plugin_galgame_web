@@ -377,6 +377,23 @@ function slotCard(key, matchedFile, label, idPrefix) {
   (function(fidRef) { btn.onclick = function() { document.getElementById(fidRef).click(); }; })(fid);
   card.appendChild(btn);
 
+  if (allFiles.length > 0) {
+    var select = document.createElement("select");
+    select.style.cssText = "margin-top:4px;font-size:11px;padding:2px 4px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:4px;width:100%;";
+    var opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "选择已有文件...";
+    select.appendChild(opt0);
+    for (var j = 0; j < allFiles.length; j++) {
+      var opt = document.createElement("option");
+      opt.value = allFiles[j].name;
+      opt.textContent = allFiles[j].name;
+      select.appendChild(opt);
+    }
+    (function(k, sel) { sel.onchange = function() { if (sel.value) assignToSlot(k, sel.value); }; })(uploadKey, select);
+    card.appendChild(select);
+  }
+
   return card;
 }
 
@@ -447,6 +464,21 @@ async function uploadToSlot(key, input) {
     }
   } catch(e) {
     setStatus(`❌ ${key}: ${e.message}`, "error");
+  }
+}
+
+async function assignToSlot(key, sourceName) {
+  setStatus("分配 " + sourceName + " → " + key + " ...");
+  try {
+    var data = await bridge.apiPost("assets/copy", { source: sourceName, key: key });
+    if (data.copied) {
+      setStatus("✅ " + data.source + " → " + data.copied, "success");
+      await loadFiles();
+    } else {
+      setStatus("❌ " + (data.error || "失败"), "error");
+    }
+  } catch(e) {
+    setStatus("❌ " + e.message, "error");
   }
 }
 
