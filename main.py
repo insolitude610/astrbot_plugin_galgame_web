@@ -8,7 +8,7 @@ import shutil
 import time
 import uuid
 
-from quart import Response, request
+from quart import Response, request, make_response
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
@@ -217,6 +217,12 @@ class GalgamePlugin(Star):
             self._api_rapid_action,
             ["POST"],
             "Notify rapid click/keyboard activity",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/page/<path:filename>",
+            self._api_page_serve,
+            ["GET"],
+            "Serve standalone web UI static files",
         )
 
     # ---- persistence helpers ----
@@ -819,15 +825,37 @@ class GalgamePlugin(Star):
 
         return {"status": "ok"}
 
+    async def _api_page_serve(self, filename: str):
+        base_dir = pathlib.Path(__file__).parent / "pages" / "galgame"
+        safe_path = _safe_path(filename, base_dir)
+        if not safe_path or not safe_path.is_file():
+            return await make_response("not found", 404)
+
+        mime = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css",
+            ".js": "text/javascript",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon",
+            ".json": "application/json",
+        }
+        content_type = mime.get(safe_path.suffix.lower(), "application/octet-stream")
+        data = safe_path.read_bytes()
+        return await make_response(data, {"Content-Type": content_type})
+
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
             "打开方式：\n"
-            "AstrBot Dashboard → 插件 → AI Galgame 虚拟伙伴 → Galgame 页面\n\n"
-            "或直接在 Dashboard 地址后追加：\n"
-            "/api/plugin/page/content/"
-            f"{PLUGIN_NAME}/galgame/index.html"
+            "浏览器访问 Dashboard 地址后追加：\n"
+            f"/api/plug/{PLUGIN_NAME}/page/index.html\n\n"
+            "或在 Dashboard 中：插件 → AI Galgame 虚拟伙伴 → Galgame 页面"
         )
 
     async def terminate(self):

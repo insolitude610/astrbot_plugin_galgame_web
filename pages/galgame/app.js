@@ -1,4 +1,5 @@
-const bridge = window.AstrBotPluginPage;
+const PLUGIN_NAME = "astrbot_plugin_galgame_web";
+const API_BASE = "/api/plug/" + PLUGIN_NAME;
 
 let sessionId = null;
 let currentEmotion = "neutral";
@@ -14,10 +15,7 @@ let backgroundFile = "";
 let typewriterTimer = null;
 let mouthTimer = null;
 let isAudioPlaying = false;
-
-const spriteCache = {};
-
-const PLUGIN_NAME = "astrbot_plugin_galgame_web";
+let sseSource = null;
 
 /* ---- DOM refs ---- */
 const el = {
@@ -38,74 +36,54 @@ const el = {
   ttsAudio: document.getElementById("tts-audio"),
 };
 
-/* ---- util ---- */
+/* ---- API helpers ---- */
+
+async function apiGet(endpoint, params) {
+  var url = API_BASE + "/" + endpoint;
+  if (params) {
+    url += "?" + new URLSearchParams(params).toString();
+  }
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
+  return resp.json();
+}
+
+async function apiPost(endpoint, body) {
+  var resp = await fetch(API_BASE + "/" + endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
+  return resp.json();
+}
+
 function assetUrl(filename) {
   if (!filename) return "";
-  if (spriteCache[filename]) return spriteCache[filename];
-  return "./assets/" + filename;
-}
-
-function collectFileNames() {
-  const names = [];
-  const add = function (v) { if (v && names.indexOf(v) === -1) names.push(v); };
-
-  for (var k in expressions) { add(expressions[k]); }
-  for (var k in layers) { add(layers[k]); }
-  add(backgroundFile);
-
-  return names;
-}
-
-async function loadAssets() {
-  const names = collectFileNames();
-  if (names.length === 0) return;
-
-  try {
-    const resp = await bridge.apiPost("assets/batch", { names: names });
-    const files = resp.files || [];
-    for (var i = 0; i < files.length; i++) {
-      spriteCache[files[i].name] = files[i].data;
-    }
-  } catch (e) {
-    console.warn("Failed to load assets:", e);
-  }
+  return API_BASE + "/page/assets/" + filename;
 }
 
 /* ---- init ---- */
 async function init() {
   try {
-    if (!bridge || !bridge.ready) {
-      el.dialogText.textContent = "Bridge 未加载，请刷新页面。";
-      return;
-    }
-    await bridge.ready();
-  } catch (err) {
-    console.error("Bridge ready failed:", err);
-    el.dialogText.textContent = "Bridge 初始化失败，请刷新页面。";
-    return;
-  }
-
-  try {
-    const config = await bridge.apiGet("config");
+    var config = await apiGet("config");
     applyConfig(config);
   } catch (err) {
     console.warn("Failed to load config, using defaults:", err);
     applyConfig({});
   }
 
-  await loadAssets();
   applyBackground();
 
-  let savedId = "";
-  try { savedId = localStorage.getItem("galgame_session_id") || ""; } catch (_) { /* sandboxed iframe */ }
+  var savedId = localStorage.getItem("galgame_session_id") || "";
   try {
-    const resp = await bridge.apiPost("session/init", { resume_id: savedId });
+    var resp = await apiPost("session/init", { resume_id: savedId });
     if (!resp || !resp.session_id) {
       console.error("session/init returned:", resp);
       el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
     } else {
       sessionId = resp.session_id;
-      try { localStorage.setItem("galgame_session_id", sessionId); } catch (_) { /* sandboxed iframe */ }
+      localStorage.setItem("galgame_session_id", sessionId);
       subscribeSSE();
     }
   } catch (err) {
@@ -157,9 +135,9 @@ function applySprites() {
 }
 
 function loadExpressionToLayer(emotion) {
-  const src = assetUrl(expressions[emotion] || expressions["neutral"]);
+  var src = assetUrl(expressions[emotion] || expressions["neutral"]);
   if (!src) return;
-  const img = new Image();
+  var img = new Image();
   img.onload = function () {
     el.layerHead.src = src;
     el.layerHead.classList.remove("switching");
@@ -169,9 +147,9 @@ function loadExpressionToLayer(emotion) {
 }
 
 function loadExpressionToSingle(emotion) {
-  const src = assetUrl(expressions[emotion] || expressions["neutral"]);
+  var src = assetUrl(expressions[emotion] || expressions["neutral"]);
   if (!src) return;
-  const img = new Image();
+  var img = new Image();
   img.onload = function () {
     el.spriteSingleImg.src = src;
     el.spriteSingleImg.classList.remove("switching");
@@ -182,51 +160,44 @@ function loadExpressionToSingle(emotion) {
 
 /* ---- SSE ---- */
 
-let sseSubId = null;
-let sseRetries = 0;
-const SSE_MAX_RETRIES = 5;
-
-async function subscribeSSE() {
-  if (sseSubId) {
-    await bridge.unsubscribeSSE(sseSubId);
+function subscribeSSE() {
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
   }
-  sseSubId = await bridge.subscribeSSE(
-    "stream",
-    {
-      onMessage(event) {
-        sseRetries = 0;
-        const msg = event.parsed;
-        if (!msg) return;
-        switch (msg.type) {
-          case "emotion":
-            switchExpression(msg.value);
-            break;
-          case "text":
-            typewriterAppend(msg.value);
-            break;
-          case "audio":
-            playTTSAudio(msg.value);
-            break;
-          case "end":
-            finishResponse();
-            break;
-          case "error":
-            showError(msg.message);
-            break;
-        }
-      },
-      onError() {
-        console.warn("SSE connection error, will retry...");
-        sseRetries++;
-        if (sseRetries <= SSE_MAX_RETRIES) {
-          setTimeout(subscribeSSE, 3000);
-        } else {
-          el.dialogText.textContent = "连接已断开，请刷新页面。";
-        }
-      },
-    },
-    { session_id: sessionId },
-  );
+
+  var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
+  sseSource = new EventSource(url);
+
+  sseSource.addEventListener("message", function (event) {
+    var msg = null;
+    try { msg = JSON.parse(event.data); } catch (_) { return; }
+    if (!msg) return;
+
+    switch (msg.type) {
+      case "emotion":
+        switchExpression(msg.value);
+        break;
+      case "text":
+        typewriterAppend(msg.value);
+        break;
+      case "audio":
+        playTTSAudio(msg.value);
+        break;
+      case "end":
+        finishResponse();
+        break;
+      case "error":
+        showError(msg.message);
+        break;
+    }
+  });
+
+  sseSource.onerror = function () {
+    sseSource.close();
+    sseSource = null;
+    el.dialogText.textContent = "连接已断开，请刷新页面。";
+  };
 }
 
 /* ---- expression ---- */
@@ -244,7 +215,7 @@ function switchExpression(emotion) {
 /* ---- typewriter ---- */
 
 function typewriterAppend(text) {
-  const elText = el.dialogText;
+  var elText = el.dialogText;
   if (typewriterTimer) {
     var cur = elText.querySelector(".cursor");
     if (cur) cur.remove();
@@ -252,8 +223,8 @@ function typewriterAppend(text) {
     typewriterTimer = null;
   }
 
-  const baseText = elText.textContent.replace(/█$/, "");
-  let i = 0;
+  var baseText = elText.textContent.replace(/█$/, "");
+  var i = 0;
   function tick() {
     if (i < text.length) {
       i++;
@@ -261,7 +232,7 @@ function typewriterAppend(text) {
       typewriterTimer = setTimeout(tick, 60);
     } else {
       typewriterTimer = null;
-      const cursor = document.createElement("span");
+      var cursor = document.createElement("span");
       cursor.className = "cursor";
       elText.appendChild(cursor);
     }
@@ -274,7 +245,7 @@ function typewriterAppend(text) {
 function playTTSAudio(base64data) {
   if (!base64data) return;
 
-  const audio = el.ttsAudio;
+  var audio = el.ttsAudio;
   audio.src = "data:audio/wav;base64," + base64data;
 
   audio.onplay = function () {
@@ -301,7 +272,7 @@ function startMouthAnimation() {
   if (spriteMode !== "layered") return;
   if (!layers.mouth_open || !layers.mouth_closed) return;
 
-  let open = true;
+  var open = true;
   el.layerMouth.classList.add("speaking");
   el.layerMouth.classList.add("visible");
   mouthTimer = setInterval(function () {
@@ -325,7 +296,7 @@ function stopMouthAnimation() {
 
 function finishResponse() {
   stopMouthAnimation();
-  const elText = el.dialogText;
+  var elText = el.dialogText;
   var cur = elText.querySelector(".cursor");
   if (cur) cur.remove();
   enableInput();
@@ -362,14 +333,14 @@ function setupInput() {
 }
 
 async function sendMessage() {
-  const text = el.userInput.value.trim();
+  var text = el.userInput.value.trim();
   if (!text || !sessionId) return;
 
   el.userInput.value = "";
   disableInput();
 
   try {
-    await bridge.apiPost("send", {
+    await apiPost("send", {
       session_id: sessionId,
       text: text,
     });
@@ -382,8 +353,8 @@ async function sendMessage() {
 /* ---- rapid click / keyboard detection ---- */
 
 function setupRapidDetection() {
-  let clickTimestamps = [];
-  let keyTimestamps = [];
+  var clickTimestamps = [];
+  var keyTimestamps = [];
 
   document.addEventListener("click", function (e) {
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
@@ -398,7 +369,7 @@ function setupRapidDetection() {
   });
 
   function trackTimestamps(ts) {
-    const now = Date.now();
+    var now = Date.now();
     ts.push(now);
     ts = ts.filter(function (t) { return now - t < rapidWindowMs; });
     if (ts.length >= rapidThreshold) {
@@ -412,7 +383,7 @@ function setupRapidDetection() {
 async function notifyRapidAction(count) {
   if (!sessionId) return;
   try {
-    await bridge.apiPost("rapid_action", {
+    await apiPost("rapid_action", {
       session_id: sessionId,
       count: count,
     });
@@ -428,4 +399,5 @@ init();
 window.addEventListener("beforeunload", function () {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
+  if (sseSource) { sseSource.close(); sseSource = null; }
 });
