@@ -187,7 +187,7 @@ function handleFileSelect(e) {
 
 async function uploadFiles(fileList) {
   const filesToUpload = [];
-  for (const f of fileList) {
+  for (const f of Array.from(fileList)) {
     if (f.type.startsWith("image/")) {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -200,19 +200,24 @@ async function uploadFiles(fileList) {
   }
   if (filesToUpload.length === 0) return;
 
-  setStatus("上传中...");
+  setStatus(`上传中... 0/${filesToUpload.length}`);
   const uploaded = [];
   const failed = [];
-  for (const f of filesToUpload) {
+  for (let i = 0; i < filesToUpload.length; i++) {
+    const f = filesToUpload[i];
+    setStatus(`上传中... ${i + 1}/${filesToUpload.length} (${f.name})`);
     try {
       const data = await bridge.apiPost("assets/upload", { files: [f] });
       if (data.uploaded) {
         uploaded.push(...data.uploaded);
       } else if (data.error) {
-        failed.push(f.name);
+        failed.push(f.name + ": " + (data.error || "unknown"));
       }
     } catch (e) {
-      failed.push(f.name + ": " + e.message);
+      failed.push(f.name + ": " + (e.message || e));
+    }
+    if (i < filesToUpload.length - 1) {
+      await new Promise(r => setTimeout(r, 300));
     }
   }
   if (uploaded.length > 0) setStatus(`上传完成: ${uploaded.join(", ")}`, "success");
