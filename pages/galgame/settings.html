@@ -201,17 +201,23 @@ async function uploadFiles(fileList) {
   if (filesToUpload.length === 0) return;
 
   setStatus("上传中...");
-  try {
-    const data = await bridge.apiPost("assets/upload", { files: filesToUpload });
-    if (data.uploaded) {
-      setStatus(`上传完成: ${data.uploaded.join(", ")}`, "success");
-      await loadFiles();
-    } else {
-      setStatus(data.error || "上传失败", "error");
+  const uploaded = [];
+  const failed = [];
+  for (const f of filesToUpload) {
+    try {
+      const data = await bridge.apiPost("assets/upload", { files: [f] });
+      if (data.uploaded) {
+        uploaded.push(...data.uploaded);
+      } else if (data.error) {
+        failed.push(f.name);
+      }
+    } catch (e) {
+      failed.push(f.name + ": " + e.message);
     }
-  } catch (e) {
-    setStatus("上传失败: " + e.message, "error");
   }
+  if (uploaded.length > 0) setStatus(`上传完成: ${uploaded.join(", ")}`, "success");
+  else if (failed.length > 0) setStatus(`上传失败: ${failed.join(", ")}`, "error");
+  await loadFiles();
 }
 
 async function loadFiles() {
