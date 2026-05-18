@@ -230,20 +230,37 @@ function getEmotionKeys() {
   return config.emotion_keys || ["neutral","happy","sad","angry","surprised","blush","thinking"];
 }
 
-function getMatchedFile(key) {
+function getMatchedFile(key, prefix) {
   var keyL = key.toLowerCase();
-  // 1) exact stem match
+  // 1) exact stem match: prefix_key
+  if (prefix) {
+    var prefixed = prefix + "_" + keyL;
+    for (var i = 0; i < allFiles.length; i++) {
+      var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+      if (stem === prefixed) return allFiles[i];
+    }
+  }
+  // 2) exact stem match without prefix (backward compat)
   for (var i = 0; i < allFiles.length; i++) {
     var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
     if (stem === keyL) return allFiles[i];
   }
-  // 2) match by filename word-parts (split on _ - . whitespace)
+  // 3) word-parts match with prefix preferred
+  if (prefix) {
+    var prefixL = prefix.toLowerCase();
+    for (var i = 0; i < allFiles.length; i++) {
+      var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+      var parts = stem.split(/[_\-\s.]+/);
+      if (parts.indexOf(prefixL) !== -1 && parts.indexOf(keyL) !== -1) return allFiles[i];
+    }
+  }
+  // 4) word-parts match (backward compat)
   for (var i = 0; i < allFiles.length; i++) {
     var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
     var parts = stem.split(/[_\-\s.]+/);
     if (parts.indexOf(keyL) !== -1) return allFiles[i];
   }
-  // 3) substring fallback
+  // 5) substring fallback
   for (var i = 0; i < allFiles.length; i++) {
     var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
     if (stem.indexOf(keyL) !== -1) return allFiles[i];
@@ -284,7 +301,7 @@ function renderSingleSlots() {
   grid.innerHTML = "";
   var keys = getEmotionKeys();
   for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i]), keys[i], "single"));
+    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "single"), keys[i], "single"));
   }
 }
 
@@ -297,7 +314,7 @@ function renderLayeredLayerSlots() {
   for (var i = 0; i < LAYER_KEYS.length; i++) {
     var k = LAYER_KEYS[i];
     var label = k === "head" ? "head (默认脸)" : k;
-    grid.appendChild(slotCard(k, getMatchedFile(k), label, "layer"));
+    grid.appendChild(slotCard(k, getMatchedFile(k, "layer"), label, "layer"));
   }
 }
 
@@ -306,7 +323,7 @@ function renderLayeredExprSlots() {
   grid.innerHTML = "";
   var keys = getEmotionKeys();
   for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i]), keys[i], "expr"));
+    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "expr"), keys[i], "expr"));
   }
 }
 
@@ -345,12 +362,13 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.appendChild(statusDiv);
 
   var fid = "file-" + idPrefix + "-" + key;
+  var uploadKey = idPrefix + "_" + key;
   var fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/*";
   fileInput.id = fid;
   fileInput.style.display = "none";
-  (function(k, inp) { inp.onchange = function() { uploadToSlot(k, inp); }; })(key, fileInput);
+  (function(k, inp) { inp.onchange = function() { uploadToSlot(k, inp); }; })(uploadKey, fileInput);
   card.appendChild(fileInput);
 
   var btn = document.createElement("button");
