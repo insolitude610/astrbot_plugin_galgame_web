@@ -227,12 +227,7 @@ async function init() {
 /* ---- data ---- */
 
 function getEmotionKeys() {
-  const expr = config.expressions || {};
-  if (expr && typeof expr === "object") {
-    const keys = Object.keys(expr);
-    if (keys.length > 0) return keys;
-  }
-  return ["neutral","happy","sad","angry","surprised","blush","thinking"];
+  return config.emotion_keys || ["neutral","happy","sad","angry","surprised","blush","thinking"];
 }
 
 function getMatchedFile(key) {

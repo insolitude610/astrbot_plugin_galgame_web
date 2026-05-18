@@ -20,10 +20,23 @@ EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
 
 def _get_emotion_tags(config: dict) -> list[str]:
     expressions = config.get("expressions", {})
-    if expressions and isinstance(expressions, dict):
-        keys = [k for k in expressions if k]
-        if keys:
-            return keys
+    if not isinstance(expressions, dict):
+        expressions = {}
+    keys = [k for k in expressions if k]
+
+    custom_raw = config.get("custom_emotions", "")
+    if custom_raw and isinstance(custom_raw, str):
+        try:
+            custom = json.loads(custom_raw)
+        except (json.JSONDecodeError, TypeError):
+            custom = {}
+        if isinstance(custom, dict):
+            for k in custom:
+                if k and k not in keys:
+                    keys.append(k)
+
+    if keys:
+        return keys
     return list(DEFAULT_EMOTION_TAGS)
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
@@ -537,12 +550,14 @@ class GalgamePlugin(Star):
     async def _api_config(self):
         files = _list_asset_files()
         resolved = _resolve_assets(self.config, files)
+        emotion_keys = _get_emotion_tags(self.config)
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
             "rapid_window_seconds": self.config.get("rapid_window_seconds", 3),
             "tts_provider": self.config.get("tts_provider", ""),
             "expressions": resolved["expressions"],
+            "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
             "character_name": self.config.get("character_name", ""),
             "background": resolved["background"],
