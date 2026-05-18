@@ -118,10 +118,12 @@ class GalgamePlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
+        self._active_sse: set[str] = set()
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._gc_sessions()
         self._load_all_sessions()
-        asyncio.ensure_future(self._sync_sessions_to_db())
+        t = asyncio.ensure_future(self._sync_sessions_to_db())
+        t.add_done_callback(lambda _t: logger.warning(f"sync_sessions_to_db failed: {_t.exception()}") if _t.exception() else None)
 
         context.register_web_api(
             f"/{PLUGIN_NAME}/session/init",
@@ -267,6 +269,7 @@ class GalgamePlugin(Star):
                 "pending_rapid_clicks": 0,
                 "sse_queue": asyncio.Queue(),
                 "created_at": data.get("created_at", time.time()),
+                "_lock": asyncio.Lock(),
             }
         except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load session {session_id}: {e}")
@@ -377,6 +380,7 @@ class GalgamePlugin(Star):
             "pending_rapid_clicks": 0,
             "sse_queue": asyncio.Queue(),
             "created_at": time.time(),
+            "_lock": asyncio.Lock(),
         }
         self._sessions[session_id] = session
         await self._init_astrbot_conv(session_id, session)
@@ -399,7 +403,12 @@ class GalgamePlugin(Star):
         session = self._sessions[session_id]
         queue = session["sse_queue"]
 
-        rapid_count = session.pop("pending_rapid_clicks", 0)
+        async with session["_lock"]:
+            rapid_count = session.pop("pending_rapid_clicks", 0)
+            messages = list(session["history"])
+            messages.append({"role": "user", "content": text})
+            conv_id = session.get("conv_id", "")
+
         rapid_hint = ""
         if rapid_count > 0:
             rapid_hint = (
@@ -409,10 +418,6 @@ class GalgamePlugin(Star):
 
         system_prompt = self._build_system_prompt() + rapid_hint
 
-        messages = list(session["history"])
-        messages.append({"role": "user", "content": text})
-
-        conv_id = session.get("conv_id", "")
         try:
             await self.context.message_history_manager.insert(
                 platform_id=PLATFORM_ID,
@@ -424,10 +429,13 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to save user message to history: {e}")
 
+        has_active = session_id in self._active_sse
+
         try:
             llm_prov_id = self.config.get("llm_provider", "")
             if not llm_prov_id:
-                await queue.put({"type": "error", "message": "未配置对话模型，请在插件设置中选择 LLM Provider"})
+                if has_active:
+                    await queue.put({"type": "error", "message": "未配置对话模型，请在插件设置中选择 LLM Provider"})
                 return {"status": "ok"}
 
             from astrbot.core.agent.message import (
@@ -461,12 +469,12 @@ class GalgamePlugin(Star):
 
             clean_text = EMOTION_PATTERN.sub("", full_text).strip()
 
-            session["history"].append({"role": "user", "content": text})
-            session["history"].append({"role": "assistant", "content": clean_text})
-            session["current_emotion"] = current_emotion
-
-            if len(session["history"]) > 40:
-                session["history"] = session["history"][-40:]
+            async with session["_lock"]:
+                session["history"].append({"role": "user", "content": text})
+                session["history"].append({"role": "assistant", "content": clean_text})
+                session["current_emotion"] = current_emotion
+                if len(session["history"]) > 40:
+                    session["history"] = session["history"][-40:]
 
             self._save_session(session_id)
 
@@ -487,33 +495,35 @@ class GalgamePlugin(Star):
             except Exception as e:
                 logger.warning(f"Failed to sync conversation to DB: {e}")
 
-            await queue.put({"type": "emotion", "value": current_emotion})
+            if has_active:
+                await queue.put({"type": "emotion", "value": current_emotion})
 
-            chunk_size = 3
-            for i in range(0, len(clean_text), chunk_size):
-                chunk = clean_text[i : i + chunk_size]
-                await queue.put({"type": "text", "value": chunk})
+                chunk_size = 3
+                for i in range(0, len(clean_text), chunk_size):
+                    chunk = clean_text[i : i + chunk_size]
+                    await queue.put({"type": "text", "value": chunk})
 
-            tts_prov = self._get_config_tts_provider()
-            if tts_prov:
-                try:
-                    audio_path = await tts_prov.get_audio(clean_text)
-                    if audio_path and os.path.exists(audio_path):
-                        with open(audio_path, "rb") as f:
-                            audio_b64 = base64.b64encode(f.read()).decode()
-                        await queue.put({"type": "audio", "value": audio_b64})
-                        try:
-                            os.remove(audio_path)
-                        except OSError:
-                            pass
-                except Exception as e:
-                    logger.warning(f"TTS generation failed: {e}")
+                tts_prov = self._get_config_tts_provider()
+                if tts_prov:
+                    try:
+                        audio_path = await tts_prov.get_audio(clean_text)
+                        if audio_path and os.path.exists(audio_path):
+                            with open(audio_path, "rb") as f:
+                                audio_b64 = base64.b64encode(f.read()).decode()
+                            await queue.put({"type": "audio", "value": audio_b64})
+                            try:
+                                os.remove(audio_path)
+                            except OSError:
+                                pass
+                    except Exception as e:
+                        logger.warning(f"TTS generation failed: {e}")
 
-            await queue.put({"type": "end"})
+                await queue.put({"type": "end"})
 
         except Exception as e:
             logger.exception(f"Error processing message: {e}")
-            await queue.put({"type": "error", "message": f"处理消息时出错: {e}"})
+            if has_active:
+                await queue.put({"type": "error", "message": f"处理消息时出错: {e}"})
 
         return {"status": "ok"}
 
@@ -526,16 +536,25 @@ class GalgamePlugin(Star):
 
             return Response(error_stream(), content_type="text/event-stream")
 
+        self._active_sse.add(session_id)
         session = self._sessions[session_id]
         queue = session["sse_queue"]
 
         async def event_stream():
-            while True:
-                try:
-                    msg = await asyncio.wait_for(queue.get(), timeout=25)
-                    yield f"event: message\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
+            try:
+                while True:
+                    try:
+                        msg = await asyncio.wait_for(queue.get(), timeout=25)
+                        yield f"event: message\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+            finally:
+                self._active_sse.discard(session_id)
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
 
         return Response(
             event_stream(),
@@ -566,12 +585,9 @@ class GalgamePlugin(Star):
     async def _api_assets_list(self):
         entries = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[assets] list scanning dir: {ASSETS_DIR}")
         for f in sorted(ASSETS_DIR.iterdir()):
             if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
-                logger.info(f"[assets] list found: {f.name}")
                 entries.append({"name": f.name})
-        logger.info(f"[assets] list return {len(entries)} files: {[e['name'] for e in entries]}")
         return {"files": entries}
 
     async def _api_assets_upload(self):
@@ -709,7 +725,8 @@ class GalgamePlugin(Star):
         count = data.get("count", 0)
 
         if session_id in self._sessions:
-            self._sessions[session_id]["pending_rapid_clicks"] = count
+            async with self._sessions[session_id]["_lock"]:
+                self._sessions[session_id]["pending_rapid_clicks"] = count
 
         return {"status": "ok"}
 
@@ -727,8 +744,13 @@ class GalgamePlugin(Star):
     async def terminate(self):
         for sid in list(self._sessions.keys()):
             session = self._sessions[sid]
+            self._active_sse.discard(sid)
             queue = session.get("sse_queue")
             if queue:
-                await queue.put({"type": "end"})
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
             self._save_session(sid)
         self._sessions.clear()
