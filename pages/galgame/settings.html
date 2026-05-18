@@ -231,24 +231,30 @@ function getEmotionKeys() {
 }
 
 function getMatchedFile(key) {
-  const keyL = key.toLowerCase();
-  // exact match first
-  for (const f of allFiles) {
-    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
-    if (stem === keyL) return f;
+  var keyL = key.toLowerCase();
+  // 1) exact stem match
+  for (var i = 0; i < allFiles.length; i++) {
+    var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem === keyL) return allFiles[i];
   }
-  // substring match
-  for (const f of allFiles) {
-    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
-    if (stem.includes(keyL) || keyL.includes(stem)) return f;
+  // 2) match by filename word-parts (split on _ - . whitespace)
+  for (var i = 0; i < allFiles.length; i++) {
+    var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+    var parts = stem.split(/[_\-\s.]+/);
+    if (parts.indexOf(keyL) !== -1) return allFiles[i];
+  }
+  // 3) substring fallback
+  for (var i = 0; i < allFiles.length; i++) {
+    var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem.indexOf(keyL) !== -1) return allFiles[i];
   }
   return null;
 }
 
 function getMatchedBg() {
-  for (const f of allFiles) {
-    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
-    if (stem === "background" || stem === "bg") return f;
+  for (var i = 0; i < allFiles.length; i++) {
+    var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem === "background" || stem === "bg") return allFiles[i];
   }
   return null;
 }
@@ -265,67 +271,95 @@ function renderAll() {
 }
 
 function renderModeIndicator() {
-  const mode = config.sprite_mode || "single";
-  const el = document.getElementById("mode-indicator");
-  el.innerHTML = `当前渲染模式：<span class="mode-badge ${mode}">${mode === "layered" ? "Layered 多层" : "Single 单图"}</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>`;
+  var mode = config.sprite_mode || "single";
+  var el = document.getElementById("mode-indicator");
+  el.innerHTML = '当前渲染模式：<span class="mode-badge ' + mode + '">' + (mode === "layered" ? "Layered 多层" : "Single 单图") + '</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>';
 }
 
 function renderSingleSlots() {
-  const section = document.getElementById("section-single");
-  const grid = document.getElementById("slots-single");
-  const mode = config.sprite_mode || "single";
+  var section = document.getElementById("section-single");
+  var grid = document.getElementById("slots-single");
+  var mode = config.sprite_mode || "single";
   section.className = "section " + (mode === "single" ? "active" : "inactive");
-
-  const keys = getEmotionKeys();
-  grid.innerHTML = keys.map(k => {
-    const f = getMatchedFile(k);
-    return slotCard(k, f, "表情");
-  }).join("");
+  grid.innerHTML = "";
+  var keys = getEmotionKeys();
+  for (var i = 0; i < keys.length; i++) {
+    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i]), keys[i], "single"));
+  }
 }
 
 function renderLayeredLayerSlots() {
-  const section = document.getElementById("section-layered");
-  const grid = document.getElementById("slots-layers");
-  const mode = config.sprite_mode || "single";
+  var section = document.getElementById("section-layered");
+  var grid = document.getElementById("slots-layers");
+  var mode = config.sprite_mode || "single";
   section.className = "section " + (mode === "layered" ? "active" : "inactive");
-
-  grid.innerHTML = LAYER_KEYS.map(k => {
-    const f = getMatchedFile(k);
-    const label = k === "head" ? "图层:head (默认脸)" : "图层:" + k;
-    return slotCard(k, f, label);
-  }).join("");
+  grid.innerHTML = "";
+  for (var i = 0; i < LAYER_KEYS.length; i++) {
+    var k = LAYER_KEYS[i];
+    var label = k === "head" ? "head (默认脸)" : k;
+    grid.appendChild(slotCard(k, getMatchedFile(k), label, "layer"));
+  }
 }
 
 function renderLayeredExprSlots() {
-  const grid = document.getElementById("slots-layered-expr");
-  const keys = getEmotionKeys();
-  grid.innerHTML = keys.map(k => {
-    const f = getMatchedFile(k);
-    return slotCard(k, f, "表情: " + k + " (仅脸部)");
-  }).join("");
+  var grid = document.getElementById("slots-layered-expr");
+  grid.innerHTML = "";
+  var keys = getEmotionKeys();
+  for (var i = 0; i < keys.length; i++) {
+    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i]), keys[i], "expr"));
+  }
 }
 
 function renderBgSlot() {
-  const f = getMatchedBg();
-  document.getElementById("slots-bg").innerHTML = slotCard("background", f, "背景图");
+  var grid = document.getElementById("slots-bg");
+  grid.innerHTML = "";
+  grid.appendChild(slotCard("background", getMatchedBg(), "背景图", "bg"));
 }
 
-function slotCard(key, matchedFile, label) {
-  const cls = matchedFile ? "slot-card matched" : "slot-card missing";
-  let preview;
+function slotCard(key, matchedFile, label, idPrefix) {
+  var card = document.createElement("div");
+  card.className = matchedFile ? "slot-card matched" : "slot-card missing";
+  card.id = "slot-" + idPrefix + "-" + key;
+
   if (matchedFile && matchedFile.data) {
-    preview = `<img class="slot-img" src="${matchedFile.data}" alt="${key}">`;
+    var img = document.createElement("img");
+    img.className = "slot-img";
+    img.alt = key;
+    img.src = matchedFile.data;
+    card.appendChild(img);
   } else {
-    preview = `<div class="slot-img placeholder">🖼</div>`;
+    var ph = document.createElement("div");
+    ph.className = "slot-img placeholder";
+    ph.textContent = "🖼";
+    card.appendChild(ph);
   }
-  return `
-    <div class="${cls}" id="slot-${key}">
-      ${preview}
-      <div class="slot-name">${label}</div>
-      <div class="slot-status ${matchedFile ? 'matched' : 'missing'}">${matchedFile ? '✅ ' + matchedFile.name : '❌ 未上传'}</div>
-      <input type="file" accept="image/*" id="file-${key}" style="display:none" onchange="uploadToSlot('${key}', this)" />
-      <button class="btn btn-primary" onclick="document.getElementById('file-${key}').click()">上传</button>
-    </div>`;
+
+  var nameDiv = document.createElement("div");
+  nameDiv.className = "slot-name";
+  nameDiv.textContent = label;
+  card.appendChild(nameDiv);
+
+  var statusDiv = document.createElement("div");
+  statusDiv.className = "slot-status " + (matchedFile ? "matched" : "missing");
+  statusDiv.textContent = matchedFile ? "\u2705 " + matchedFile.name : "\u274C 未上传";
+  card.appendChild(statusDiv);
+
+  var fid = "file-" + idPrefix + "-" + key;
+  var fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.id = fid;
+  fileInput.style.display = "none";
+  (function(k, inp) { inp.onchange = function() { uploadToSlot(k, inp); }; })(key, fileInput);
+  card.appendChild(fileInput);
+
+  var btn = document.createElement("button");
+  btn.className = "btn btn-primary";
+  btn.textContent = "上传";
+  (function(fidRef) { btn.onclick = function() { document.getElementById(fidRef).click(); }; })(fid);
+  card.appendChild(btn);
+
+  return card;
 }
 
 function renderFileGrid() {
