@@ -205,6 +205,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 const PLUGIN = "astrbot_plugin_galgame_web";
 const LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
 const BG_KEYS = ["background"];
+const FILE_URL_BASE = "/api/plugin/" + PLUGIN + "/assets/file?name=";
 
 let bridge = null;
 let allFiles = [];
@@ -321,11 +322,11 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.className = matchedFile ? "slot-card matched" : "slot-card missing";
   card.id = "slot-" + idPrefix + "-" + key;
 
-  if (matchedFile && matchedFile.data) {
+  if (matchedFile) {
     var img = document.createElement("img");
     img.className = "slot-img";
     img.alt = key;
-    img.src = matchedFile.data;
+    img.src = FILE_URL_BASE + encodeURIComponent(matchedFile.name);
     card.appendChild(img);
   } else {
     var ph = document.createElement("div");
@@ -378,7 +379,7 @@ function renderFileGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    img.src = f.data || "";
+    img.src = FILE_URL_BASE + encodeURIComponent(f.name);
     card.appendChild(img);
 
     const body = document.createElement("div");
@@ -436,22 +437,15 @@ async function uploadToSlot(key, input) {
 
 async function loadFiles() {
   setStatus("");
-  const loading = document.getElementById("loading");
+  var loading = document.getElementById("loading");
   loading.style.display = "block";
   try {
-    const data = await bridge.apiGet("assets/list");
-    const rawFiles = data.files || [];
-    if (rawFiles.length > 0) {
-      const names = rawFiles.map(f => f.name);
-      const batchData = await bridge.apiPost("assets/batch", { names });
-      allFiles = batchData.files || [];
-    } else {
-      allFiles = [];
-    }
-    renderAll();
+    var data = await bridge.apiGet("assets/list");
+    allFiles = (data.files || []).map(function(f) { return { name: f.name }; });
   } catch(e) {
     setStatus("加载失败: " + e.message, "error");
   }
+  renderAll();
   loading.style.display = "none";
 }
 

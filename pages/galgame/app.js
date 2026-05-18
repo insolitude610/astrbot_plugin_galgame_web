@@ -131,6 +131,8 @@ function loadExpressionToSingle(emotion) {
 /* ---- SSE ---- */
 
 let sseSubId = null;
+let sseRetries = 0;
+const SSE_MAX_RETRIES = 5;
 
 async function subscribeSSE() {
   if (sseSubId) {
@@ -140,6 +142,7 @@ async function subscribeSSE() {
     "stream",
     {
       onMessage(event) {
+        sseRetries = 0;
         const msg = event.parsed;
         if (!msg) return;
         switch (msg.type) {
@@ -162,7 +165,12 @@ async function subscribeSSE() {
       },
       onError() {
         console.warn("SSE connection error, will retry...");
-        setTimeout(subscribeSSE, 3000);
+        sseRetries++;
+        if (sseRetries <= SSE_MAX_RETRIES) {
+          setTimeout(subscribeSSE, 3000);
+        } else {
+          el.dialogText.textContent = "连接已断开，请刷新页面。";
+        }
       },
     },
     { session_id: sessionId },
@@ -187,16 +195,16 @@ function typewriterAppend(text) {
   const el = el.dialogText;
   if (typewriterTimer) {
     el.querySelector(".cursor")?.remove();
-    el.textContent = el.textContent.replace(/█$/, "");
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
   }
 
+  const baseText = el.textContent.replace(/█$/, "");
   let i = 0;
   function tick() {
     if (i < text.length) {
-      el.textContent += text[i];
       i++;
+      el.textContent = baseText + text.substring(0, i);
       typewriterTimer = setTimeout(tick, 60);
     } else {
       typewriterTimer = null;
@@ -362,3 +370,8 @@ async function notifyRapidAction(count) {
 /* ---- boot ---- */
 
 init();
+
+window.addEventListener("beforeunload", function() {
+  if (typewriterTimer) clearTimeout(typewriterTimer);
+  if (mouthTimer) clearInterval(mouthTimer);
+});
