@@ -60,7 +60,7 @@ async function apiPost(endpoint, body) {
 
 function assetUrl(filename) {
   if (!filename) return "";
-  return "/assets/" + filename;
+  return "./assets/" + filename;
 }
 
 /* ---- init ---- */
@@ -75,7 +75,8 @@ async function init() {
 
   applyBackground();
 
-  var savedId = localStorage.getItem("galgame_session_id") || "";
+  var savedId = "";
+  try { savedId = localStorage.getItem("galgame_session_id") || ""; } catch (_) {}
   try {
     var resp = await apiPost("session/init", { resume_id: savedId });
     if (!resp || !resp.session_id) {
@@ -83,7 +84,7 @@ async function init() {
       el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
     } else {
       sessionId = resp.session_id;
-      localStorage.setItem("galgame_session_id", sessionId);
+      try { localStorage.setItem("galgame_session_id", sessionId); } catch (_) {}
       subscribeSSE();
     }
   } catch (err) {

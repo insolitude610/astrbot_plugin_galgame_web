@@ -245,7 +245,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
 
 
 class GalgamePlugin(Star):
-    async def __init__(self, context: Context, config: dict | None = None):
+    def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
