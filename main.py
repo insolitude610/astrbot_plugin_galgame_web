@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import time
 import uuid
 
@@ -184,6 +185,12 @@ class GalgamePlugin(Star):
             self._api_assets_batch,
             ["POST"],
             "Get base64 data for multiple asset files",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/copy",
+            self._api_assets_copy,
+            ["POST"],
+            "Copy an existing asset to a new key name",
         )
         context.register_web_api(
             f"/{PLUGIN_NAME}/rapid_action",
@@ -715,6 +722,30 @@ class GalgamePlugin(Star):
                 logger.warning(f"[assets] batch read failed {name}: {e}")
         logger.info(f"[assets] batch return {len(result)} files")
         return {"files": result}
+
+    async def _api_assets_copy(self):
+        data = await request.get_json() or {}
+        source = data.get("source", "").strip()
+        dest_key = data.get("key", "").strip()
+        if not source or not dest_key:
+            return {"error": "source and key required"}, 400
+        src_path = _safe_path(source, ASSETS_DIR)
+        if not src_path or not src_path.is_file():
+            return {"error": "source not found"}, 404
+        ext = src_path.suffix.lower()
+        if ext not in IMAGE_EXTS:
+            return {"error": "unsupported extension"}, 400
+        dest_name = f"{dest_key}{ext}"
+        dst_path = _safe_path(dest_name, ASSETS_DIR)
+        if not dst_path or dst_path.suffix.lower() not in IMAGE_EXTS:
+            return {"error": "invalid destination"}, 400
+        try:
+            ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+            logger.info(f"Copied asset: {source} -> {dst_path.name}")
+            return {"copied": dst_path.name, "source": source}
+        except OSError as e:
+            return {"error": str(e)}, 500
 
     async def _api_rapid_action(self):
         data = await request.get_json()
