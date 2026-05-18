@@ -9,7 +9,7 @@ html, body {
   height: 100vh;
   overflow: hidden;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  user-select: none;
+  user-select: auto;
   background: #000;
 }
 

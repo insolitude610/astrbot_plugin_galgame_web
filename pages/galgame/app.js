@@ -9,10 +9,13 @@ let rapidWindowMs = 3000;
 let expressions = {};
 let layers = {};
 let characterName = "小星";
+let backgroundFile = "";
 
 let typewriterTimer = null;
 let mouthTimer = null;
 let isAudioPlaying = false;
+
+const spriteCache = {};
 
 const PLUGIN_NAME = "astrbot_plugin_galgame_web";
 
@@ -38,7 +41,34 @@ const el = {
 /* ---- util ---- */
 function assetUrl(filename) {
   if (!filename) return "";
-  return `./assets/${filename}`;
+  if (spriteCache[filename]) return spriteCache[filename];
+  return "./assets/" + filename;
+}
+
+function collectFileNames() {
+  const names = [];
+  const add = function (v) { if (v && names.indexOf(v) === -1) names.push(v); };
+
+  for (var k in expressions) { add(expressions[k]); }
+  for (var k in layers) { add(layers[k]); }
+  add(backgroundFile);
+
+  return names;
+}
+
+async function loadAssets() {
+  const names = collectFileNames();
+  if (names.length === 0) return;
+
+  try {
+    const resp = await bridge.apiPost("assets/batch", { names: names });
+    const files = resp.files || [];
+    for (var i = 0; i < files.length; i++) {
+      spriteCache[files[i].name] = files[i].data;
+    }
+  } catch (e) {
+    console.warn("Failed to load assets:", e);
+  }
 }
 
 /* ---- init ---- */
@@ -63,15 +93,19 @@ async function init() {
     applyConfig({});
   }
 
+  await loadAssets();
+  applyBackground();
+
+  let savedId = "";
+  try { savedId = localStorage.getItem("galgame_session_id") || ""; } catch (_) { /* sandboxed iframe */ }
   try {
-    const savedId = localStorage.getItem("galgame_session_id") || "";
     const resp = await bridge.apiPost("session/init", { resume_id: savedId });
     if (!resp || !resp.session_id) {
       console.error("session/init returned:", resp);
       el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
     } else {
       sessionId = resp.session_id;
-      localStorage.setItem("galgame_session_id", sessionId);
+      try { localStorage.setItem("galgame_session_id", sessionId); } catch (_) { /* sandboxed iframe */ }
       subscribeSSE();
     }
   } catch (err) {
@@ -92,10 +126,13 @@ function applyConfig(cfg) {
   expressions = cfg.expressions || {};
   layers = cfg.layers || {};
   characterName = cfg.character_name || "小星";
+  backgroundFile = cfg.background || "";
   el.characterName.textContent = characterName;
-  const bg = cfg.background || "";
-  if (bg) {
-    el.bg.style.backgroundImage = `url(${assetUrl(bg)})`;
+}
+
+function applyBackground() {
+  if (backgroundFile) {
+    el.bg.style.backgroundImage = "url(" + assetUrl(backgroundFile) + ")";
   }
 }
 
@@ -123,7 +160,7 @@ function loadExpressionToLayer(emotion) {
   const src = assetUrl(expressions[emotion] || expressions["neutral"]);
   if (!src) return;
   const img = new Image();
-  img.onload = () => {
+  img.onload = function () {
     el.layerHead.src = src;
     el.layerHead.classList.remove("switching");
   };
@@ -135,7 +172,7 @@ function loadExpressionToSingle(emotion) {
   const src = assetUrl(expressions[emotion] || expressions["neutral"]);
   if (!src) return;
   const img = new Image();
-  img.onload = () => {
+  img.onload = function () {
     el.spriteSingleImg.src = src;
     el.spriteSingleImg.classList.remove("switching");
   };
@@ -207,25 +244,26 @@ function switchExpression(emotion) {
 /* ---- typewriter ---- */
 
 function typewriterAppend(text) {
-  const el = el.dialogText;
+  const elText = el.dialogText;
   if (typewriterTimer) {
-    el.querySelector(".cursor")?.remove();
+    var cur = elText.querySelector(".cursor");
+    if (cur) cur.remove();
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
   }
 
-  const baseText = el.textContent.replace(/█$/, "");
+  const baseText = elText.textContent.replace(/█$/, "");
   let i = 0;
   function tick() {
     if (i < text.length) {
       i++;
-      el.textContent = baseText + text.substring(0, i);
+      elText.textContent = baseText + text.substring(0, i);
       typewriterTimer = setTimeout(tick, 60);
     } else {
       typewriterTimer = null;
       const cursor = document.createElement("span");
       cursor.className = "cursor";
-      el.appendChild(cursor);
+      elText.appendChild(cursor);
     }
   }
   tick();
@@ -237,22 +275,22 @@ function playTTSAudio(base64data) {
   if (!base64data) return;
 
   const audio = el.ttsAudio;
-  audio.src = `data:audio/wav;base64,${base64data}`;
+  audio.src = "data:audio/wav;base64," + base64data;
 
-  audio.onplay = () => {
+  audio.onplay = function () {
     isAudioPlaying = true;
     startMouthAnimation();
   };
-  audio.onended = () => {
+  audio.onended = function () {
     isAudioPlaying = false;
     stopMouthAnimation();
   };
-  audio.onerror = () => {
+  audio.onerror = function () {
     isAudioPlaying = false;
     stopMouthAnimation();
   };
 
-  audio.play().catch((e) => {
+  audio.play().catch(function (e) {
     console.warn("Audio play failed:", e);
   });
 }
@@ -266,7 +304,7 @@ function startMouthAnimation() {
   let open = true;
   el.layerMouth.classList.add("speaking");
   el.layerMouth.classList.add("visible");
-  mouthTimer = setInterval(() => {
+  mouthTimer = setInterval(function () {
     el.layerMouth.src = assetUrl(open ? layers.mouth_open : layers.mouth_closed);
     open = !open;
   }, 180);
@@ -288,7 +326,8 @@ function stopMouthAnimation() {
 function finishResponse() {
   stopMouthAnimation();
   const elText = el.dialogText;
-  elText.querySelector(".cursor")?.remove();
+  var cur = elText.querySelector(".cursor");
+  if (cur) cur.remove();
   enableInput();
   el.userInput.focus();
 }
@@ -314,7 +353,7 @@ function enableInput() {
 
 function setupInput() {
   el.sendBtn.addEventListener("click", sendMessage);
-  el.userInput.addEventListener("keydown", (e) => {
+  el.userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter") {
       e.preventDefault();
       sendMessage();
@@ -346,13 +385,13 @@ function setupRapidDetection() {
   let clickTimestamps = [];
   let keyTimestamps = [];
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", function (e) {
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
     keyTimestamps = [];
   });
 
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", function (e) {
     if (e.target === el.userInput) return;
     keyTimestamps = trackTimestamps(keyTimestamps);
     clickTimestamps = [];
@@ -361,7 +400,7 @@ function setupRapidDetection() {
   function trackTimestamps(ts) {
     const now = Date.now();
     ts.push(now);
-    ts = ts.filter((t) => now - t < rapidWindowMs);
+    ts = ts.filter(function (t) { return now - t < rapidWindowMs; });
     if (ts.length >= rapidThreshold) {
       notifyRapidAction(ts.length);
       return [];
@@ -386,7 +425,7 @@ async function notifyRapidAction(count) {
 
 init();
 
-window.addEventListener("beforeunload", function() {
+window.addEventListener("beforeunload", function () {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
 });
