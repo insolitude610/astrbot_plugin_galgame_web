@@ -205,7 +205,6 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 const PLUGIN = "astrbot_plugin_galgame_web";
 const LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
 const BG_KEYS = ["background"];
-const FILE_URL_BASE = "/api/plugin/" + PLUGIN + "/assets/file?name=";
 
 let bridge = null;
 let allFiles = [];
@@ -322,11 +321,11 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.className = matchedFile ? "slot-card matched" : "slot-card missing";
   card.id = "slot-" + idPrefix + "-" + key;
 
-  if (matchedFile) {
+  if (matchedFile && matchedFile.data) {
     var img = document.createElement("img");
     img.className = "slot-img";
     img.alt = key;
-    img.src = FILE_URL_BASE + encodeURIComponent(matchedFile.name);
+    img.src = matchedFile.data;
     card.appendChild(img);
   } else {
     var ph = document.createElement("div");
@@ -379,7 +378,7 @@ function renderFileGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    img.src = FILE_URL_BASE + encodeURIComponent(f.name);
+    img.src = f.data || "";
     card.appendChild(img);
 
     const body = document.createElement("div");
@@ -441,11 +440,19 @@ async function loadFiles() {
   loading.style.display = "block";
   try {
     var data = await bridge.apiGet("assets/list");
-    allFiles = (data.files || []).map(function(f) { return { name: f.name }; });
+    var rawFiles = data.files || [];
+    if (rawFiles.length > 0) {
+      var names = [];
+      for (var i = 0; i < rawFiles.length; i++) { names.push(rawFiles[i].name); }
+      var batchData = await bridge.apiPost("assets/batch", { names: names });
+      allFiles = batchData.files || [];
+    } else {
+      allFiles = [];
+    }
+    renderAll();
   } catch(e) {
     setStatus("加载失败: " + e.message, "error");
   }
-  renderAll();
   loading.style.display = "none";
 }
 
