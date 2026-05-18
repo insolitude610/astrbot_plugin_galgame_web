@@ -147,6 +147,12 @@ class GalgamePlugin(Star):
             "Upload image files to the assets directory",
         )
         context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/upload-key",
+            self._api_assets_upload_key,
+            ["POST"],
+            "Upload an image and save with a fixed key name (e.g. happy.png)",
+        )
+        context.register_web_api(
             f"/{PLUGIN_NAME}/assets/delete",
             self._api_assets_delete,
             ["POST"],
@@ -587,6 +593,46 @@ class GalgamePlugin(Star):
         if not uploaded:
             return {"error": "no valid image files uploaded"}, 400
         return {"uploaded": uploaded}
+
+    async def _api_assets_upload_key(self):
+        """Upload a single image and save as {key}.{ext}. Automatically deduces extension."""
+        data = await request.get_json() or {}
+        key = data.get("key", "").strip()
+        b64_data = data.get("data", "")
+        if not key or not b64_data:
+            return {"error": "key and data required"}, 400
+        if "," in b64_data:
+            # Strip data:image/xxx;base64, prefix
+            prefix, b64_data = b64_data.split(",", 1)
+            # Detect extension from MIME prefix
+            mime_ext = ".png"
+            if "jpeg" in prefix or "jpg" in prefix:
+                mime_ext = ".jpg"
+            elif "webp" in prefix:
+                mime_ext = ".webp"
+            elif "bmp" in prefix:
+                mime_ext = ".bmp"
+            elif "gif" in prefix:
+                mime_ext = ".gif"
+            name = f"{key}{mime_ext}"
+        else:
+            name = f"{key}.png"
+        if len(b64_data) > MAX_UPLOAD_BYTES * 2:
+            return {"error": "file too large"}, 400
+        safe_path = _safe_path(name, ASSETS_DIR)
+        if not safe_path or safe_path.suffix.lower() not in IMAGE_EXTS:
+            return {"error": "unsupported extension"}, 400
+        try:
+            raw = base64.b64decode(b64_data)
+            if len(raw) > MAX_UPLOAD_BYTES:
+                return {"error": "file too large"}, 400
+            ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+            with open(safe_path, "wb") as fout:
+                fout.write(raw)
+            logger.info(f"Uploaded key asset: {safe_path.name}")
+            return {"uploaded": safe_path.name}
+        except Exception as e:
+            return {"error": str(e)}, 500
 
     async def _api_assets_delete(self):
         data = await request.get_json() or {}

@@ -13,26 +13,118 @@ body {
   min-height: 100vh;
   padding: 24px;
 }
-h1 { font-size: 22px; margin-bottom: 8px; }
-.sub { color: #888; margin-bottom: 24px; font-size: 13px; }
+h1 { font-size: 22px; margin-bottom: 4px; }
+.sub { color: #888; margin-bottom: 20px; font-size: 13px; }
+.mode-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mode-badge.single { background: #8b5cf633; color: #a78bfa; }
+.mode-badge.layered { background: #4ade8033; color: #4ade80; }
+.mode-desc {
+  margin: 6px 0 16px;
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.6;
+}
 
-/* upload zone */
-.upload-zone {
-  border: 2px dashed #555;
+/* sections */
+.section {
+  margin-bottom: 28px;
+  padding: 16px;
   border-radius: 12px;
-  padding: 32px;
-  text-align: center;
-  margin-bottom: 24px;
+  border: 1px solid #333;
+  background: #16213e;
+}
+.section.active { border-color: #8b5cf6; }
+.section.inactive { opacity: 0.55; }
+.section h2 {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.section .hint {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.section.inactive .hint::before {
+  content: "当前模式为 ";
+}
+.section.inactive .hint::after {
+  content: "，以下素材暂不生效。";
+}
+.sub-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #aaa;
+  margin: 14px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #222;
+}
+
+/* slot grid */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.slot-card {
+  background: #0d1b2a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.slot-card.matched { border-color: #4ade8055; }
+.slot-card.missing { border-color: #ef444455; }
+.slot-img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: contain;
+  background: #111;
+  border-radius: 6px;
+  min-height: 80px;
+}
+.slot-img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: #444;
+  background: #111;
+  border-radius: 6px;
+  aspect-ratio: 3/4;
+}
+.slot-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+.slot-status {
+  font-size: 11px;
+}
+.slot-status.matched { color: #4ade80; }
+.slot-status.missing { color: #ef4444; }
+
+/* buttons */
+.btn {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 5px;
   cursor: pointer;
-  transition: border-color .2s, background .2s;
+  font-size: 12px;
+  transition: opacity .2s;
 }
-.upload-zone:hover, .upload-zone.dragover {
-  border-color: #8b5cf6;
-  background: rgba(139,92,246,.08);
-}
-.upload-zone p { color: #aaa; font-size: 14px; }
-.upload-zone .icon { font-size: 36px; margin-bottom: 8px; }
-#file-input { display: none; }
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: #8b5cf6; color: #fff; }
+.btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
+.btn-danger { background: #ef4444; color: #fff; }
 
 /* action bar */
 .action-bar {
@@ -42,231 +134,214 @@ h1 { font-size: 22px; margin-bottom: 8px; }
   align-items: center;
   flex-wrap: wrap;
 }
-.btn {
-  padding: 6px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: opacity .2s;
-}
-.btn:hover { opacity: 0.85; }
-.btn-primary { background: #8b5cf6; color: #fff; }
-.btn-danger { background: #ef4444; color: #fff; }
-.btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
-.status { font-size: 13px; color: #4ade80; }
+.status { font-size: 13px; }
+.status.success { color: #4ade80; }
 .status.error { color: #ef4444; }
+.loading { text-align: center; padding: 20px; color: #888; }
 
-/* grid */
+/* grid for all files */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
 }
 .card {
-  background: #16213e;
-  border-radius: 10px;
+  background: #0d1b2a;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid #333;
-  transition: border-color .2s;
 }
-.card:hover { border-color: #555; }
-.card-img {
-  width: 100%;
-  aspect-ratio: 3/4;
-  object-fit: contain;
-  background: #111;
-  display: block;
-}
-.card-body {
-  padding: 10px 12px;
-}
-.card-name {
-  font-size: 12px;
-  color: #ccc;
-  word-break: break-all;
-  margin-bottom: 6px;
-}
-.card-mappings {
-  font-size: 11px;
-  color: #8b5cf6;
-  line-height: 1.5;
-}
-.card-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-.card-actions .btn { padding: 3px 10px; font-size: 11px; }
-
-/* mapping table */
-.mapping-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 24px;
-  font-size: 13px;
-}
-.mapping-table th {
-  text-align: left;
-  color: #888;
-  padding: 8px 12px;
-  border-bottom: 1px solid #333;
-  font-weight: 500;
-}
-.mapping-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #222;
-}
-.mapping-table .matched { color: #4ade80; }
-.mapping-table .missing { color: #ef4444; }
-.mapping-table .manual { color: #facc15; }
-
-.loading { text-align: center; padding: 40px; color: #888; }
+.card-img { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #111; }
+.card-body { padding: 8px 10px; }
+.card-name { font-size: 11px; color: #aaa; word-break: break-all; }
+.card-actions { margin-top: 6px; }
+.card-actions .btn { padding: 3px 8px; font-size: 11px; }
 </style>
 </head>
 <body>
 
 <h1>立绘资源管理</h1>
-<p class="sub">拖拽上传 PNG 图片，按命名约定自动匹配情绪/图层。文件存储在 <code>pages/galgame/assets/</code></p>
-
-<div class="upload-zone" id="upload-zone">
-  <div class="icon">&#128206;</div>
-  <p>拖拽 PNG 文件到此处，或点击选择文件</p>
-  <input type="file" id="file-input" multiple accept="image/png,image/jpeg,image/webp,image/bmp,image/gif" />
-</div>
+<div class="sub" id="mode-indicator"></div>
 
 <div class="action-bar">
-  <button class="btn btn-primary" id="refresh-btn">刷新列表</button>
+  <button class="btn btn-primary" id="refresh-btn">刷新</button>
   <span class="status" id="status"></span>
 </div>
 
-<div id="grid-container"></div>
-<div class="loading" id="loading">加载中...</div>
+<!-- Single mode section -->
+<div class="section" id="section-single">
+  <h2>Single 模式素材 — 全身立绘 + 表情差分</h2>
+  <div class="hint">每种情绪对应<strong>一张完整半身立绘</strong>（身体+头+头发在一张图里）。AI 切换情绪时整张图替换。不需要图层文件。</div>
+  <div class="slot-grid" id="slots-single"></div>
+</div>
 
-<h3 style="margin-top: 32px;">文件映射状态</h3>
-<table class="mapping-table" id="mapping-table"></table>
+<!-- Layered mode section -->
+<div class="section" id="section-layered">
+  <h2>Layered 模式素材 — 分层 PNG 伪 Live2D</h2>
+  <div class="hint">角色拆成多个透明 PNG 层叠加，各有独立动画。表情切换时<strong>只替换脸部</strong>。图层文件固定，表情文件为每种情绪准备一张<strong>仅脸部区域</strong>的 PNG。</div>
+  <div class="sub-section-title">图层文件</div>
+  <div class="slot-grid" id="slots-layers"></div>
+  <div class="sub-section-title">表情文件（仅脸部区域）</div>
+  <div class="slot-grid" id="slots-layered-expr"></div>
+</div>
+
+<!-- Background section -->
+<div class="section" id="section-bg">
+  <h2>场景背景图</h2>
+  <div class="hint">一张背景图，推荐 16:9 或更宽的横向图片。</div>
+  <div class="slot-grid" id="slots-bg"></div>
+</div>
+
+<!-- All files grid -->
+<h3 style="margin-top: 28px;">所有已上传文件</h3>
+<div class="section" style="border-color: #444; opacity: 1;">
+  <div id="grid-container"></div>
+  <div class="loading" id="loading">加载中...</div>
+</div>
 
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
 const PLUGIN = "astrbot_plugin_galgame_web";
-const EMOTION_KEYS = ["neutral","happy","sad","angry","surprised","blush","thinking"];
 const LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
-const BG_KEYS = ["background","bg"];
+const BG_KEYS = ["background"];
 
 let bridge = null;
-let files = [];
+let allFiles = [];
+let config = {};
 
 async function init() {
   bridge = window.AstrBotPluginPage;
   await bridge.ready();
 
-  document.getElementById("refresh-btn").onclick = loadFiles;
-  document.getElementById("file-input").onchange = handleFileSelect;
-  setupDragDrop();
-
-  await loadFiles();
-}
-
-function setupDragDrop() {
-  const zone = document.getElementById("upload-zone");
-  zone.onclick = () => document.getElementById("file-input").click();
-
-  zone.ondragover = e => { e.preventDefault(); zone.classList.add("dragover"); };
-  zone.ondragleave = () => zone.classList.remove("dragover");
-  zone.ondrop = e => {
-    e.preventDefault();
-    zone.classList.remove("dragover");
-    uploadFiles(e.dataTransfer.files);
-  };
-}
-
-function handleFileSelect(e) {
-  uploadFiles(e.target.files);
-  e.target.value = "";
-}
-
-async function uploadFiles(fileList) {
-  const filesToUpload = [];
-  for (const f of Array.from(fileList)) {
-    if (f.type.startsWith("image/")) {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(f);
-      });
-      filesToUpload.push({ name: f.name, data: base64 });
-    }
-  }
-  if (filesToUpload.length === 0) return;
-
-  setStatus(`上传中... 0/${filesToUpload.length}`);
-  const uploaded = [];
-  const failed = [];
-  for (let i = 0; i < filesToUpload.length; i++) {
-    const f = filesToUpload[i];
-    setStatus(`上传中... ${i + 1}/${filesToUpload.length} (${f.name})`);
-    try {
-      const data = await bridge.apiPost("assets/upload", { files: [f] });
-      if (data.uploaded) {
-        uploaded.push(...data.uploaded);
-      } else if (data.error) {
-        failed.push(f.name + ": " + (data.error || "unknown"));
-      }
-    } catch (e) {
-      failed.push(f.name + ": " + (e.message || e));
-    }
-    if (i < filesToUpload.length - 1) {
-      await new Promise(r => setTimeout(r, 300));
-    }
-  }
-  if (uploaded.length > 0) setStatus(`上传完成: ${uploaded.join(", ")}`, "success");
-  else if (failed.length > 0) setStatus(`上传失败: ${failed.join(", ")}`, "error");
-  await loadFiles();
-}
-
-async function loadFiles() {
-  setStatus("");
-  const loading = document.getElementById("loading");
-  loading.style.display = "block";
   try {
-    const data = await bridge.apiGet("assets/list");
-    console.log("[settings] list response:", data);
-    const rawFiles = data.files || [];
-    if (rawFiles.length > 0) {
-      const names = rawFiles.map(f => f.name);
-      console.log("[settings] batch request names:", names);
-      const batchData = await bridge.apiPost("assets/batch", { names });
-      console.log("[settings] batch response:", batchData);
-      files = batchData.files || [];
-    } else {
-      console.log("[settings] no files in list");
-      files = [];
-    }
-    renderGrid();
-    renderMapping();
-  } catch (e) {
-    console.error("[settings] loadFiles error:", e);
-    setStatus("加载失败: " + e.message, "error");
+    config = await bridge.apiGet("config");
+  } catch(e) {
+    config = {};
   }
-  loading.style.display = "none";
+
+  document.getElementById("refresh-btn").onclick = loadFiles;
+  await loadFiles();
 }
 
-function renderGrid() {
+/* ---- data ---- */
+
+function getEmotionKeys() {
+  const expr = config.expressions || {};
+  if (expr && typeof expr === "object") {
+    const keys = Object.keys(expr);
+    if (keys.length > 0) return keys;
+  }
+  return ["neutral","happy","sad","angry","surprised","blush","thinking"];
+}
+
+function getMatchedFile(key) {
+  const keyL = key.toLowerCase();
+  // exact match first
+  for (const f of allFiles) {
+    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem === keyL) return f;
+  }
+  // substring match
+  for (const f of allFiles) {
+    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem.includes(keyL) || keyL.includes(stem)) return f;
+  }
+  return null;
+}
+
+function getMatchedBg() {
+  for (const f of allFiles) {
+    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
+    if (stem === "background" || stem === "bg") return f;
+  }
+  return null;
+}
+
+/* ---- render ---- */
+
+function renderAll() {
+  renderModeIndicator();
+  renderSingleSlots();
+  renderLayeredLayerSlots();
+  renderLayeredExprSlots();
+  renderBgSlot();
+  renderFileGrid();
+}
+
+function renderModeIndicator() {
+  const mode = config.sprite_mode || "single";
+  const el = document.getElementById("mode-indicator");
+  el.innerHTML = `当前渲染模式：<span class="mode-badge ${mode}">${mode === "layered" ? "Layered 多层" : "Single 单图"}</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>`;
+}
+
+function renderSingleSlots() {
+  const section = document.getElementById("section-single");
+  const grid = document.getElementById("slots-single");
+  const mode = config.sprite_mode || "single";
+  section.className = "section " + (mode === "single" ? "active" : "inactive");
+
+  const keys = getEmotionKeys();
+  grid.innerHTML = keys.map(k => {
+    const f = getMatchedFile(k);
+    return slotCard(k, f, "表情");
+  }).join("");
+}
+
+function renderLayeredLayerSlots() {
+  const section = document.getElementById("section-layered");
+  const grid = document.getElementById("slots-layers");
+  const mode = config.sprite_mode || "single";
+  section.className = "section " + (mode === "layered" ? "active" : "inactive");
+
+  grid.innerHTML = LAYER_KEYS.map(k => {
+    const f = getMatchedFile(k);
+    const label = k === "head" ? "图层:head (默认脸)" : "图层:" + k;
+    return slotCard(k, f, label);
+  }).join("");
+}
+
+function renderLayeredExprSlots() {
+  const grid = document.getElementById("slots-layered-expr");
+  const keys = getEmotionKeys();
+  grid.innerHTML = keys.map(k => {
+    const f = getMatchedFile(k);
+    return slotCard(k, f, "表情: " + k + " (仅脸部)");
+  }).join("");
+}
+
+function renderBgSlot() {
+  const f = getMatchedBg();
+  document.getElementById("slots-bg").innerHTML = slotCard("background", f, "背景图");
+}
+
+function slotCard(key, matchedFile, label) {
+  const cls = matchedFile ? "slot-card matched" : "slot-card missing";
+  let preview;
+  if (matchedFile && matchedFile.data) {
+    preview = `<img class="slot-img" src="${matchedFile.data}" alt="${key}">`;
+  } else {
+    preview = `<div class="slot-img placeholder">🖼</div>`;
+  }
+  return `
+    <div class="${cls}" id="slot-${key}">
+      ${preview}
+      <div class="slot-name">${label}</div>
+      <div class="slot-status ${matchedFile ? 'matched' : 'missing'}">${matchedFile ? '✅ ' + matchedFile.name : '❌ 未上传'}</div>
+      <input type="file" accept="image/*" id="file-${key}" style="display:none" onchange="uploadToSlot('${key}', this)" />
+      <button class="btn btn-primary" onclick="document.getElementById('file-${key}').click()">上传</button>
+    </div>`;
+}
+
+function renderFileGrid() {
   const container = document.getElementById("grid-container");
-  container.innerHTML = "";
-  if (files.length === 0) {
-    container.innerHTML = '<div class="loading">暂无图片，上传 PNG 文件开始</div>';
+  if (allFiles.length === 0) {
+    container.innerHTML = '<div class="loading">暂无文件</div>';
     return;
   }
-
   const grid = document.createElement("div");
   grid.className = "grid";
-
-  for (const f of files) {
-    const stem = f.name.replace(/\.[^.]+$/, "").toLowerCase();
-    const mappings = findMappings(stem);
-
+  for (const f of allFiles) {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -274,26 +349,15 @@ function renderGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    if (f.data) {
-      img.src = f.data;
-      console.log("[settings] img src set: " + f.name + " len=" + f.data.length);
-    } else {
-      console.warn("[settings] no data for: " + f.name);
-    }
+    img.src = f.data || "";
     card.appendChild(img);
 
     const body = document.createElement("div");
     body.className = "card-body";
-
     const nameEl = document.createElement("div");
     nameEl.className = "card-name";
     nameEl.textContent = f.name;
     body.appendChild(nameEl);
-
-    const mapEl = document.createElement("div");
-    mapEl.className = "card-mappings";
-    mapEl.textContent = mappings || "无匹配";
-    body.appendChild(mapEl);
 
     const actions = document.createElement("div");
     actions.className = "card-actions";
@@ -307,62 +371,59 @@ function renderGrid() {
     card.appendChild(body);
     grid.appendChild(card);
   }
-
+  container.innerHTML = "";
   container.appendChild(grid);
 }
 
-function findMappings(stem) {
-  const matches = [];
-  for (const k of EMOTION_KEYS) {
-    if (stem === k || stem.includes(k) || k.includes(stem)) {
-      matches.push(`表情:${k}`);
+/* ---- upload ---- */
+
+async function uploadToSlot(key, input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = "";
+
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  setStatus(`上传 ${key} ...`);
+  try {
+    const data = await bridge.apiPost("assets/upload-key", { key, data: base64 });
+    if (data.uploaded) {
+      setStatus(`✅ ${key} → ${data.uploaded}`, "success");
+      await loadFiles();
+    } else {
+      setStatus(`❌ ${key}: ${data.error || "失败"}`, "error");
     }
+  } catch(e) {
+    setStatus(`❌ ${key}: ${e.message}`, "error");
   }
-  for (const k of LAYER_KEYS) {
-    if (stem === k || stem.includes(k) || k.includes(stem)) {
-      matches.push(`图层:${k}`);
-    }
-  }
-  for (const k of BG_KEYS) {
-    if (stem === k || stem.includes(k)) {
-      matches.push("背景");
-    }
-  }
-  return matches.join(" · ");
 }
 
-function renderMapping() {
-  const names = files.map(f => f.name);
-  const stems = new Set(names.map(n => n.replace(/\.[^.]+$/, "").toLowerCase()));
-  let html = "<tr><th>类型</th><th>键名</th><th>匹配文件</th></tr>";
+/* ---- list / delete ---- */
 
-  for (const k of EMOTION_KEYS) {
-    const found = findFileFor(k, stems, names);
-    html += `<tr><td>表情</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
+async function loadFiles() {
+  setStatus("");
+  const loading = document.getElementById("loading");
+  loading.style.display = "block";
+  try {
+    const data = await bridge.apiGet("assets/list");
+    const rawFiles = data.files || [];
+    if (rawFiles.length > 0) {
+      const names = rawFiles.map(f => f.name);
+      const batchData = await bridge.apiPost("assets/batch", { names });
+      allFiles = batchData.files || [];
+    } else {
+      allFiles = [];
+    }
+    renderAll();
+  } catch(e) {
+    setStatus("加载失败: " + e.message, "error");
   }
-  for (const k of LAYER_KEYS) {
-    const found = findFileFor(k, stems, names);
-    html += `<tr><td>图层</td><td>${k}</td><td class="${found ? 'matched' : 'missing'}">${found || '未匹配'}</td></tr>`;
-  }
-  const bg = findFileForBg(stems, names);
-  html += `<tr><td>背景</td><td>background</td><td class="${bg ? 'matched' : 'missing'}">${bg || '未匹配'}</td></tr>`;
-
-  document.getElementById("mapping-table").innerHTML = html;
-}
-
-function findFileFor(key, stems, names) {
-  if (stems.has(key)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === key) || key + ".png";
-  for (const s of stems) {
-    if (s.includes(key) || key.includes(s)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === s) || s + ".png";
-  }
-  return null;
-}
-
-function findFileForBg(stems, names) {
-  for (const k of BG_KEYS) {
-    if (stems.has(k)) return names.find(n => n.replace(/\.[^.]+$/, "").toLowerCase() === k) || k + ".png";
-  }
-  return null;
+  loading.style.display = "none";
 }
 
 async function deleteFile(filename) {
@@ -376,7 +437,7 @@ async function deleteFile(filename) {
     } else {
       setStatus(data.error || "删除失败", "error");
     }
-  } catch (e) {
+  } catch(e) {
     setStatus("删除失败: " + e.message, "error");
   }
 }
@@ -384,8 +445,8 @@ async function deleteFile(filename) {
 function setStatus(msg, type) {
   const el = document.getElementById("status");
   el.textContent = msg;
-  el.className = "status" + (type === "error" ? " error" : "");
-  if (msg) setTimeout(() => { if (el.textContent === msg) setStatus(""); }, 4000);
+  el.className = "status" + (type ? " " + type : "");
+  if (msg) setTimeout(() => { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
 }
 
 init();
