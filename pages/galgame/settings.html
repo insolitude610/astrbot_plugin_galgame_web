@@ -200,22 +200,34 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   <div class="loading" id="loading">加载中...</div>
 </div>
 
-<script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
-const PLUGIN = "astrbot_plugin_galgame_web";
-const LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
-const BG_KEYS = ["background"];
+var PLUGIN = "astrbot_plugin_galgame_web";
+var API_BASE = "/api/plug/" + PLUGIN;
+var LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","orb"];
+var BG_KEYS = ["background"];
 
-let bridge = null;
-let allFiles = [];
-let config = {};
+var allFiles = [];
+var config = {};
+
+async function apiGet(endpoint) {
+  var resp = await fetch(API_BASE + "/" + endpoint);
+  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
+  return resp.json();
+}
+
+async function apiPost(endpoint, body) {
+  var resp = await fetch(API_BASE + "/" + endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
+  return resp.json();
+}
 
 async function init() {
-  bridge = window.AstrBotPluginPage;
-  await bridge.ready();
-
   try {
-    config = await bridge.apiGet("config");
+    config = await apiGet("config");
   } catch(e) {
     config = {};
   }
@@ -240,12 +252,12 @@ function getMatchedFile(key, prefix) {
       if (stem === prefixed) return allFiles[i];
     }
   }
-  // 2) exact stem match without prefix (backward compat)
+  // 2) exact stem match without prefix
   for (var i = 0; i < allFiles.length; i++) {
     var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
     if (stem === keyL) return allFiles[i];
   }
-  // 3) word-parts match with prefix preferred
+  // 3) word-parts match with prefix
   if (prefix) {
     var prefixL = prefix.toLowerCase();
     for (var i = 0; i < allFiles.length; i++) {
@@ -254,7 +266,7 @@ function getMatchedFile(key, prefix) {
       if (parts.indexOf(prefixL) !== -1 && parts.indexOf(keyL) !== -1) return allFiles[i];
     }
   }
-  // 4) word-parts match (backward compat)
+  // 4) word-parts match
   for (var i = 0; i < allFiles.length; i++) {
     var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
     var parts = stem.split(/[_\-\s.]+/);
@@ -398,37 +410,38 @@ function slotCard(key, matchedFile, label, idPrefix) {
 }
 
 function renderFileGrid() {
-  const container = document.getElementById("grid-container");
+  var container = document.getElementById("grid-container");
   if (allFiles.length === 0) {
     container.innerHTML = '<div class="loading">暂无文件</div>';
     return;
   }
-  const grid = document.createElement("div");
+  var grid = document.createElement("div");
   grid.className = "grid";
-  for (const f of allFiles) {
-    const card = document.createElement("div");
+  for (var i = 0; i < allFiles.length; i++) {
+    var f = allFiles[i];
+    var card = document.createElement("div");
     card.className = "card";
 
-    const img = document.createElement("img");
+    var img = document.createElement("img");
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
     img.src = f.data || "";
     card.appendChild(img);
 
-    const body = document.createElement("div");
+    var body = document.createElement("div");
     body.className = "card-body";
-    const nameEl = document.createElement("div");
+    var nameEl = document.createElement("div");
     nameEl.className = "card-name";
     nameEl.textContent = f.name;
     body.appendChild(nameEl);
 
-    const actions = document.createElement("div");
+    var actions = document.createElement("div");
     actions.className = "card-actions";
-    const delBtn = document.createElement("button");
+    var delBtn = document.createElement("button");
     delBtn.className = "btn btn-danger";
     delBtn.textContent = "删除";
-    delBtn.onclick = () => deleteFile(f.name);
+    delBtn.onclick = function(fn) { return function() { deleteFile(fn); }; }(f.name);
     actions.appendChild(delBtn);
     body.appendChild(actions);
 
@@ -442,35 +455,35 @@ function renderFileGrid() {
 /* ---- upload ---- */
 
 async function uploadToSlot(key, input) {
-  const file = input.files[0];
+  var file = input.files[0];
   if (!file) return;
   input.value = "";
 
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+  var base64 = await new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 
-  setStatus(`上传 ${key} ...`);
+  setStatus("上传 " + key + " ...");
   try {
-    const data = await bridge.apiPost("assets/upload-key", { key, data: base64 });
+    var data = await apiPost("assets/upload-key", { key: key, data: base64 });
     if (data.uploaded) {
-      setStatus(`✅ ${key} → ${data.uploaded}`, "success");
+      setStatus("✅ " + key + " → " + data.uploaded, "success");
       await loadFiles();
     } else {
-      setStatus(`❌ ${key}: ${data.error || "失败"}`, "error");
+      setStatus("❌ " + key + ": " + (data.error || "失败"), "error");
     }
   } catch(e) {
-    setStatus(`❌ ${key}: ${e.message}`, "error");
+    setStatus("❌ " + key + ": " + e.message, "error");
   }
 }
 
 async function assignToSlot(key, sourceName) {
   setStatus("分配 " + sourceName + " → " + key + " ...");
   try {
-    var data = await bridge.apiPost("assets/copy", { source: sourceName, key: key });
+    var data = await apiPost("assets/copy", { source: sourceName, key: key });
     if (data.copied) {
       setStatus("✅ " + data.source + " → " + data.copied, "success");
       await loadFiles();
@@ -489,12 +502,12 @@ async function loadFiles() {
   var loading = document.getElementById("loading");
   loading.style.display = "block";
   try {
-    var data = await bridge.apiGet("assets/list");
+    var data = await apiGet("assets/list");
     var rawFiles = data.files || [];
     if (rawFiles.length > 0) {
       var names = [];
       for (var i = 0; i < rawFiles.length; i++) { names.push(rawFiles[i].name); }
-      var batchData = await bridge.apiPost("assets/batch", { names: names });
+      var batchData = await apiPost("assets/batch", { names: names });
       allFiles = batchData.files || [];
     } else {
       allFiles = [];
@@ -507,12 +520,12 @@ async function loadFiles() {
 }
 
 async function deleteFile(filename) {
-  if (!confirm(`确定删除 ${filename}？`)) return;
+  if (!confirm("确定删除 " + filename + "？")) return;
   setStatus("删除中...");
   try {
-    const data = await bridge.apiPost("assets/delete", { filename });
+    var data = await apiPost("assets/delete", { filename: filename });
     if (data.deleted) {
-      setStatus(`已删除: ${data.deleted}`, "success");
+      setStatus("已删除: " + data.deleted, "success");
       await loadFiles();
     } else {
       setStatus(data.error || "删除失败", "error");
@@ -523,10 +536,10 @@ async function deleteFile(filename) {
 }
 
 function setStatus(msg, type) {
-  const el = document.getElementById("status");
+  var el = document.getElementById("status");
   el.textContent = msg;
   el.className = "status" + (type ? " " + type : "");
-  if (msg) setTimeout(() => { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
+  if (msg) setTimeout(function() { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
 }
 
 init();
