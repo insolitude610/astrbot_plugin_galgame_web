@@ -1,24 +1,27 @@
 const PLUGIN_NAME = "astrbot_plugin_galgame_web";
 const API_BASE = "/api/plug/" + PLUGIN_NAME;
 
-let sessionId = null;
-let currentEmotion = "neutral";
-let spriteMode = "single";
-let ttsProvider = "";
-let rapidThreshold = 5;
-let rapidWindowMs = 3000;
-let expressions = {};
-let layers = {};
-let characterName = "小星";
-let backgroundFile = "";
+var sessionId = null;
+var currentEmotion = "neutral";
+var spriteMode = "single";
+var ttsProvider = "";
+var rapidThreshold = 5;
+var rapidWindowMs = 3000;
+var expressions = {};
+var layers = {};
+var characterName = "小星";
+var backgroundFile = "";
 
-let typewriterTimer = null;
-let mouthTimer = null;
-let isAudioPlaying = false;
-let sseSource = null;
+var typewriterTimer = null;
+var mouthTimer = null;
+var isAudioPlaying = false;
+var sseSource = null;
+var bridgeSseSubId = null;
+
+var useBridge = (typeof window.AstrBotPluginPage !== "undefined" && window.AstrBotPluginPage);
 
 /* ---- DOM refs ---- */
-const el = {
+var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
   spriteSingle: document.getElementById("sprite-single"),
@@ -36,31 +39,107 @@ const el = {
   ttsAudio: document.getElementById("tts-audio"),
 };
 
-/* ---- API helpers ---- */
+/* ---- API helpers (bridge or direct) ---- */
 
-async function apiGet(endpoint, params) {
+function apiGet(endpoint, params) {
+  if (useBridge) {
+    return window.AstrBotPluginPage.apiGet(endpoint, params);
+  }
   var url = API_BASE + "/" + endpoint;
   if (params) {
     url += "?" + new URLSearchParams(params).toString();
   }
-  var resp = await fetch(url);
-  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
-  return resp.json();
+  return fetch(url).then(function (r) {
+    if (!r.ok) throw new Error(endpoint + " returned " + r.status);
+    return r.json();
+  });
 }
 
-async function apiPost(endpoint, body) {
-  var resp = await fetch(API_BASE + "/" + endpoint, {
+function apiPost(endpoint, body) {
+  if (useBridge) {
+    return window.AstrBotPluginPage.apiPost(endpoint, body);
+  }
+  return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }).then(function (r) {
+    if (!r.ok) throw new Error(endpoint + " returned " + r.status);
+    return r.json();
   });
-  if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
-  return resp.json();
 }
 
 function assetUrl(filename) {
   if (!filename) return "";
   return "./assets/" + filename;
+}
+
+/* ---- SSE ---- */
+
+function subscribeSSE() {
+  unsubscribeSSE();
+
+  if (useBridge) {
+    bridgeSseSubId = window.AstrBotPluginPage.subscribeSSE(
+      "stream",
+      {
+        onMessage: function (event) {
+          handleSseMsg(event.parsed);
+        },
+        onError: function () {
+          console.warn("SSE connection error, will retry...");
+          setTimeout(subscribeSSE, 3000);
+        },
+      },
+      { session_id: sessionId },
+    );
+  } else {
+    var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
+    sseSource = new EventSource(url);
+    sseSource.addEventListener("message", function (event) {
+      var msg = null;
+      try { msg = JSON.parse(event.data); } catch (_) { return; }
+      handleSseMsg(msg);
+    });
+    sseSource.onerror = function () {
+      sseSource.close();
+      sseSource = null;
+      console.warn("SSE connection error, will retry...");
+      setTimeout(subscribeSSE, 3000);
+    };
+  }
+}
+
+function unsubscribeSSE() {
+  if (bridgeSseSubId) {
+    try { window.AstrBotPluginPage.unsubscribeSSE(bridgeSseSubId); } catch (_) {}
+    bridgeSseSubId = null;
+  }
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+}
+
+function handleSseMsg(msg) {
+  if (!msg) return;
+  switch (msg.type) {
+    case "emotion":
+      switchExpression(msg.value);
+      break;
+    case "text":
+      typewriterAppend(msg.value);
+      break;
+    case "audio":
+      playTTSAudio(msg.value);
+      break;
+    case "end":
+      finishResponse();
+      break;
+    case "error":
+      showError(msg.message);
+      break;
+  }
 }
 
 /* ---- init ---- */
@@ -157,48 +236,6 @@ function loadExpressionToSingle(emotion) {
   };
   el.spriteSingleImg.classList.add("switching");
   img.src = src;
-}
-
-/* ---- SSE ---- */
-
-function subscribeSSE() {
-  if (sseSource) {
-    sseSource.close();
-    sseSource = null;
-  }
-
-  var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
-  sseSource = new EventSource(url);
-
-  sseSource.addEventListener("message", function (event) {
-    var msg = null;
-    try { msg = JSON.parse(event.data); } catch (_) { return; }
-    if (!msg) return;
-
-    switch (msg.type) {
-      case "emotion":
-        switchExpression(msg.value);
-        break;
-      case "text":
-        typewriterAppend(msg.value);
-        break;
-      case "audio":
-        playTTSAudio(msg.value);
-        break;
-      case "end":
-        finishResponse();
-        break;
-      case "error":
-        showError(msg.message);
-        break;
-    }
-  });
-
-  sseSource.onerror = function () {
-    sseSource.close();
-    sseSource = null;
-    el.dialogText.textContent = "连接已断开，请刷新页面。";
-  };
 }
 
 /* ---- expression ---- */
@@ -400,5 +437,5 @@ init();
 window.addEventListener("beforeunload", function () {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
-  if (sseSource) { sseSource.close(); sseSource = null; }
+  unsubscribeSSE();
 });
