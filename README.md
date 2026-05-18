@@ -2,7 +2,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-一个 AstrBot 插件，在浏览器中呈现 Galgame 风格的 AI 虚拟伙伴界面。支持多层 PNG 伪 Live2D 独立动画、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
+一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持多层 PNG 伪 Live2D 独立动画、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
 
 ## 功能亮点
 
@@ -38,6 +38,7 @@
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o |
 | TTS Provider | 语音合成 | Edge TTS（免费） |
 | 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
+| 独立 WebUI 端口 | 插件启动的独立 HTTP 服务器端口 | 默认 6186，设为 0 关闭 |
 | 自定义情绪 | JSON 格式添加额外情绪标签 | 例：`{"dokidoki": ""}` |
 | 会话保留天数 | 超过该天数未活跃的会话自动清理 | 默认 7 天，0 = 永不清理 |
 
@@ -47,11 +48,17 @@
 
 **打开界面：**
 
-- **方式一**：AstrBot Dashboard → 插件 → AI Galgame 虚拟伙伴 → 点击「Galgame」页面
-- **方式二**：浏览器访问 Dashboard 地址后追加 `/api/plugin/page/content/astrbot_plugin_galgame_web/galgame/index.html`
-- **方式三**：在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 会回复打开方式
+插件启动后会自动在本机启动一个 HTTP 服务器（默认端口 6186），浏览器直接访问即可：
+
+```
+http://localhost:6186
+```
+
+也可以在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 会回复访问地址。
 
 打开后在输入框输入文字即可对话。
+
+> **注意**：WebUI 通过该独立端口访问，不在 AstrBot Dashboard 内嵌显示。端口可在插件配置中修改。
 
 ---
 
@@ -269,19 +276,27 @@ Same light-gray background, same 3:4 composition.
 ## 技术架构
 
 ```
-浏览器 (Galgame UI)
-  ↕ Bridge API + SSE
-AstrBot Dashboard (Quart)
-  ↕ register_web_api
-插件后端 main.py
-  ↕ context.llm_generate / context.get_provider_by_id
-AstrBot Core
-  └─ LLM + TTS + Persona + 会话管理
+浏览器 (http://localhost:6186)
+  ├─ 静态文件 → 插件内置 HTTP Server (ThreadingHTTPServer)
+  └─ /api/* → 代理至 AstrBot Core (Quart :6185) → SSE + fetch
 ```
+
+- 前端: 原生 HTML/CSS/JS，无框架依赖
+- 后端: Python `http.server` + AstrBot Star API
+- 通信: `fetch()` + `EventSource (SSE)`，通过本地代理与 AstrBot Core 交互
 
 ---
 
 ## 变更记录
+
+### v0.3.0
+
+- **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口（默认 6186）提供完整 WebUI
+- **移除 Dashboard 内嵌** — 不再通过 Dashboard 沙箱 iframe 访问，避免 sandbox 限制
+- **Bridge SDK 移除** — 前端改用原生 `fetch()` + `EventSource` 直接通信
+- **API 代理** — 插件内置服务器自动代理 `/api/*` 请求到 AstrBot Core，支持 SSE 流式代理
+- 返回 `user-select: auto`，允许文本选中复制
+- `localStorage` 正常工作（无 sandbox 限制）
 
 ### v0.2.4
 
