@@ -47,6 +47,18 @@ def _get_emotion_tags(config: dict) -> list[str]:
         return keys
     return list(DEFAULT_EMOTION_TAGS)
 
+def _extract_emotion(text: str, emotion_tags: list[str]) -> tuple[str, str]:
+    m = EMOTION_PATTERN.search(text)
+    if m and m.group(1).lower() in emotion_tags:
+        return EMOTION_PATTERN.sub("", text).strip(), m.group(1).lower()
+
+    for tag in emotion_tags:
+        p = re.compile(rf"\[{re.escape(tag)}\]", re.IGNORECASE)
+        if p.search(text):
+            return p.sub("", text).strip(), tag.lower()
+
+    return text.strip(), "neutral"
+
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
 ASSETS_DIR = pathlib.Path(__file__).parent / "pages" / "galgame" / "assets"
@@ -676,15 +688,8 @@ class GalgamePlugin(Star):
 
             full_text = resp.completion_text or ""
 
-            emotion_match = EMOTION_PATTERN.search(full_text)
             emotion_tags = _get_emotion_tags(self.config)
-            current_emotion = "neutral"
-            if emotion_match:
-                tag = emotion_match.group(1).lower()
-                if tag in emotion_tags:
-                    current_emotion = tag
-
-            clean_text = EMOTION_PATTERN.sub("", full_text).strip()
+            clean_text, current_emotion = _extract_emotion(full_text, emotion_tags)
 
             async with session["_lock"]:
                 session["history"].append({"role": "user", "content": text})
