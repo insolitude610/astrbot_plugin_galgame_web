@@ -20,6 +20,7 @@ from quart import Response, request
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.star import Context, Star
+from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
 
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
@@ -620,6 +621,45 @@ class GalgamePlugin(Star):
             logger.exception("session/init failed")
             return {"error": "internal error"}, 500
 
+    async def _push_command_through_pipeline(self, text: str, session_id: str) -> str:
+        message_id = str(uuid.uuid4())
+
+        back_queue = webchat_queue_mgr.get_or_create_back_queue(
+            message_id, session_id
+        )
+
+        payload = {
+            "message": [{"type": "text", "text": text}],
+            "message_id": message_id,
+            "selected_provider": None,
+            "selected_model": None,
+            "enable_streaming": False,
+        }
+
+        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
+        await chat_queue.put(("galgame", session_id, payload))
+
+        parts = []
+        try:
+            while True:
+                result = await asyncio.wait_for(back_queue.get(), timeout=120)
+                msg_type = result.get("type", "")
+                data_text = result.get("data", "")
+
+                if msg_type == "end":
+                    break
+                elif msg_type in ("plain", "complete"):
+                    if data_text:
+                        parts.append(data_text)
+                elif msg_type == "image":
+                    parts.append(data_text)
+        except asyncio.TimeoutError:
+            logger.warning(f"[pipeline] timeout waiting for response to session_id={session_id}")
+        finally:
+            webchat_queue_mgr.remove_back_queue(message_id)
+
+        return "".join(parts).strip()
+
     async def _api_send(self):
         data = await request.get_json() or {}
         logger.debug(f"[send] received body keys={list(data.keys()) if data else []}")
@@ -634,6 +674,36 @@ class GalgamePlugin(Star):
         if not text:
             return {"error": "empty text"}, 400
 
+        # ---- command detection via pipeline ----
+        cfg = self.context.get_config()
+        wake_prefixes = cfg.get("wake_prefix", ["/"])
+        matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
+
+        if matched_prefix:
+            command_text = text[len(matched_prefix):].strip()
+            cmd_name = command_text.split()[0].lower() if command_text else ""
+
+            session = self._sessions[session_id]
+            if cmd_name == "reset":
+                async with session["_lock"]:
+                    session["history"] = []
+                    session["current_emotion"] = "neutral"
+                self._save_session(session_id)
+            elif cmd_name == "new":
+                async with session["_lock"]:
+                    session["history"] = []
+                    session["current_emotion"] = "neutral"
+                self._save_session(session_id)
+
+            try:
+                reply = await self._push_command_through_pipeline(text, session_id)
+            except Exception as e:
+                logger.exception(f"[pipeline] push failed: {e}")
+                reply = "指令处理失败"
+
+            return {"reply": reply, "emotion": "neutral"}
+
+        # ---- regular chat ----
         try:
             session = self._sessions[session_id]
 
@@ -934,7 +1004,9 @@ class GalgamePlugin(Star):
             url = "（未启用独立 WebUI，请在插件设置中设置 web_port）"
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
-            f"浏览器访问：{url}"
+            f"浏览器访问：{url}\n\n"
+            "支持 AstrBot 指令（/help /reset /new 等），"
+            "以唤醒前缀开头的消息会走 AstrBot 指令管道"
         )
 
     async def terminate(self):
