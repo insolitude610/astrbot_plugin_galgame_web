@@ -263,8 +263,8 @@ async function init() {
   }
 
   document.getElementById("refresh-btn").onclick = loadFiles;
-  await loadFiles();
   applyBackground();
+  await loadFiles();
 }
 
 function applyBackground() {
