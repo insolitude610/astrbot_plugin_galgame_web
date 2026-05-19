@@ -115,7 +115,110 @@ function applyConfig(cfg) {
 function applyBackground() {
   if (backgroundFile) {
     el.bg.style.backgroundImage = "url(" + assetUrl(backgroundFile) + ")";
+    analyzeBgColor();
   }
+}
+
+function analyzeBgColor() {
+  var img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function () {
+    var canvas = document.createElement("canvas");
+    var size = 80;
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, size, size);
+    var data = ctx.getImageData(0, 0, size, size).data;
+
+    var r = 0, g = 0, b = 0, count = 0;
+    for (var i = 0; i < data.length; i += 16) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      count++;
+    }
+    r = Math.round(r / count);
+    g = Math.round(g / count);
+    b = Math.round(b / count);
+
+    // Convert to HSL, shift hue towards warm if too cool
+    var hsl = rgbToHsl(r, g, b);
+    var hue = hsl[0];
+    // Push cool blues/greens towards warm amber/gold
+    if (hue > 180 && hue < 300) hue = (hue + 80) % 360;
+    var sat = Math.min(hsl[1] * 1.3, 0.55);
+    var light = Math.max(hsl[2], 0.15);
+
+    // Generate palette from adjusted hue
+    applyHistoryPalette(hue, sat, light);
+  };
+  img.src = assetUrl(backgroundFile);
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  var max = Math.max(r, g, b), min = Math.min(r, g, b);
+  var h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    var d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [h * 360, s, l];
+}
+
+function hslToRgba(h, s, l, a) {
+  h /= 360;
+  var r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    var p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return "rgba(" + Math.round(r*255) + "," + Math.round(g*255) + "," + Math.round(b*255) + "," + a + ")";
+}
+function hue2rgb(p, q, t) {
+  if (t < 0) t += 1; if (t > 1) t -= 1;
+  if (t < 1/6) return p + (q - p) * 6 * t;
+  if (t < 1/2) return q;
+  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+  return p;
+}
+
+function applyHistoryPalette(hue, sat, light) {
+  var root = document.documentElement.style;
+
+  root.setProperty("--history-bg", hslToRgba(hue, sat * 0.7, light * 0.18, 0.95));
+  root.setProperty("--history-border", hslToRgba(hue, sat * 0.85, light * 0.22, 0.20));
+  root.setProperty("--history-title", hslToRgba(hue, sat * 0.14, light * 0.85, 0.85));
+  root.setProperty("--history-close", hslToRgba(hue, sat * 0.1, light * 0.7, 0.45));
+  root.setProperty("--history-close-hover", hslToRgba(hue, sat * 0.14, light * 0.85, 0.85));
+  root.setProperty("--history-header-border", hslToRgba(hue, sat * 0.3, light * 0.2, 0.12));
+  root.setProperty("--history-scrollbar", hslToRgba(hue, sat * 0.4, light * 0.25, 0.15));
+  root.setProperty("--history-shadow", hslToRgba(hue, sat * 0.5, light * 0.15, 0.06));
+
+  root.setProperty("--history-ai-tag", hslToRgba(hue, sat * 0.55, light * 0.75, 1));
+  root.setProperty("--history-user-tag", hslToRgba(hue, sat * 0.25, light * 0.7, 1));
+
+  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.55, light * 0.22, 0.14));
+  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.6, light * 0.28, 0.20));
+  root.setProperty("--history-ai-bubble-text", hslToRgba(hue, sat * 0.2, light * 0.88, 1));
+
+  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.35, light * 0.18, 0.10));
+  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.4, light * 0.22, 0.14));
+  root.setProperty("--history-user-bubble-text", hslToRgba(hue, sat * 0.12, light * 0.82, 1));
+
+  root.setProperty("--history-overlay", hslToRgba(hue, sat * 0.3, light * 0.08, 0.78));
+  root.setProperty("--history-overlay-bg", "linear-gradient(" + hslToRgba(hue, sat * 0.3, light * 0.12, 0.78) + "," + hslToRgba(hue, sat * 0.3, light * 0.06, 0.78) + "), var(--history-bg-img)");
 }
 
 function applySprites() {
@@ -332,10 +435,10 @@ async function toggleHistory() {
 
   var overlay = document.getElementById("history-overlay");
   if (backgroundFile) {
-    overlay.style.setProperty("--history-bg", "url(" + assetUrl(backgroundFile) + ")");
+    overlay.style.setProperty("--history-bg-img", "url(" + assetUrl(backgroundFile) + ")");
     overlay.classList.add("has-bg");
   } else {
-    overlay.style.removeProperty("--history-bg");
+    overlay.style.removeProperty("--history-bg-img");
     overlay.classList.remove("has-bg");
   }
 
