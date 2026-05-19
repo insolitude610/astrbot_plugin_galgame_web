@@ -319,69 +319,10 @@ function getMatchedFile(key, prefix) {
   return null;
 }
 
-function getMatchedBg() {
-  for (var i = 0; i < allFiles.length; i++) {
-    var stem = allFiles[i].name.replace(/\.[^.]+$/, "").toLowerCase();
-    if (stem === "background" || stem === "bg") return allFiles[i];
-  }
-  return null;
-}
-
-/* ---- render ---- */
-
-function renderAll() {
-  renderModeIndicator();
-  renderSingleSlots();
-  renderLayeredLayerSlots();
-  renderLayeredExprSlots();
-  renderBgSlot();
-  renderFileGrid();
-}
-
-function renderModeIndicator() {
-  var mode = config.sprite_mode || "single";
-  var el = document.getElementById("mode-indicator");
-  el.innerHTML = '当前渲染模式：<span class="mode-badge ' + mode + '">' + (mode === "layered" ? "Layered 多层" : "Single 单图") + '</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>';
-}
-
-function renderSingleSlots() {
-  var section = document.getElementById("section-single");
-  var grid = document.getElementById("slots-single");
-  var mode = config.sprite_mode || "single";
-  section.className = "section " + (mode === "single" ? "active" : "inactive");
-  grid.innerHTML = "";
-  var keys = getEmotionKeys();
-  for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "single"), keys[i], "single"));
-  }
-}
-
-function renderLayeredLayerSlots() {
-  var section = document.getElementById("section-layered");
-  var grid = document.getElementById("slots-layers");
-  var mode = config.sprite_mode || "single";
-  section.className = "section " + (mode === "layered" ? "active" : "inactive");
-  grid.innerHTML = "";
-  for (var i = 0; i < LAYER_KEYS.length; i++) {
-    var k = LAYER_KEYS[i];
-    var label = k === "head" ? "head (默认脸)" : k;
-    grid.appendChild(slotCard(k, getMatchedFile(k, "layer"), label, "layer"));
-  }
-}
-
-function renderLayeredExprSlots() {
-  var grid = document.getElementById("slots-layered-expr");
-  grid.innerHTML = "";
-  var keys = getEmotionKeys();
-  for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "expr"), keys[i], "expr"));
-  }
-}
-
 function renderBgSlot() {
   var grid = document.getElementById("slots-bg");
   grid.innerHTML = "";
-  grid.appendChild(slotCard("background", getMatchedBg(), "背景图", "bg"));
+  grid.appendChild(slotCard("background", getMatchedFile("background", "bg"), "背景图", "bg"));
 }
 
 function slotCard(key, matchedFile, label, idPrefix) {
