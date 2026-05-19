@@ -395,12 +395,12 @@ html, body {
 #history-content {
   position: absolute;
   inset: 40px 60px;
-  background: rgba(10,10,28,.92);
-  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(38,32,62,.95);
+  border: 1px solid rgba(180,160,220,.18);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 48px rgba(0,0,0,.6);
+  box-shadow: 0 8px 48px rgba(0,0,0,.4), 0 0 60px rgba(100,80,160,.1);
 }
 
 #history-header {
@@ -408,13 +408,13 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid rgba(200,180,255,.1);
   flex-shrink: 0;
 }
 #history-title {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(255,255,255,.7);
+  color: rgba(220,210,255,.85);
 }
 #history-close {
   background: none;
