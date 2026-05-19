@@ -144,6 +144,7 @@ def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
 class GalgameWebHandler(BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:6185"
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame_web" / "galgame"
+    assets_dir: pathlib.Path = ASSETS_DIR
     jwt_token: str = ""
 
     MIME = {
@@ -179,6 +180,10 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             path = "/index.html"
         filename = path.lstrip("/")
         safe = _safe_path(filename, self.static_dir)
+        if filename.startswith("assets/"):
+            safe_assets = _safe_path(filename, self.assets_dir)
+            if safe_assets and safe_assets.is_file():
+                safe = safe_assets
         if not safe or not safe.is_file():
             self.send_error(404)
             return
