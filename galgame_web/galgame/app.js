@@ -150,6 +150,7 @@ function applyConfig(cfg) {
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
   el.characterName.textContent = characterName;
+  document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
 }
 
 function applyBackground() {

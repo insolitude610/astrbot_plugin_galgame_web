@@ -61,6 +61,12 @@
     "default": 7,
     "hint": "超过该天数的旧会话自动清理。设为 0 则永不清理"
   },
+  "sprite_scale": {
+    "description": "立绘缩放比例",
+    "type": "float",
+    "default": 1.0,
+    "hint": "立绘整体缩放倍数。1.0 为原始大小，建议范围 0.5 ~ 2.0"
+  },
   "sprite_mode": {
     "description": "立绘渲染模式",
     "type": "string",
