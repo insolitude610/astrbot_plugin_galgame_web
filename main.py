@@ -570,16 +570,17 @@ class GalgamePlugin(Star):
         emotion_tags = _get_emotion_tags(self.config)
         emotions = ", ".join(emotion_tags)
 
-        prompt = f"""{persona_prompt}
-
-回复规则：
-1. 用口语化、亲切的中文回复，像朋友聊天一样自然
-2. 回复长度控制在 1-4 句话，不要过长
-3. 回复末尾必须加上情绪标签，格式为 [emotion:xxx]
-   可选情绪：{emotions}
-   根据对话内容选择最贴合当前心情的情绪标签
-4. 不要在标签前后加任何多余文字
-5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"""
+        prompt = (
+            persona_prompt
+            + "\n\n回复规则：\n"
+            + "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
+            + "2. 回复长度控制在 1-4 句话，不要过长\n"
+            + "3. 回复末尾必须加上情绪标签，格式为 [emotion:xxx]\n"
+            + "   可选情绪：" + emotions + "\n"
+            + "   根据对话内容选择最贴合当前心情的情绪标签\n"
+            + "4. 不要在标签前后加任何多余文字\n"
+            + "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"
+        )
 
         if extra:
             prompt += f"\n\n{extra}"
