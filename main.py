@@ -680,7 +680,7 @@ class GalgamePlugin(Star):
             if not llm_prov_id:
                 if has_active:
                     await queue.put({"type": "error", "message": "未配置对话模型，请在插件设置中选择 LLM Provider"})
-                return {"status": "ok"}
+                return {"error": "未配置对话模型，请在插件设置中选择 LLM Provider"}
 
             from astrbot.core.agent.message import (
                 AssistantMessageSegment,
