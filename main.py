@@ -240,17 +240,17 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Connection", "keep-alive")
                 self.end_headers()
-                logger.debug(f"[proxy] SSE stream started for {self.path}")
+                logger.info(f"[proxy] SSE stream started for {self.path}")
                 try:
                     while True:
                         chunk = resp.read(4096)
                         if not chunk:
                             break
-                        logger.debug(f"[proxy] SSE chunk len={len(chunk)}")
+                        logger.info(f"[proxy] SSE chunk len={len(chunk)}")
                         self.wfile.write(chunk)
                         self.wfile.flush()
                 except Exception as e:
-                    logger.debug(f"[proxy] SSE stream ended: {e}")
+                    logger.info(f"[proxy] SSE stream ended: {e}")
             else:
                 body_bytes = resp.read()
                 self.send_header("Content-Length", str(len(body_bytes)))
@@ -745,7 +745,7 @@ class GalgamePlugin(Star):
             logger.info(f"[send] has_active={has_active} active_sse_count={len(self._active_sse)} session_id={session_id[:8]}")
             if has_active:
                 await queue.put({"type": "emotion", "value": current_emotion})
-                logger.debug(f"[send] pushed emotion={current_emotion}")
+                logger.info(f"[send] pushed emotion={current_emotion}")
 
                 chunk_size = 3
                 for i in range(0, len(clean_text), chunk_size):
@@ -768,7 +768,7 @@ class GalgamePlugin(Star):
                         logger.warning(f"TTS generation failed: {e}")
 
                 await queue.put({"type": "end"})
-                logger.debug("[send] pushed end event")
+                logger.info("[send] pushed end event")
 
         except Exception as e:
             logger.exception(f"Error processing message: {e}")
