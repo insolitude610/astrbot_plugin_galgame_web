@@ -628,9 +628,12 @@ class GalgamePlugin(Star):
         message_id = str(uuid.uuid4())
         webchat_sid = f"webchat!galgame!{session_id}"
 
+        logger.info(f"[pipeline] start msg_id={message_id[:8]} sid={session_id[:8]} cmd={text[:40]}")
+
         back_queue = webchat_queue_mgr.get_or_create_back_queue(
             message_id, webchat_sid
         )
+        logger.info(f"[pipeline] back_queue created for {message_id[:8]}")
 
         payload = {
             "message": [{"type": "text", "text": text}],
@@ -642,6 +645,7 @@ class GalgamePlugin(Star):
 
         chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
         await chat_queue.put(("galgame", session_id, payload))
+        logger.info(f"[pipeline] pushed to chat_queue key={session_id[:8]}, polling back_queue...")
 
         parts = []
         try:
@@ -649,8 +653,10 @@ class GalgamePlugin(Star):
                 result = await asyncio.wait_for(back_queue.get(), timeout=120)
                 msg_type = result.get("type", "")
                 data_text = result.get("data", "")
+                logger.info(f"[pipeline] recv type={msg_type!r} data={data_text[:80]!r}")
 
                 if msg_type == "end":
+                    logger.info(f"[pipeline] end signal → collected {len(parts)} parts")
                     break
                 elif msg_type in ("plain", "complete"):
                     if data_text:
@@ -658,11 +664,14 @@ class GalgamePlugin(Star):
                 elif msg_type == "image":
                     parts.append(data_text)
         except asyncio.TimeoutError:
-            logger.warning(f"[pipeline] timeout waiting for response to session_id={session_id}")
+            logger.warning(f"[pipeline] TIMEOUT after 120s for sid={session_id[:8]}")
         finally:
             webchat_queue_mgr.remove_back_queue(message_id)
+            logger.info(f"[pipeline] cleaned up back_queue {message_id[:8]}")
 
-        return "".join(parts).strip()
+        result_text = "".join(parts).strip()
+        logger.info(f"[pipeline] returning text_len={len(result_text)}")
+        return result_text
 
     async def _api_send(self):
         data = await request.get_json() or {}
