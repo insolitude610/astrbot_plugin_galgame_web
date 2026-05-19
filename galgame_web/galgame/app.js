@@ -206,12 +206,12 @@ function applyHistoryPalette(hue, sat) {
   root.setProperty("--history-ai-tag", hslToRgba(hue, sat * 0.45, 0.78, 1));
   root.setProperty("--history-user-tag", hslToRgba(hue, sat * 0.18, 0.72, 1));
 
-  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.35, 0.28, 0.12));
-  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.4, 0.34, 0.16));
+  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.35, 0.28, 0.22));
+  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.4, 0.34, 0.35));
   root.setProperty("--history-ai-bubble-text", hslToRgba(hue, sat * 0.1, 0.90, 1));
 
-  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.22, 0.24, 0.08));
-  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.28, 0.30, 0.12));
+  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.22, 0.24, 0.18));
+  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.28, 0.30, 0.30));
   root.setProperty("--history-user-bubble-text", hslToRgba(hue, sat * 0.08, 0.85, 1));
 
   root.setProperty("--history-overlay", hslToRgba(hue, sat * 0.15, 0.18, 0.65));
