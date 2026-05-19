@@ -518,6 +518,9 @@ class GalgamePlugin(Star):
                 await self._init_astrbot_conv(sid, session)
                 self._save_session(sid)
             else:
+                history = session.get("history", [])
+                if not history:
+                    continue
                 try:
                     await self.context.conversation_manager.get_conversation(
                         unified_msg_origin=session["umo"],
@@ -623,9 +626,10 @@ class GalgamePlugin(Star):
 
     async def _push_command_through_pipeline(self, text: str, session_id: str) -> str:
         message_id = str(uuid.uuid4())
+        webchat_sid = f"webchat!galgame!{session_id}"
 
         back_queue = webchat_queue_mgr.get_or_create_back_queue(
-            message_id, session_id
+            message_id, webchat_sid
         )
 
         payload = {
@@ -636,8 +640,8 @@ class GalgamePlugin(Star):
             "enable_streaming": False,
         }
 
-        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
-        await chat_queue.put(("galgame", session_id, payload))
+        chat_queue = webchat_queue_mgr.get_or_create_queue(webchat_sid)
+        await chat_queue.put(("galgame", webchat_sid, payload))
 
         parts = []
         try:
