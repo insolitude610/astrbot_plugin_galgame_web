@@ -343,10 +343,13 @@ async function sendMessage() {
   disableInput();
 
   try {
-    await apiPost("send", {
+    var resp = await apiPost("send", {
       session_id: sessionId,
       text: text,
     });
+    if (resp.error) {
+      showError(resp.error);
+    }
   } catch (err) {
     console.error("Send failed:", err);
     showError("发送失败，请重试。");
