@@ -383,11 +383,11 @@ html, body {
 #history-overlay {
   position: absolute;
   inset: 0;
-  background: var(--history-overlay, rgba(30,20,10,.78));
+  background: var(--history-overlay, rgba(40,32,25,.65));
   backdrop-filter: blur(6px);
 }
 #history-overlay.has-bg {
-  background: var(--history-overlay-bg, linear-gradient(rgba(40,25,10,.78), rgba(30,18,8,.78))), var(--history-bg-img);
+  background: var(--history-overlay-bg, linear-gradient(rgba(50,40,30,.68), rgba(35,28,20,.65))), var(--history-bg-img);
   background-size: cover;
   background-position: center;
 }
@@ -395,12 +395,12 @@ html, body {
 #history-content {
   position: absolute;
   inset: 40px 60px;
-  background: var(--history-bg, rgba(42,30,20,.95));
-  border: 1px solid var(--history-border, rgba(200,160,120,.18));
+  background: var(--history-bg, rgba(55,42,32,.92));
+  border: 1px solid var(--history-border, rgba(200,160,120,.15));
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 48px rgba(0,0,0,.4), 0 0 60px var(--history-shadow, rgba(180,130,80,.08));
+  box-shadow: 0 8px 48px rgba(0,0,0,.35), 0 0 60px var(--history-shadow, rgba(180,130,80,.05));
 }
 
 #history-header {
@@ -414,19 +414,19 @@ html, body {
 #history-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--history-title, rgba(240,210,170,.85));
+  color: var(--history-title, rgba(250,230,200,.88));
 }
 #history-close {
   background: none;
   border: none;
-  color: var(--history-close, rgba(200,180,150,.45));
+  color: var(--history-close, rgba(210,190,160,.55));
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
   transition: color .2s;
   display: flex;
 }
-#history-close:hover { color: var(--history-close-hover, rgba(240,210,170,.85)); }
+#history-close:hover { color: var(--history-close-hover, rgba(250,230,200,.90)); }
 
 #history-list {
   flex: 1;

@@ -148,10 +148,7 @@ function analyzeBgColor() {
     // Push cool blues/greens towards warm amber/gold
     if (hue > 180 && hue < 300) hue = (hue + 80) % 360;
     var sat = Math.min(hsl[1] * 1.3, 0.55);
-    var light = Math.max(hsl[2], 0.15);
-
-    // Generate palette from adjusted hue
-    applyHistoryPalette(hue, sat, light);
+    applyHistoryPalette(hue, sat);
   };
   img.src = assetUrl(backgroundFile);
 }
@@ -194,31 +191,31 @@ function hue2rgb(p, q, t) {
   return p;
 }
 
-function applyHistoryPalette(hue, sat, light) {
+function applyHistoryPalette(hue, sat) {
   var root = document.documentElement.style;
 
-  root.setProperty("--history-bg", hslToRgba(hue, sat * 0.7, light * 0.18, 0.95));
-  root.setProperty("--history-border", hslToRgba(hue, sat * 0.85, light * 0.22, 0.20));
-  root.setProperty("--history-title", hslToRgba(hue, sat * 0.14, light * 0.85, 0.85));
-  root.setProperty("--history-close", hslToRgba(hue, sat * 0.1, light * 0.7, 0.45));
-  root.setProperty("--history-close-hover", hslToRgba(hue, sat * 0.14, light * 0.85, 0.85));
-  root.setProperty("--history-header-border", hslToRgba(hue, sat * 0.3, light * 0.2, 0.12));
-  root.setProperty("--history-scrollbar", hslToRgba(hue, sat * 0.4, light * 0.25, 0.15));
-  root.setProperty("--history-shadow", hslToRgba(hue, sat * 0.5, light * 0.15, 0.06));
+  root.setProperty("--history-bg", hslToRgba(hue, sat * 0.35, 0.22, 0.92));
+  root.setProperty("--history-border", hslToRgba(hue, sat * 0.5, 0.32, 0.18));
+  root.setProperty("--history-title", hslToRgba(hue, sat * 0.12, 0.88, 0.88));
+  root.setProperty("--history-close", hslToRgba(hue, sat * 0.08, 0.72, 0.55));
+  root.setProperty("--history-close-hover", hslToRgba(hue, sat * 0.12, 0.88, 0.90));
+  root.setProperty("--history-header-border", hslToRgba(hue, sat * 0.2, 0.28, 0.12));
+  root.setProperty("--history-scrollbar", hslToRgba(hue, sat * 0.25, 0.38, 0.15));
+  root.setProperty("--history-shadow", hslToRgba(hue, sat * 0.3, 0.12, 0.05));
 
-  root.setProperty("--history-ai-tag", hslToRgba(hue, sat * 0.55, light * 0.75, 1));
-  root.setProperty("--history-user-tag", hslToRgba(hue, sat * 0.25, light * 0.7, 1));
+  root.setProperty("--history-ai-tag", hslToRgba(hue, sat * 0.45, 0.78, 1));
+  root.setProperty("--history-user-tag", hslToRgba(hue, sat * 0.18, 0.72, 1));
 
-  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.55, light * 0.22, 0.14));
-  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.6, light * 0.28, 0.20));
-  root.setProperty("--history-ai-bubble-text", hslToRgba(hue, sat * 0.2, light * 0.88, 1));
+  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.35, 0.28, 0.12));
+  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.4, 0.34, 0.16));
+  root.setProperty("--history-ai-bubble-text", hslToRgba(hue, sat * 0.1, 0.90, 1));
 
-  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.35, light * 0.18, 0.10));
-  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.4, light * 0.22, 0.14));
-  root.setProperty("--history-user-bubble-text", hslToRgba(hue, sat * 0.12, light * 0.82, 1));
+  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.22, 0.24, 0.08));
+  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.28, 0.30, 0.12));
+  root.setProperty("--history-user-bubble-text", hslToRgba(hue, sat * 0.08, 0.85, 1));
 
-  root.setProperty("--history-overlay", hslToRgba(hue, sat * 0.3, light * 0.08, 0.78));
-  root.setProperty("--history-overlay-bg", "linear-gradient(" + hslToRgba(hue, sat * 0.3, light * 0.12, 0.78) + "," + hslToRgba(hue, sat * 0.3, light * 0.06, 0.78) + "), var(--history-bg-img)");
+  root.setProperty("--history-overlay", hslToRgba(hue, sat * 0.15, 0.18, 0.65));
+  root.setProperty("--history-overlay-bg", "linear-gradient(" + hslToRgba(hue, sat * 0.18, 0.22, 0.68) + "," + hslToRgba(hue, sat * 0.15, 0.16, 0.65) + "), var(--history-bg-img)");
 }
 
 function applySprites() {
