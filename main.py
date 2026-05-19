@@ -558,11 +558,11 @@ class GalgamePlugin(Star):
             return None
         return self.context.get_provider_by_id(prov_id)
 
-    def _build_system_prompt(self):
+    async def _build_system_prompt(self):
         persona_id = self.config.get("persona", "")
         persona_prompt = ""
         if persona_id:
-            persona = self.context.persona_manager.get_persona(persona_id)
+            persona = await self.context.persona_manager.get_persona(persona_id)
             if persona:
                 persona_prompt = persona.system_prompt
 
@@ -657,7 +657,7 @@ class GalgamePlugin(Star):
                     f"可能心情烦躁或着急，请关心一下ta怎么了）"
                 )
 
-            system_prompt = self._build_system_prompt() + rapid_hint
+            system_prompt = await self._build_system_prompt() + rapid_hint
 
             try:
                 await self.context.message_history_manager.insert(
