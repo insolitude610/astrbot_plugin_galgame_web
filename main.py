@@ -208,6 +208,8 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else None
 
+        logger.debug(f"[proxy] {method} {self.path} cl={length} body_bytes={len(body) if body else 0} jwt={'yes' if GalgameWebHandler.jwt_token else 'no'}")
+
         req = urllib.request.Request(url, data=body, method=method)
         for key, val in self.headers.items():
             low = key.lower()
@@ -222,6 +224,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             resp = urllib.request.urlopen(req, timeout=120)
             status = resp.status
             ct = resp.headers.get("Content-Type", "")
+            logger.debug(f"[proxy] upstream responded {status} ct={ct[:50] if ct else ''}")
 
             self.send_response(status)
             for key, val in resp.headers.items():
@@ -250,8 +253,10 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body_bytes)
         except urllib.error.HTTPError as e:
+            logger.warning(f"[proxy] upstream HTTP error {e.code} for {method} {self.path}")
             self.send_error(e.code or 502)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[proxy] upstream error for {method} {self.path}: {e}")
             self.send_error(502)
 
 
@@ -620,8 +625,9 @@ class GalgamePlugin(Star):
             return {"error": "internal error"}, 500
 
     async def _api_send(self):
-        data = await request.get_json()
-        if not data:
+        data = await request.get_json() or {}
+        logger.debug(f"[send] received body keys={list(data.keys()) if data else []}")
+        if not isinstance(data, dict) or not data:
             return {"error": "no data"}, 400
 
         session_id = data.get("session_id", "")
