@@ -15,7 +15,6 @@ var backgroundFile = "";
 var typewriterTimer = null;
 var mouthTimer = null;
 var isAudioPlaying = false;
-var sseSource = null;
 
 /* ---- DOM refs ---- */
 var el = {
@@ -65,47 +64,6 @@ function assetUrl(filename) {
   return "./assets/" + filename;
 }
 
-/* ---- SSE ---- */
-
-function subscribeSSE() {
-  if (sseSource) {
-    sseSource.close();
-    sseSource = null;
-  }
-
-  var url = API_BASE + "/stream?session_id=" + encodeURIComponent(sessionId);
-  sseSource = new EventSource(url);
-
-  sseSource.addEventListener("message", function (event) {
-    var msg = null;
-    try { msg = JSON.parse(event.data); } catch (_) { return; }
-    if (!msg) return;
-    switch (msg.type) {
-      case "emotion":
-        switchExpression(msg.value);
-        break;
-      case "text":
-        typewriterAppend(msg.value);
-        break;
-      case "audio":
-        playTTSAudio(msg.value);
-        break;
-      case "end":
-        finishResponse();
-        break;
-      case "error":
-        showError(msg.message);
-        break;
-    }
-  });
-
-  sseSource.onerror = function () {
-    sseSource.close();
-    sseSource = null;
-    el.dialogText.textContent = "连接已断开，请刷新页面。";
-  };
-}
-
 /* ---- init ---- */
 
 async function init() {
@@ -128,7 +86,6 @@ async function init() {
     } else {
       sessionId = resp.session_id;
       localStorage.setItem("galgame_session_id", sessionId);
-      subscribeSSE();
     }
   } catch (err) {
     console.error("Failed to init session:", err);
@@ -409,5 +366,4 @@ init();
 window.addEventListener("beforeunload", function () {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
-  if (sseSource) { sseSource.close(); sseSource = null; }
 });
