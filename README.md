@@ -298,9 +298,13 @@ Same light-gray background, same 3:4 composition.
 - **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口（默认 6186）提供完整 WebUI
 - **移除 Dashboard 内嵌** — 不再通过 Dashboard 沙箱 iframe 访问，避免 sandbox 限制
 - **同步 API 架构** — `send` 返回完整回复（文本 + 情绪），前端本地播打字机；移除 SSE 依赖
+- **AstrBot 指令全兼容** — `/help /reset /new` 等所有已注册指令通过 webchat 管道分发，LLM 不接管
 - **对话历史面板** — 内建聊天记录查看，气泡式展示，背景色自适应
 - **立绘缩放** — 新增 `sprite_scale` 配置项，CSS `scale` 变换
 - **JWT 代理认证** — 所有 API 请求通过代理自动附带 JWT Bearer 令牌
+- 修复立绘管理页面背景图匹配不到上传文件的 bug
+- 修复指令输入后 WebUI 卡死（回执队列 key 对齐 + 双重前缀修正 + 消息类型 `plain`）
+- 修复 Dashboard 数据管理页出现大量空 `webchat!galgame!` 对话
 - `user-select: auto`，允许文本选中复制
 - `localStorage` 正常工作（无 sandbox 限制）
 
