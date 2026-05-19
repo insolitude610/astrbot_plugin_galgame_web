@@ -15,7 +15,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import jwt
 
-from quart import Response, request, make_response
+from quart import Response, request
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
@@ -142,7 +142,6 @@ def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
 
 
 class GalgameWebHandler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
     upstream = "http://127.0.0.1:6185"
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame_web" / "galgame"
     assets_dir: pathlib.Path = ASSETS_DIR
@@ -225,8 +224,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
         try:
             resp = urllib.request.urlopen(req, timeout=120)
             status = resp.status
-            ct = resp.headers.get("Content-Type", "")
-            logger.debug(f"[proxy] upstream responded {status} ct={ct[:50] if ct else ''}")
+            logger.debug(f"[proxy] upstream responded {status}")
 
             self.send_response(status)
             for key, val in resp.headers.items():
@@ -236,26 +234,10 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
                 self.send_header(key, val)
             self.send_header("Access-Control-Allow-Origin", "*")
 
-            if "text/event-stream" in ct:
-                self.send_header("Cache-Control", "no-cache")
-                self.send_header("Connection", "keep-alive")
-                self.end_headers()
-                logger.info(f"[proxy] SSE stream started for {self.path}")
-                try:
-                    while True:
-                        chunk = resp.read(4096)
-                        if not chunk:
-                            break
-                        logger.info(f"[proxy] SSE chunk len={len(chunk)}")
-                        self.wfile.write(chunk)
-                        self.wfile.flush()
-                except Exception as e:
-                    logger.info(f"[proxy] SSE stream ended: {e}")
-            else:
-                body_bytes = resp.read()
-                self.send_header("Content-Length", str(len(body_bytes)))
-                self.end_headers()
-                self.wfile.write(body_bytes)
+            body_bytes = resp.read()
+            self.send_header("Content-Length", str(len(body_bytes)))
+            self.end_headers()
+            self.wfile.write(body_bytes)
         except urllib.error.HTTPError as e:
             logger.warning(f"[proxy] upstream HTTP error {e.code} for {method} {self.path}")
             self.send_error(e.code or 502)
@@ -269,7 +251,6 @@ class GalgamePlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
-        self._active_sse: set[str] = set()
         self._web_server: ThreadingHTTPServer | None = None
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._gc_sessions()
@@ -294,12 +275,6 @@ class GalgamePlugin(Star):
             self._api_send,
             ["POST"],
             "Send a user message to the AI character",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/stream",
-            self._api_stream,
-            ["GET"],
-            "SSE endpoint for receiving AI responses and emotions",
         )
         context.register_web_api(
             f"/{PLUGIN_NAME}/config",
@@ -498,7 +473,6 @@ class GalgamePlugin(Star):
                 "history": data.get("history", []),
                 "current_emotion": data.get("current_emotion", "neutral"),
                 "pending_rapid_clicks": 0,
-                "sse_queue": asyncio.Queue(),
                 "created_at": data.get("created_at", time.time()),
                 "_lock": asyncio.Lock(),
             }
@@ -611,7 +585,6 @@ class GalgamePlugin(Star):
                 "history": [],
                 "current_emotion": "neutral",
                 "pending_rapid_clicks": 0,
-                "sse_queue": asyncio.Queue(),
                 "created_at": time.time(),
                 "_lock": asyncio.Lock(),
             }
@@ -645,7 +618,6 @@ class GalgamePlugin(Star):
 
         try:
             session = self._sessions[session_id]
-            queue = session["sse_queue"]
 
             async with session["_lock"]:
                 rapid_count = session.pop("pending_rapid_clicks", 0)
@@ -672,8 +644,6 @@ class GalgamePlugin(Star):
                 )
             except Exception as e:
                 logger.warning(f"Failed to save user message to history: {e}")
-
-            has_active = session_id in self._active_sse
         except Exception as e:
             logger.exception(f"Unhandled error in _api_send pre-LLM: {e}")
             return {"error": "internal error"}, 500
@@ -683,8 +653,6 @@ class GalgamePlugin(Star):
         try:
             llm_prov_id = self.config.get("llm_provider", "")
             if not llm_prov_id:
-                if has_active:
-                    await queue.put({"type": "error", "message": "未配置对话模型，请在插件设置中选择 LLM Provider"})
                 return {"error": "未配置对话模型，请在插件设置中选择 LLM Provider"}
 
             from astrbot.core.agent.message import (
@@ -744,80 +712,10 @@ class GalgamePlugin(Star):
             except Exception as e:
                 logger.warning(f"Failed to sync conversation to DB: {e}")
 
-            logger.info(f"[send] has_active={has_active} active_sse_count={len(self._active_sse)} session_id={session_id[:8]}")
-            if has_active:
-                await queue.put({"type": "emotion", "value": current_emotion})
-                logger.info(f"[send] pushed emotion={current_emotion}")
-
-                chunk_size = 3
-                for i in range(0, len(clean_text), chunk_size):
-                    chunk = clean_text[i : i + chunk_size]
-                    await queue.put({"type": "text", "value": chunk})
-
-                tts_prov = self._get_config_tts_provider()
-                if tts_prov:
-                    try:
-                        audio_path = await tts_prov.get_audio(clean_text)
-                        if audio_path and os.path.exists(audio_path):
-                            with open(audio_path, "rb") as f:
-                                audio_b64 = base64.b64encode(f.read()).decode()
-                            await queue.put({"type": "audio", "value": audio_b64})
-                            try:
-                                os.remove(audio_path)
-                            except OSError:
-                                pass
-                    except Exception as e:
-                        logger.warning(f"TTS generation failed: {e}")
-
-                await queue.put({"type": "end"})
-                logger.info("[send] pushed end event")
-
         except Exception as e:
             logger.exception(f"Error processing message: {e}")
-            if has_active:
-                await queue.put({"type": "error", "message": f"处理消息时出错: {e}"})
 
         return {"reply": clean_text, "emotion": current_emotion}
-
-    async def _api_stream(self):
-        session_id = request.args.get("session_id", "")
-        if not session_id or session_id not in self._sessions:
-
-            async def error_stream():
-                yield f"event: error\ndata: {json.dumps({'message': 'invalid session_id'})}\n\n"
-
-            return Response(error_stream(), content_type="text/event-stream")
-
-        self._active_sse.add(session_id)
-        logger.info(f"[sse] connected session={session_id[:8]} active_count={len(self._active_sse)}")
-        session = self._sessions[session_id]
-        queue = session["sse_queue"]
-
-        async def event_stream():
-            try:
-                while True:
-                    try:
-                        msg = await asyncio.wait_for(queue.get(), timeout=25)
-                        yield f"event: message\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
-                    except asyncio.TimeoutError:
-                        yield ": keepalive\n\n"
-            finally:
-                self._active_sse.discard(session_id)
-                while not queue.empty():
-                    try:
-                        queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        break
-
-        return Response(
-            event_stream(),
-            content_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
 
     async def _api_config(self):
         files = _list_asset_files()
@@ -1031,14 +929,5 @@ class GalgamePlugin(Star):
             self._web_server = None
 
         for sid in list(self._sessions.keys()):
-            session = self._sessions[sid]
-            self._active_sse.discard(sid)
-            queue = session.get("sse_queue")
-            if queue:
-                while not queue.empty():
-                    try:
-                        queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        break
             self._save_session(sid)
         self._sessions.clear()
