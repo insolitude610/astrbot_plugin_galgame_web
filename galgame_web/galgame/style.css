@@ -386,6 +386,11 @@ html, body {
   background: rgba(0,0,0,.75);
   backdrop-filter: blur(6px);
 }
+#history-overlay.has-bg {
+  background: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,.75)), var(--history-bg);
+  background-size: cover;
+  background-position: center;
+}
 
 #history-content {
   position: absolute;
