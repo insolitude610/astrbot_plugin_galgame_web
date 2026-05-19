@@ -636,7 +636,7 @@ class GalgamePlugin(Star):
         logger.info(f"[pipeline] back_queue created for {message_id[:8]}")
 
         payload = {
-            "message": [{"type": "text", "text": text}],
+            "message": [{"type": "plain", "text": text}],
             "message_id": message_id,
             "selected_provider": None,
             "selected_model": None,
