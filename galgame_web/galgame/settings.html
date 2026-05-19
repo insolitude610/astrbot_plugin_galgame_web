@@ -13,6 +13,18 @@ body {
   min-height: 100vh;
   padding: 24px;
 }
+body.bg-loaded {
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+body.bg-loaded::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.75);
+  z-index: -1;
+}
 h1 { font-size: 22px; margin-bottom: 4px; }
 .sub { color: #888; margin-bottom: 20px; font-size: 13px; }
 .back-btn {
@@ -252,6 +264,15 @@ async function init() {
 
   document.getElementById("refresh-btn").onclick = loadFiles;
   await loadFiles();
+  applyBackground();
+}
+
+function applyBackground() {
+  var bg = config.background;
+  if (bg) {
+    document.body.style.backgroundImage = "url(./assets/" + encodeURIComponent(bg) + ")";
+    document.body.classList.add("bg-loaded");
+  }
 }
 
 /* ---- data ---- */
