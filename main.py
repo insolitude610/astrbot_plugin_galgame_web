@@ -61,7 +61,7 @@ def _extract_emotion(text: str, emotion_tags: list[str]) -> tuple[str, str]:
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
-ASSETS_DIR = pathlib.Path(__file__).parent / "pages" / "galgame" / "assets"
+ASSETS_DIR = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 

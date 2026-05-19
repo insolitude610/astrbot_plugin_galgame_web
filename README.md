@@ -9,14 +9,14 @@
 - **多层 PNG 伪 Live2D** —— 身体/头发/脸部/嘴部各自独立动画，不依赖 Live2D SDK
 - **情绪实时切换** —— AI 回复中标记 `[emotion:happy]` 等标签，立绘表情自动淡入淡出
 - **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
-- **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等）
-  > **注意：TTS 功能当前暂不可用**，因独立 Web 服务器的 SSE 流受 Quart 输出缓冲影响，音频数据无法实时推送至前端。文本对话功能正常，TTS 将在后续版本修复后恢复。
+- **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等），受限于同步 API 架构暂不可用
 - **打字机效果** —— 回复文字逐字显示
 - **嘴型同步** —— 播放语音时嘴部自动开合
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
 - **双层渲染模式** —— 支持完整分层 PNG（layered）或单张立绘 + 表情差分（single）
+- **对话历史面板** —— 内建聊天记录查看，气泡式展示，背景色自适应
 - **纯 CSS 动画** —— 呼吸、头发摆动、球体漂浮、对话框滑入，零依赖
-- **SSE 实时通信** —— 文本逐段推送、情绪即时切换、音频流式播放
+- **同步请求/响应** —— `send` API 返回完整回复（文本 + 情绪），前端本地播打字机动画
 - **会话持久化** —— 对话历史自动存盘，重启/重载后保留；localStorage 记录 session_id，关掉页面再打开可继续对话
 - **立绘管理页面** —— 浏览器内拖拽上传 / 预览 / 删除 PNG，自动匹配情绪/图层
 
@@ -142,7 +142,7 @@ http://localhost:6186
 
 ### 工作原理
 
-插件后端会在 system prompt 中要求 AI 在回复末尾附上 `[emotion:xxx]` 标签。后端解析标签后通过 SSE 推送给前端，前端根据情绪名查 `expressions` 映射表，将立绘切换为对应表情图。
+插件后端会在 system prompt 中要求 AI 在回复末尾附上 `[emotion:xxx]` 标签。后端解析标签后，将回复文本和情绪一并返回给前端，前端根据情绪名查 `expressions` 映射表，将立绘切换为对应表情图。
 
 ### 默认情绪列表
 
@@ -262,15 +262,18 @@ Same light-gray background, same 3:4 composition.
 
 ---
 
-## SSE 事件协议
+## API 响应格式
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `type: "emotion"` | 切换情绪 | `value` 为情绪标签 |
-| `type: "text"` | 文本流 | `value` 为逐段推送的回复文字 |
-| `type: "audio"` | 语音 | `value` 为 base64 编码的 WAV 音频 |
-| `type: "end"` | 回复完毕 | 无额外字段 |
-| `type: "error"` | 错误 | `message` 为错误描述 |
+`POST /api/plug/astrbot_plugin_galgame_web/send` 返回：
+
+```json
+{
+  "reply": "AI 回复文本（已去除情绪标签）",
+  "emotion": "happy"
+}
+```
+
+前端收到后执行打字机动画显示 `reply`，并根据 `emotion` 切换立绘表情。
 
 ---
 
@@ -279,12 +282,12 @@ Same light-gray background, same 3:4 composition.
 ```
 浏览器 (http://localhost:6186)
   ├─ 静态文件 → 插件内置 HTTP Server (ThreadingHTTPServer)
-  └─ /api/* → 代理至 AstrBot Core (Quart :6185) → SSE + fetch
+  └─ /api/* → 代理至 AstrBot Core (Quart :6185) → fetch 同步请求
 ```
 
 - 前端: 原生 HTML/CSS/JS，无框架依赖
 - 后端: Python `http.server` + AstrBot Star API
-- 通信: `fetch()` + `EventSource (SSE)`，通过本地代理与 AstrBot Core 交互
+- 通信: `fetch()` 同步请求/响应，通过本地代理与 AstrBot Core 交互，JWT Bearer 认证
 
 ---
 
@@ -294,9 +297,11 @@ Same light-gray background, same 3:4 composition.
 
 - **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口（默认 6186）提供完整 WebUI
 - **移除 Dashboard 内嵌** — 不再通过 Dashboard 沙箱 iframe 访问，避免 sandbox 限制
-- **Bridge SDK 移除** — 前端改用原生 `fetch()` + `EventSource` 直接通信
-- **API 代理** — 插件内置服务器自动代理 `/api/*` 请求到 AstrBot Core，支持 SSE 流式代理
-- 返回 `user-select: auto`，允许文本选中复制
+- **同步 API 架构** — `send` 返回完整回复（文本 + 情绪），前端本地播打字机；移除 SSE 依赖
+- **对话历史面板** — 内建聊天记录查看，气泡式展示，背景色自适应
+- **立绘缩放** — 新增 `sprite_scale` 配置项，CSS `scale` 变换
+- **JWT 代理认证** — 所有 API 请求通过代理自动附带 JWT Bearer 令牌
+- `user-select: auto`，允许文本选中复制
 - `localStorage` 正常工作（无 sandbox 限制）
 
 ### v0.2.4
