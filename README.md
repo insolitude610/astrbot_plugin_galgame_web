@@ -10,6 +10,7 @@
 - **情绪实时切换** —— AI 回复中标记 `[emotion:happy]` 等标签，立绘表情自动淡入淡出
 - **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
 - **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等）
+  > **注意：TTS 功能当前暂不可用**，因独立 Web 服务器的 SSE 流受 Quart 输出缓冲影响，音频数据无法实时推送至前端。文本对话功能正常，TTS 将在后续版本修复后恢复。
 - **打字机效果** —— 回复文字逐字显示
 - **嘴型同步** —— 播放语音时嘴部自动开合
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
@@ -36,7 +37,7 @@
 | 角色显示名 | 对话框上方显示的名称 | 你的角色名 |
 | 角色人格 | 选择已在 AstrBot 配置好的 Persona | AstrBot 预设或自建 |
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o |
-| TTS Provider | 语音合成 | Edge TTS（免费） |
+| TTS Provider | 语音合成（暂不可用） | 等待后续修复 |
 | 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
 | 独立 WebUI 端口 | 插件启动的独立 HTTP 服务器端口 | 默认 6186，设为 0 关闭 |
 | 自定义情绪 | JSON 格式添加额外情绪标签 | 例：`{"dokidoki": ""}` |
