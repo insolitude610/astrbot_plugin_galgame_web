@@ -739,6 +739,7 @@ class GalgamePlugin(Star):
             except Exception as e:
                 logger.warning(f"Failed to sync conversation to DB: {e}")
 
+            logger.info(f"[send] has_active={has_active} active_sse_count={len(self._active_sse)} session_id={session_id[:8]}")
             if has_active:
                 await queue.put({"type": "emotion", "value": current_emotion})
 
@@ -781,6 +782,7 @@ class GalgamePlugin(Star):
             return Response(error_stream(), content_type="text/event-stream")
 
         self._active_sse.add(session_id)
+        logger.info(f"[sse] connected session={session_id[:8]} active_count={len(self._active_sse)}")
         session = self._sessions[session_id]
         queue = session["sse_queue"]
 
