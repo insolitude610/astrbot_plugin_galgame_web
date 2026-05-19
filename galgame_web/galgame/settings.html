@@ -15,6 +15,20 @@ body {
 }
 h1 { font-size: 22px; margin-bottom: 4px; }
 .sub { color: #888; margin-bottom: 20px; font-size: 13px; }
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #aaa;
+  text-decoration: none;
+  font-size: 13px;
+  margin-bottom: 16px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  transition: color .2s, background .2s;
+}
+.back-btn:hover { color: #c4b5fd; background: #1e293b; }
 .mode-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -162,6 +176,10 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 <body>
 
 <h1>立绘资源管理</h1>
+<a class="back-btn" href="./index.html" title="返回 Galgame 界面">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>返回</span>
+</a>
 <div class="sub" id="mode-indicator"></div>
 
 <div class="action-bar">
