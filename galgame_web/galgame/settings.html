@@ -389,11 +389,11 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.className = matchedFile ? "slot-card matched" : "slot-card missing";
   card.id = "slot-" + idPrefix + "-" + key;
 
-  if (matchedFile && matchedFile.data) {
+  if (matchedFile && matchedFile.url) {
     var img = document.createElement("img");
     img.className = "slot-img";
     img.alt = key;
-    img.src = matchedFile.data;
+    img.src = matchedFile.url;
     card.appendChild(img);
   } else {
     var ph = document.createElement("div");
@@ -465,7 +465,7 @@ function renderFileGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    img.src = f.data || "";
+    img.src = f.url || "";
     card.appendChild(img);
 
     var body = document.createElement("div");
@@ -543,14 +543,10 @@ async function loadFiles() {
   try {
     var data = await apiGet("assets/list");
     var rawFiles = data.files || [];
-    if (rawFiles.length > 0) {
-      var names = [];
-      for (var i = 0; i < rawFiles.length; i++) { names.push(rawFiles[i].name); }
-      var batchData = await apiPost("assets/batch", { names: names });
-      allFiles = batchData.files || [];
-    } else {
-      allFiles = [];
+    for (var i = 0; i < rawFiles.length; i++) {
+      rawFiles[i].url = "./assets/" + encodeURIComponent(rawFiles[i].name);
     }
+    allFiles = rawFiles;
     renderAll();
   } catch(e) {
     setStatus("加载失败: " + e.message, "error");
