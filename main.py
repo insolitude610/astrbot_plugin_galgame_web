@@ -678,6 +678,8 @@ class GalgamePlugin(Star):
             logger.exception(f"Unhandled error in _api_send pre-LLM: {e}")
             return {"error": "internal error"}, 500
 
+        clean_text = ""
+        current_emotion = "neutral"
         try:
             llm_prov_id = self.config.get("llm_provider", "")
             if not llm_prov_id:
@@ -775,7 +777,7 @@ class GalgamePlugin(Star):
             if has_active:
                 await queue.put({"type": "error", "message": f"处理消息时出错: {e}"})
 
-        return {"status": "ok"}
+        return {"reply": clean_text, "emotion": current_emotion}
 
     async def _api_stream(self):
         session_id = request.args.get("session_id", "")

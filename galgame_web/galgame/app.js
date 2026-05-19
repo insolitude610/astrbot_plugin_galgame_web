@@ -347,7 +347,11 @@ async function sendMessage() {
       session_id: sessionId,
       text: text,
     });
-    if (resp.error) {
+    if (resp.reply) {
+      switchExpression(resp.emotion || "neutral");
+      typewriterAppend(resp.reply);
+      finishResponse();
+    } else if (resp.error) {
       showError(resp.error);
     }
   } catch (err) {
