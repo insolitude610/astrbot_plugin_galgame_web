@@ -383,11 +383,11 @@ html, body {
 #history-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,.75);
+  background: rgba(30,20,10,.78);
   backdrop-filter: blur(6px);
 }
 #history-overlay.has-bg {
-  background: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,.75)), var(--history-bg);
+  background: linear-gradient(rgba(40,25,10,.78), rgba(30,18,8,.78)), var(--history-bg);
   background-size: cover;
   background-position: center;
 }
@@ -395,12 +395,12 @@ html, body {
 #history-content {
   position: absolute;
   inset: 40px 60px;
-  background: rgba(38,32,62,.95);
-  border: 1px solid rgba(180,160,220,.18);
+  background: rgba(42,30,20,.95);
+  border: 1px solid rgba(200,160,120,.18);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 48px rgba(0,0,0,.4), 0 0 60px rgba(100,80,160,.1);
+  box-shadow: 0 8px 48px rgba(0,0,0,.4), 0 0 60px rgba(180,130,80,.08);
 }
 
 #history-header {
@@ -408,25 +408,25 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid rgba(200,180,255,.1);
+  border-bottom: 1px solid rgba(200,160,120,.1);
   flex-shrink: 0;
 }
 #history-title {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(220,210,255,.85);
+  color: rgba(240,210,170,.85);
 }
 #history-close {
   background: none;
   border: none;
-  color: rgba(255,255,255,.45);
+  color: rgba(200,180,150,.45);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
   transition: color .2s;
   display: flex;
 }
-#history-close:hover { color: rgba(255,255,255,.85); }
+#history-close:hover { color: rgba(240,210,170,.85); }
 
 #history-list {
   flex: 1;
@@ -435,7 +435,7 @@ html, body {
 }
 #history-list::-webkit-scrollbar { width: 4px; }
 #history-list::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,.1);
+  background: rgba(200,160,120,.15);
   border-radius: 2px;
 }
 
@@ -455,12 +455,12 @@ html, body {
   letter-spacing: .5px;
 }
 .history-msg.assistant .msg-tag {
-  color: #b8a0e0;
+  color: #e0b888;
   text-align: left;
   padding-left: 4px;
 }
 .history-msg.user .msg-tag {
-  color: #8899bb;
+  color: #c8b898;
   text-align: right;
   padding-right: 4px;
 }
@@ -477,17 +477,17 @@ html, body {
 }
 
 .history-msg.assistant .msg-bubble {
-  background: rgba(140,120,200,.12);
-  border: 1px solid rgba(160,140,220,.18);
+  background: rgba(160,120,80,.14);
+  border: 1px solid rgba(200,150,100,.20);
   border-top-left-radius: 4px;
-  color: #e8e0f8;
+  color: #f0dcc8;
 }
 
 .history-msg.user .msg-bubble {
-  background: rgba(120,150,200,.10);
-  border: 1px solid rgba(130,160,210,.14);
+  background: rgba(140,110,80,.10);
+  border: 1px solid rgba(180,140,100,.14);
   border-top-right-radius: 4px;
-  color: #c8d8f0;
+  color: #e0d4c0;
   float: right;
 }
 
