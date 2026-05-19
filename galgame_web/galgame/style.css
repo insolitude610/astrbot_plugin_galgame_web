@@ -338,3 +338,120 @@ html, body {
   background: rgba(255,255,255,.15);
   color: rgba(255,255,255,.85);
 }
+
+/* ---- History Button ---- */
+
+#history-btn {
+  position: fixed;
+  top: 12px;
+  right: 58px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  border: none;
+  color: rgba(255,255,255,.5);
+  cursor: pointer;
+  transition: color .2s, background .2s;
+}
+#history-btn:hover {
+  background: rgba(255,255,255,.15);
+  color: rgba(255,255,255,.85);
+}
+
+/* ---- History Panel ---- */
+
+#history-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+#history-panel.active {
+  display: block;
+  animation: history-fade-in .3s ease-out;
+}
+@keyframes history-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+#history-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+}
+
+#history-content {
+  position: absolute;
+  inset: 40px 60px;
+  background: rgba(10,10,28,.92);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 48px rgba(0,0,0,.6);
+}
+
+#history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  flex-shrink: 0;
+}
+#history-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255,255,255,.7);
+}
+#history-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.45);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color .2s;
+  display: flex;
+}
+#history-close:hover { color: rgba(255,255,255,.85); }
+
+#history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+#history-list::-webkit-scrollbar { width: 4px; }
+#history-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.1);
+  border-radius: 2px;
+}
+
+.history-msg {
+  margin-bottom: 16px;
+  animation: history-msg-in .2s ease-out;
+}
+@keyframes history-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.history-msg .msg-role {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  opacity: .7;
+}
+.history-msg.user .msg-role { color: #888; }
+.history-msg.assistant .msg-role { color: rgba(200,170,255,.85); }
+.history-msg .msg-body {
+  font-size: 14px;
+  line-height: 1.75;
+  color: rgba(255,255,255,.78);
+}

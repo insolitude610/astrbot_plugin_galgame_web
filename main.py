@@ -289,6 +289,12 @@ class GalgamePlugin(Star):
             "Send a user message to the AI character",
         )
         context.register_web_api(
+            f"/{PLUGIN_NAME}/history",
+            self._api_history,
+            ["GET"],
+            "Get conversation history for the current session",
+        )
+        context.register_web_api(
             f"/{PLUGIN_NAME}/config",
             self._api_config,
             ["GET"],
@@ -721,6 +727,12 @@ class GalgamePlugin(Star):
             logger.exception(f"Error processing message: {e}")
 
         return {"reply": clean_text, "emotion": current_emotion}
+
+    async def _api_history(self):
+        session_id = request.args.get("session_id", "")
+        if not session_id or session_id not in self._sessions:
+            return {"error": "invalid session_id"}, 400
+        return {"messages": self._sessions[session_id]["history"]}
 
     async def _api_config(self):
         files = _list_asset_files()

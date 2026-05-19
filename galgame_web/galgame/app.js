@@ -33,6 +33,8 @@ var el = {
   userInput: document.getElementById("user-input"),
   sendBtn: document.getElementById("send-btn"),
   ttsAudio: document.getElementById("tts-audio"),
+  historyPanel: document.getElementById("history-panel"),
+  historyList: document.getElementById("history-list"),
 };
 
 /* ---- API helpers ---- */
@@ -314,6 +316,48 @@ async function sendMessage() {
   } catch (err) {
     console.error("Send failed:", err);
     showError("发送失败，请重试。");
+  }
+}
+
+/* ---- history ---- */
+
+async function toggleHistory() {
+  var panel = el.historyPanel;
+  if (panel.classList.contains("active")) {
+    panel.classList.remove("active");
+    return;
+  }
+
+  if (!sessionId) return;
+
+  try {
+    var data = await apiGet("history", { session_id: sessionId });
+    var messages = data.messages || [];
+    var list = el.historyList;
+    list.innerHTML = "";
+
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
+      var div = document.createElement("div");
+      div.className = "history-msg " + (msg.role === "user" ? "user" : "assistant");
+
+      var roleEl = document.createElement("div");
+      roleEl.className = "msg-role";
+      roleEl.textContent = msg.role === "user" ? "你" : characterName;
+      div.appendChild(roleEl);
+
+      var bodyEl = document.createElement("div");
+      bodyEl.className = "msg-body";
+      bodyEl.textContent = msg.content;
+      div.appendChild(bodyEl);
+
+      list.appendChild(div);
+    }
+
+    list.scrollTop = list.scrollHeight;
+    panel.classList.add("active");
+  } catch (err) {
+    console.error("Failed to load history:", err);
   }
 }
 

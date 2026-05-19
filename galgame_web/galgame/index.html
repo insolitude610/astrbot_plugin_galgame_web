@@ -51,6 +51,26 @@
     </svg>
   </a>
 
+  <button id="history-btn" title="对话历史" onclick="toggleHistory()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 8v4l3 3"></path>
+      <circle cx="12" cy="12" r="10"></circle>
+    </svg>
+  </button>
+
+  <div id="history-panel">
+    <div id="history-overlay" onclick="toggleHistory()"></div>
+    <div id="history-content">
+      <div id="history-header">
+        <span id="history-title">对话历史</span>
+        <button id="history-close" onclick="toggleHistory()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
   <audio id="tts-audio" preload="auto"></audio>
 
   <script src="./app.js"></script>
