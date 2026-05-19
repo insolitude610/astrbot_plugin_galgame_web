@@ -1017,9 +1017,7 @@ class GalgamePlugin(Star):
             url = "（未启用独立 WebUI，请在插件设置中设置 web_port）"
         yield event.plain_result(
             "AI Galgame 虚拟伙伴\n\n"
-            f"浏览器访问：{url}\n\n"
-            "支持 AstrBot 指令（/help /reset /new 等），"
-            "以唤醒前缀开头的消息会走 AstrBot 指令管道"
+            f"浏览器访问：{url}"
         )
 
     async def terminate(self):
