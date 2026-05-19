@@ -204,6 +204,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
     def _proxy(self, method):
         url = self.upstream + self.path
         body = None
+        length = 0
         if method == "POST":
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else None
