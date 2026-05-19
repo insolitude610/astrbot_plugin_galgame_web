@@ -640,36 +640,40 @@ class GalgamePlugin(Star):
         if not text:
             return {"error": "empty text"}, 400
 
-        session = self._sessions[session_id]
-        queue = session["sse_queue"]
-
-        async with session["_lock"]:
-            rapid_count = session.pop("pending_rapid_clicks", 0)
-            messages = list(session["history"])
-            messages.append({"role": "user", "content": text})
-            conv_id = session.get("conv_id", "")
-
-        rapid_hint = ""
-        if rapid_count > 0:
-            rapid_hint = (
-                f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，"
-                f"可能心情烦躁或着急，请关心一下ta怎么了）"
-            )
-
-        system_prompt = self._build_system_prompt() + rapid_hint
-
         try:
-            await self.context.message_history_manager.insert(
-                platform_id=PLATFORM_ID,
-                user_id=conv_id,
-                content={"type": "user", "message": text},
-                sender_id="user",
-                sender_name="用户",
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save user message to history: {e}")
+            session = self._sessions[session_id]
+            queue = session["sse_queue"]
 
-        has_active = session_id in self._active_sse
+            async with session["_lock"]:
+                rapid_count = session.pop("pending_rapid_clicks", 0)
+                messages = list(session["history"])
+                messages.append({"role": "user", "content": text})
+                conv_id = session.get("conv_id", "")
+
+            rapid_hint = ""
+            if rapid_count > 0:
+                rapid_hint = (
+                    f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，"
+                    f"可能心情烦躁或着急，请关心一下ta怎么了）"
+                )
+
+            system_prompt = self._build_system_prompt() + rapid_hint
+
+            try:
+                await self.context.message_history_manager.insert(
+                    platform_id=PLATFORM_ID,
+                    user_id=conv_id,
+                    content={"type": "user", "message": text},
+                    sender_id="user",
+                    sender_name="用户",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save user message to history: {e}")
+
+            has_active = session_id in self._active_sse
+        except Exception as e:
+            logger.exception(f"Unhandled error in _api_send pre-LLM: {e}")
+            return {"error": "internal error"}, 500
 
         try:
             llm_prov_id = self.config.get("llm_provider", "")
