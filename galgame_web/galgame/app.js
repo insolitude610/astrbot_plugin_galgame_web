@@ -347,20 +347,22 @@ async function toggleHistory() {
 
     for (var i = 0; i < messages.length; i++) {
       var msg = messages[i];
-      var div = document.createElement("div");
-      div.className = "history-msg " + (msg.role === "user" ? "user" : "assistant");
+      var isUser = msg.role === "user";
 
-      var roleEl = document.createElement("div");
-      roleEl.className = "msg-role";
-      roleEl.textContent = msg.role === "user" ? "你" : characterName;
-      div.appendChild(roleEl);
+      var row = document.createElement("div");
+      row.className = "history-msg " + (isUser ? "user" : "assistant");
 
-      var bodyEl = document.createElement("div");
-      bodyEl.className = "msg-body";
-      bodyEl.textContent = msg.content;
-      div.appendChild(bodyEl);
+      var tag = document.createElement("div");
+      tag.className = "msg-tag";
+      tag.textContent = isUser ? "你" : characterName;
+      row.appendChild(tag);
 
-      list.appendChild(div);
+      var bubble = document.createElement("div");
+      bubble.className = "msg-bubble";
+      bubble.textContent = msg.content;
+      row.appendChild(bubble);
+
+      list.appendChild(row);
     }
 
     list.scrollTop = list.scrollHeight;
