@@ -640,8 +640,8 @@ class GalgamePlugin(Star):
             "enable_streaming": False,
         }
 
-        chat_queue = webchat_queue_mgr.get_or_create_queue(webchat_sid)
-        await chat_queue.put(("galgame", webchat_sid, payload))
+        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
+        await chat_queue.put(("galgame", session_id, payload))
 
         parts = []
         try:
