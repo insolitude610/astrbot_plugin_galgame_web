@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import datetime
 import json
 import os
 import pathlib
@@ -11,6 +12,8 @@ import uuid
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+
+import jwt
 
 from quart import Response, request, make_response
 
@@ -141,6 +144,7 @@ def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
 class GalgameWebHandler(BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:6185"
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame_web" / "galgame"
+    jwt_token: str = ""
 
     MIME = {
         ".html": "text/html; charset=utf-8",
@@ -206,6 +210,8 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
                 req.add_header(key, val)
         if body and method == "POST":
             req.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
+        if GalgameWebHandler.jwt_token:
+            req.add_header("Authorization", f"Bearer {GalgameWebHandler.jwt_token}")
 
         try:
             resp = urllib.request.urlopen(req, timeout=120)
@@ -260,6 +266,7 @@ class GalgamePlugin(Star):
         # ---- start standalone web server ----
         web_port = int(self.config.get("web_port", 0) or 0)
         if web_port > 0:
+            self._setup_proxy_auth()
             self._start_web_server(web_port)
 
         context.register_web_api(
@@ -351,6 +358,30 @@ class GalgamePlugin(Star):
             logger.info(f"Galgame WebUI started at http://localhost:{port}")
         except OSError as e:
             logger.warning(f"Failed to start Galgame WebUI on port {port}: {e}")
+
+    def _setup_proxy_auth(self):
+        try:
+            cfg = self.context.get_config()
+            dashboard_cfg = cfg.get("dashboard", {}) if cfg else {}
+            jwt_secret = dashboard_cfg.get("jwt_secret", "")
+            username = dashboard_cfg.get("username", "astrbot")
+            if jwt_secret and username:
+                payload = {
+                    "username": username,
+                    "exp": datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(days=7),
+                }
+                GalgameWebHandler.jwt_token = jwt.encode(
+                    payload, jwt_secret, algorithm="HS256"
+                )
+                logger.info("Galgame proxy JWT generated successfully")
+            else:
+                logger.warning(
+                    "Could not generate JWT for proxy: "
+                    "jwt_secret or username missing from config"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to setup proxy auth: {e}")
 
     # ---- persistence helpers ----
 
