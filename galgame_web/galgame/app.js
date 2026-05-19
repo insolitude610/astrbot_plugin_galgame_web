@@ -330,6 +330,15 @@ async function toggleHistory() {
 
   if (!sessionId) return;
 
+  var overlay = document.getElementById("history-overlay");
+  if (backgroundFile) {
+    overlay.style.setProperty("--history-bg", "url(" + assetUrl(backgroundFile) + ")");
+    overlay.classList.add("has-bg");
+  } else {
+    overlay.style.removeProperty("--history-bg");
+    overlay.classList.remove("has-bg");
+  }
+
   try {
     var data = await apiGet("history", { session_id: sessionId });
     var messages = data.messages || [];
