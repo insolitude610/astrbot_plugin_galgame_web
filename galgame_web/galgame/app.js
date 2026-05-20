@@ -279,18 +279,16 @@ function switchExpression(emotion) {
 function typewriterAppend(text) {
   var elText = el.dialogText;
   if (typewriterTimer) {
-    var cur = elText.querySelector(".cursor");
-    if (cur) cur.remove();
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
   }
 
-  var baseText = elText.textContent.replace(/█$/, "");
+  elText.textContent = "";
   var i = 0;
   function tick() {
     if (i < text.length) {
       i++;
-      elText.textContent = baseText + text.substring(0, i);
+      elText.textContent = text.substring(0, i);
       typewriterTimer = setTimeout(tick, 60);
     } else {
       typewriterTimer = null;
@@ -373,7 +371,6 @@ function showError(msg) {
 function disableInput() {
   el.userInput.disabled = true;
   el.sendBtn.disabled = true;
-  el.dialogText.textContent = "";
 }
 
 function enableInput() {
