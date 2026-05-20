@@ -71,7 +71,6 @@ EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "th
 LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "orb"]
 
 PLATFORM_ID = "webchat"
-GALGAME_UMO_PREFIX = "webchat!galgame!"
 
 
 def _list_asset_files() -> list[str]:
@@ -266,6 +265,9 @@ class GalgamePlugin(Star):
         self.config = config or {}
         self._sessions: dict[str, dict] = {}
         self._web_server: ThreadingHTTPServer | None = None
+        cfg = self.context.get_config()
+        dashboard_cfg = cfg.get("dashboard", {}) if cfg else {}
+        self._webchat_username = dashboard_cfg.get("username", "astrbot")
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._migrate_old_assets()
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -424,7 +426,7 @@ class GalgamePlugin(Star):
                     pass
 
     def _build_umo(self, session_id: str) -> str:
-        return f"{PLATFORM_ID}:FriendMessage:{GALGAME_UMO_PREFIX}{session_id}"
+        return f"{PLATFORM_ID}:FriendMessage:webchat!{self._webchat_username}!{session_id}"
 
     async def _init_astrbot_conv(self, session_id: str, session: dict):
         umo = self._build_umo(session_id)
@@ -579,7 +581,11 @@ class GalgamePlugin(Star):
     @filter.on_llm_request()
     async def _inject_galgame_rules(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
         umo = event.unified_msg_origin
-        if not umo or GALGAME_UMO_PREFIX not in umo:
+        if not umo:
+            return
+        _, _, webchat_sid = umo.partition(":FriendMessage:")
+        sid = webchat_sid.rsplit("!", 1)[-1] if webchat_sid else ""
+        if sid not in self._sessions:
             return
 
         emotion_tags = _get_emotion_tags(self.config)
@@ -649,7 +655,7 @@ class GalgamePlugin(Star):
 
     async def _push_through_pipeline(self, text: str, session_id: str) -> str:
         message_id = str(uuid.uuid4())
-        webchat_sid = f"webchat!galgame!{session_id}"
+        webchat_sid = f"webchat!{self._webchat_username}!{session_id}"
 
         logger.info(f"[pipeline] start msg_id={message_id[:8]} sid={session_id[:8]} cmd={text[:40]}")
 
@@ -667,7 +673,7 @@ class GalgamePlugin(Star):
         }
 
         chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
-        await chat_queue.put(("galgame", session_id, payload))
+        await chat_queue.put((self._webchat_username, session_id, payload))
         logger.info(f"[pipeline] pushed to chat_queue key={session_id[:8]}, polling back_queue...")
 
         parts = []
