@@ -62,7 +62,7 @@ def _extract_emotion(text: str, emotion_tags: list[str]) -> tuple[str, str]:
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
-ASSETS_DIR = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
+ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 
@@ -266,6 +266,8 @@ class GalgamePlugin(Star):
         self._sessions: dict[str, dict] = {}
         self._web_server: ThreadingHTTPServer | None = None
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        self._migrate_old_assets()
+        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         self._gc_sessions()
         self._load_all_sessions()
         t = asyncio.ensure_future(self._sync_sessions_to_db())
@@ -359,6 +361,7 @@ class GalgamePlugin(Star):
             or "6185"
         )
         GalgameWebHandler.upstream = f"http://127.0.0.1:{upstream_port}"
+        GalgameWebHandler.assets_dir = ASSETS_DIR
         try:
             self._web_server = ThreadingHTTPServer(("0.0.0.0", port), GalgameWebHandler)
             thread = threading.Thread(target=self._web_server.serve_forever, daemon=True)
@@ -550,6 +553,27 @@ class GalgamePlugin(Star):
                 pass
         if removed:
             logger.info(f"GC removed {removed} expired sessions")
+
+    def _migrate_old_assets(self):
+        old_dir = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
+        if not old_dir.is_dir():
+            return
+        existing = set(
+            f.name for f in ASSETS_DIR.iterdir()
+        ) if ASSETS_DIR.is_dir() else set()
+        migrated = 0
+        for f in old_dir.iterdir():
+            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS:
+                continue
+            if f.name in existing:
+                continue
+            try:
+                shutil.copy2(f, ASSETS_DIR / f.name)
+                migrated += 1
+            except OSError:
+                pass
+        if migrated:
+            logger.info(f"Migrated {migrated} assets from old location to {ASSETS_DIR}")
 
     def _get_config_tts_provider(self):
         prov_id = self.config.get("tts_provider", "")
