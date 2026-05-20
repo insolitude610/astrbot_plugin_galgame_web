@@ -19,6 +19,7 @@ from quart import Response, request
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
+from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star
 from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
 
@@ -575,40 +576,38 @@ class GalgamePlugin(Star):
         if migrated:
             logger.info(f"Migrated {migrated} assets from old location to {ASSETS_DIR}")
 
+    @filter.on_llm_request()
+    async def _inject_galgame_rules(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
+        umo = event.unified_msg_origin
+        if not umo or GALGAME_UMO_PREFIX not in umo:
+            return
+
+        emotion_tags = _get_emotion_tags(self.config)
+        emotions = ", ".join(emotion_tags)
+
+        extra = self.config.get("system_prompt_extra", "")
+
+        galgame_prompt = (
+            "\n\n回复规则：\n"
+            "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
+            "2. 回复长度控制在 1-4 句话，不要过长\n"
+            "3. 回复末尾必须加上情绪标签，格式为 [emotion:xxx]\n"
+            "   可选情绪：" + emotions + "\n"
+            "   根据对话内容选择最贴合当前心情的情绪标签\n"
+            "4. 不要在标签前后加任何多余文字\n"
+            "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"
+        )
+
+        if extra:
+            galgame_prompt += f"\n\n{extra}"
+
+        req.system_prompt += galgame_prompt
+
     def _get_config_tts_provider(self):
         prov_id = self.config.get("tts_provider", "")
         if not prov_id:
             return None
         return self.context.get_provider_by_id(prov_id)
-
-    async def _build_system_prompt(self):
-        persona_id = self.config.get("persona", "")
-        persona_prompt = ""
-        if persona_id:
-            persona = await self.context.persona_manager.get_persona(persona_id)
-            if persona:
-                persona_prompt = persona.system_prompt
-
-        extra = self.config.get("system_prompt_extra", "")
-        emotion_tags = _get_emotion_tags(self.config)
-        emotions = ", ".join(emotion_tags)
-
-        prompt = (
-            persona_prompt
-            + "\n\n回复规则：\n"
-            + "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
-            + "2. 回复长度控制在 1-4 句话，不要过长\n"
-            + "3. 回复末尾必须加上情绪标签，格式为 [emotion:xxx]\n"
-            + "   可选情绪：" + emotions + "\n"
-            + "   根据对话内容选择最贴合当前心情的情绪标签\n"
-            + "4. 不要在标签前后加任何多余文字\n"
-            + "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"
-        )
-
-        if extra:
-            prompt += f"\n\n{extra}"
-
-        return prompt
 
     async def _api_session_init(self):
         try:
@@ -648,7 +647,7 @@ class GalgamePlugin(Star):
             logger.exception("session/init failed")
             return {"error": "internal error"}, 500
 
-    async def _push_command_through_pipeline(self, text: str, session_id: str) -> str:
+    async def _push_through_pipeline(self, text: str, session_id: str) -> str:
         message_id = str(uuid.uuid4())
         webchat_sid = f"webchat!galgame!{session_id}"
 
@@ -711,7 +710,8 @@ class GalgamePlugin(Star):
         if not text:
             return {"error": "empty text"}, 400
 
-        # ---- command detection via pipeline ----
+        session = self._sessions[session_id]
+
         cfg = self.context.get_config()
         wake_prefixes = cfg.get("wake_prefix", ["/"])
         matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
@@ -719,119 +719,70 @@ class GalgamePlugin(Star):
         if matched_prefix:
             command_text = text[len(matched_prefix):].strip()
             cmd_name = command_text.split()[0].lower() if command_text else ""
-
-            session = self._sessions[session_id]
-            if cmd_name == "reset":
-                async with session["_lock"]:
-                    session["history"] = []
-                    session["current_emotion"] = "neutral"
-                self._save_session(session_id)
-            elif cmd_name == "new":
+            if cmd_name in ("reset", "new"):
                 async with session["_lock"]:
                     session["history"] = []
                     session["current_emotion"] = "neutral"
                 self._save_session(session_id)
 
-            try:
-                reply = await self._push_command_through_pipeline(text, session_id)
-            except Exception as e:
-                logger.exception(f"[pipeline] push failed: {e}")
-                reply = "指令处理失败"
+        async with session["_lock"]:
+            rapid_count = session.pop("pending_rapid_clicks", 0)
+            conv_id = session.get("conv_id", "")
 
-            return {"reply": reply, "emotion": "neutral"}
-
-        # ---- regular chat ----
-        try:
-            session = self._sessions[session_id]
-
-            async with session["_lock"]:
-                rapid_count = session.pop("pending_rapid_clicks", 0)
-                messages = list(session["history"])
-                messages.append({"role": "user", "content": text})
-                conv_id = session.get("conv_id", "")
-
-            rapid_hint = ""
-            if rapid_count > 0:
-                rapid_hint = (
-                    f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，"
-                    f"可能心情烦躁或着急，请关心一下ta怎么了）"
-                )
-
-            system_prompt = await self._build_system_prompt() + rapid_hint
-
-            try:
-                await self.context.message_history_manager.insert(
-                    platform_id=PLATFORM_ID,
-                    user_id=conv_id,
-                    content={"type": "user", "message": text},
-                    sender_id="user",
-                    sender_name="用户",
-                )
-            except Exception as e:
-                logger.warning(f"Failed to save user message to history: {e}")
-        except Exception as e:
-            logger.exception(f"Unhandled error in _api_send pre-LLM: {e}")
-            return {"error": "internal error"}, 500
-
-        clean_text = ""
-        current_emotion = "neutral"
-        try:
-            llm_prov_id = self.config.get("llm_provider", "")
-            if not llm_prov_id:
-                return {"error": "未配置对话模型，请在插件设置中选择 LLM Provider"}
-
-            from astrbot.core.agent.message import (
-                AssistantMessageSegment,
-                UserMessageSegment,
-                TextPart,
+        rapid_hint = ""
+        if rapid_count > 0:
+            rapid_hint = (
+                f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，"
+                f"可能心情烦躁或着急，请关心一下ta怎么了）"
             )
 
-            contexts = []
-            for msg in messages:
-                if msg["role"] == "user":
-                    contexts.append(UserMessageSegment(content=[TextPart(text=msg["content"])]))
-                elif msg["role"] == "assistant":
-                    contexts.append(AssistantMessageSegment(content=[TextPart(text=msg["content"])]))
+        pipeline_text = text + rapid_hint
 
-            resp = await self.context.llm_generate(
-                chat_provider_id=llm_prov_id,
-                system_prompt=system_prompt,
-                contexts=contexts,
-            )
-
-            full_text = resp.completion_text or ""
-
-            emotion_tags = _get_emotion_tags(self.config)
-            clean_text, current_emotion = _extract_emotion(full_text, emotion_tags)
-
-            async with session["_lock"]:
-                session["history"].append({"role": "user", "content": text})
-                session["history"].append({"role": "assistant", "content": clean_text})
-                session["current_emotion"] = current_emotion
-                if len(session["history"]) > 40:
-                    session["history"] = session["history"][-40:]
-
-            self._save_session(session_id)
-
-            character_name = self.config.get("character_name", "角色")
-            try:
-                await self.context.message_history_manager.insert(
-                    platform_id=PLATFORM_ID,
-                    user_id=conv_id,
-                    content={"type": "bot", "message": clean_text},
-                    sender_id="bot",
-                    sender_name=character_name,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to save bot message to history: {e}")
-
-            try:
-                await self._sync_conv_to_db(session)
-            except Exception as e:
-                logger.warning(f"Failed to sync conversation to DB: {e}")
-
+        try:
+            raw_reply = await self._push_through_pipeline(pipeline_text, session_id)
         except Exception as e:
-            logger.exception(f"Error processing message: {e}")
+            logger.exception(f"[pipeline] push failed: {e}")
+            return {"error": "回复生成失败"}, 500
+
+        emotion_tags = _get_emotion_tags(self.config)
+        clean_text, current_emotion = _extract_emotion(raw_reply, emotion_tags)
+
+        async with session["_lock"]:
+            session["history"].append({"role": "user", "content": text})
+            session["history"].append({"role": "assistant", "content": clean_text})
+            session["current_emotion"] = current_emotion
+            if len(session["history"]) > 40:
+                session["history"] = session["history"][-40:]
+
+        self._save_session(session_id)
+
+        character_name = self.config.get("character_name", "角色")
+        try:
+            await self.context.message_history_manager.insert(
+                platform_id=PLATFORM_ID,
+                user_id=conv_id,
+                content={"type": "user", "message": text},
+                sender_id="user",
+                sender_name="用户",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save user message to history: {e}")
+
+        try:
+            await self.context.message_history_manager.insert(
+                platform_id=PLATFORM_ID,
+                user_id=conv_id,
+                content={"type": "bot", "message": clean_text},
+                sender_id="bot",
+                sender_name=character_name,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save bot message to history: {e}")
+
+        try:
+            await self._sync_conv_to_db(session)
+        except Exception as e:
+            logger.warning(f"Failed to sync conversation to DB: {e}")
 
         return {"reply": clean_text, "emotion": current_emotion}
 
