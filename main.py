@@ -504,6 +504,7 @@ class GalgamePlugin(Star):
                 "history": data.get("history", []),
                 "current_emotion": data.get("current_emotion", "neutral"),
                 "pending_rapid_clicks": 0,
+                "_resp_event": asyncio.Event(),
                 "created_at": data.get("created_at", time.time()),
                 "_lock": asyncio.Lock(),
             }
