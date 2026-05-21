@@ -578,6 +578,18 @@ class GalgamePlugin(Star):
         if migrated:
             logger.info(f"Migrated {migrated} assets from old location to {ASSETS_DIR}")
 
+    def _save_audio(self, audio_b64: str) -> str:
+        if "," in audio_b64:
+            audio_b64 = audio_b64.split(",", 1)[1]
+        raw = base64.b64decode(audio_b64)
+        audio_dir = pathlib.Path("data/temp")
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_path = audio_dir / f"galgame_audio_{uuid.uuid4().hex}.wav"
+        with open(audio_path, "wb") as f:
+            f.write(raw)
+        logger.info(f"Saved voice audio: {audio_path} ({len(raw)} bytes)")
+        return str(audio_path.resolve())
+
     @filter.on_llm_request()
     async def _inject_galgame_rules(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
         umo = event.unified_msg_origin
@@ -653,19 +665,25 @@ class GalgamePlugin(Star):
             logger.exception("session/init failed")
             return {"error": "internal error"}, 500
 
-    async def _push_through_pipeline(self, text: str, session_id: str) -> str:
+    async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> str:
         message_id = str(uuid.uuid4())
         webchat_sid = f"webchat!{self._webchat_username}!{session_id}"
 
-        logger.info(f"[pipeline] start msg_id={message_id[:8]} sid={session_id[:8]} cmd={text[:40]}")
+        logger.info(f"[pipeline] start msg_id={message_id[:8]} sid={session_id[:8]} text={text[:40]} audio={'yes' if audio_path else 'no'}")
 
         back_queue = webchat_queue_mgr.get_or_create_back_queue(
             message_id, webchat_sid
         )
         logger.info(f"[pipeline] back_queue created for {message_id[:8]}")
 
+        message_parts = []
+        if audio_path:
+            message_parts.append({"type": "record", "path": audio_path})
+        if text:
+            message_parts.append({"type": "plain", "text": text})
+
         payload = {
-            "message": [{"type": "plain", "text": text}],
+            "message": message_parts,
             "message_id": message_id,
             "selected_provider": None,
             "selected_model": None,
@@ -710,13 +728,23 @@ class GalgamePlugin(Star):
 
         session_id = data.get("session_id", "")
         text = data.get("text", "").strip()
+        audio_data = data.get("audio_data", "")
 
         if not session_id or session_id not in self._sessions:
             return {"error": "invalid session_id"}, 400
-        if not text:
+        if not text and not audio_data:
             return {"error": "empty text"}, 400
 
         session = self._sessions[session_id]
+
+        audio_path = ""
+        if audio_data:
+            try:
+                audio_path = self._save_audio(audio_data)
+            except Exception as e:
+                logger.warning(f"Failed to save audio: {e}")
+                if not text:
+                    return {"error": "语音处理失败，请重试"}, 500
 
         cfg = self.context.get_config()
         wake_prefixes = cfg.get("wake_prefix", ["/"])
@@ -745,7 +773,7 @@ class GalgamePlugin(Star):
         pipeline_text = text + rapid_hint
 
         try:
-            raw_reply = await self._push_through_pipeline(pipeline_text, session_id)
+            raw_reply = await self._push_through_pipeline(pipeline_text, session_id, audio_path)
         except Exception as e:
             logger.exception(f"[pipeline] push failed: {e}")
             return {"error": "回复生成失败"}, 500
