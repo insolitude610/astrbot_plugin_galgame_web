@@ -15,6 +15,10 @@
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
 - **双层渲染模式** —— 支持完整分层 PNG（layered）或单张立绘 + 表情差分（single）
 - **对话历史面板** —— 内建聊天记录查看，气泡式展示，背景色自适应
+- **语音输入** —— 浏览器麦克风录音，经 AstrBot STT 管道自动转文字
+- **AstrBot 指令全兼容** —— `/help /reset /new` 等所有已注册指令通过管道分发
+- **立绘位置可调** —— `sprite_bottom` / `sprite_left` 配置项，自由调整角色站位
+- **批量删除** —— 立绘管理页多选文件一键删除
 - **纯 CSS 动画** —— 呼吸、头发摆动、球体漂浮、对话框滑入，零依赖
 - **同步请求/响应** —— `send` API 返回完整回复（文本 + 情绪），前端本地播打字机动画
 - **会话持久化** —— 对话历史自动存盘，重启/重载后保留；localStorage 记录 session_id，关掉页面再打开可继续对话
@@ -39,6 +43,9 @@
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o |
 | TTS Provider | 语音合成（暂不可用） | 等待后续修复 |
 | 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
+| 立绘缩放比例 | 整体缩放倍数 | 默认 1.0，建议 0.5 ~ 2.0 |
+| 立绘底部位置 | vh 距离底部，越小越靠下 | 默认 28，建议 5 ~ 45 |
+| 立绘水平位置 | 水平锚点 % 位置 | 默认 50（居中） |
 | 独立 WebUI 端口 | 插件启动的独立 HTTP 服务器端口 | 默认 6186，设为 0 关闭 |
 | 自定义情绪 | JSON 格式添加额外情绪标签 | 例：`{"dokidoki": ""}` |
 | 会话保留天数 | 超过该天数未活跃的会话自动清理 | 默认 7 天，0 = 永不清理 |
@@ -288,25 +295,24 @@ Same light-gray background, same 3:4 composition.
 - 前端: 原生 HTML/CSS/JS，无框架依赖
 - 后端: Python `http.server` + AstrBot Star API
 - 通信: `fetch()` 同步请求/响应，通过本地代理与 AstrBot Core 交互，JWT Bearer 认证
-
----
+- 管道: 所有对话经 webchat 管道分发，接入记忆/感知/安全等全插件栈
 
 ## 变更记录
 
 ### v0.3.0
 
-- **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口（默认 6186）提供完整 WebUI
-- **移除 Dashboard 内嵌** — 不再通过 Dashboard 沙箱 iframe 访问，避免 sandbox 限制
-- **同步 API 架构** — `send` 返回完整回复（文本 + 情绪），前端本地播打字机；移除 SSE 依赖
-- **AstrBot 指令全兼容** — `/help /reset /new` 等所有已注册指令通过 webchat 管道分发，LLM 不接管
-- **对话历史面板** — 内建聊天记录查看，气泡式展示，背景色自适应
+- **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口提供完整 WebUI
+- **管道全集成** — 所有消息经 webchat 管道分发，指令和语音走管道、记忆/感知/安全全栈生效
+- **AstrBot 指令全兼容** — `/help /reset /new` 等所有已注册指令正常运行
+- **语音输入** — 浏览器麦克风录音为 WAV，经管道 STT 插件转文字后发送
+- **立绘位置可调** — 新增 `sprite_bottom`、`sprite_left` 配置项，自由调整角色站位
 - **立绘缩放** — 新增 `sprite_scale` 配置项，CSS `scale` 变换
+- **批量删除** — 立绘管理页多选文件一键删除
+- **资产迁移** — assets 目录移至 `data/plugin_data/`，插件更新不丢用户图片；`.migrated` 标记防重复搬迁
+- **对话历史面板** — 内建聊天记录查看，气泡式展示，背景色自适应
 - **JWT 代理认证** — 所有 API 请求通过代理自动附带 JWT Bearer 令牌
-- 修复立绘管理页面背景图匹配不到上传文件的 bug
-- 修复指令输入后 WebUI 卡死（回执队列 key 对齐 + 双重前缀修正 + 消息类型 `plain`）
-- 修复 Dashboard 数据管理页出现大量空 `webchat!galgame!` 对话
-- `user-select: auto`，允许文本选中复制
-- `localStorage` 正常工作（无 sandbox 限制）
+- 移除 Dashboard 内嵌 / Bridge SDK / SSE 依赖
+- `user-select: auto`，`localStorage` 正常工作
 
 ### v0.2.4
 
