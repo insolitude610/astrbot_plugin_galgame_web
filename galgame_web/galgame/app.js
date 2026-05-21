@@ -25,8 +25,16 @@ var pcmChunks = [];
 var SAMPLE_RATE = 16000;
 
 function pcmToWavBlob(pcm, rate) {
-  var bufLen = pcm.length;
-  var buffer = new ArrayBuffer(44 + bufLen * 2);
+  var totalLen = 0;
+  for (var i = 0; i < pcm.length; i++) totalLen += pcm[i].length;
+  var flat = new Float32Array(totalLen);
+  var off = 0;
+  for (var i = 0; i < pcm.length; i++) {
+    flat.set(pcm[i], off);
+    off += pcm[i].length;
+  }
+
+  var buffer = new ArrayBuffer(44 + totalLen * 2);
   var view = new DataView(buffer);
 
   function wstr(off, s) {
@@ -34,7 +42,7 @@ function pcmToWavBlob(pcm, rate) {
   }
 
   wstr(0, "RIFF");
-  view.setUint32(4, 36 + bufLen * 2, true);
+  view.setUint32(4, 36 + totalLen * 2, true);
   wstr(8, "WAVE");
   wstr(12, "fmt ");
   view.setUint32(16, 16, true);
@@ -45,10 +53,10 @@ function pcmToWavBlob(pcm, rate) {
   view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
   wstr(36, "data");
-  view.setUint32(40, bufLen * 2, true);
+  view.setUint32(40, totalLen * 2, true);
 
-  for (var i = 0; i < bufLen; i++) {
-    var s = Math.max(-32768, Math.min(32767, pcm[i]));
+  for (var i = 0; i < totalLen; i++) {
+    var s = Math.max(-32768, Math.min(32767, flat[i]));
     view.setInt16(44 + i * 2, s, true);
   }
 
@@ -84,6 +92,7 @@ async function toggleRecording() {
       el.micBtn.classList.add("recording");
     } catch (err) {
       console.warn("Microphone access denied:", err);
+      showError("无法访问麦克风，请确认浏览器已授予录音权限");
     }
   }
 }
@@ -485,6 +494,8 @@ async function sendMessage(audioData) {
       finishResponse();
     } else if (resp.error) {
       showError(resp.error);
+    } else {
+      finishResponse();
     }
   } catch (err) {
     console.error("Send failed:", err);
