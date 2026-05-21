@@ -19,7 +19,7 @@ from quart import Response, request
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
-from astrbot.api.provider import ProviderRequest
+from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star
 from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
 
@@ -631,6 +631,23 @@ class GalgamePlugin(Star):
 
         req.system_prompt += galgame_prompt
 
+    @filter.on_llm_response()
+    async def _capture_llm_response(self, event: AstrMessageEvent, resp: LLMResponse) -> None:
+        umo = event.unified_msg_origin
+        if not umo:
+            return
+        _, _, webchat_sid = umo.partition(":FriendMessage:")
+        sid = webchat_sid.rsplit("!", 1)[-1] if webchat_sid else ""
+        session = self._sessions.get(sid)
+        if not session:
+            return
+        text = resp.completion_text or ""
+        if text.strip():
+            session["_last_resp_text"] = text
+        ev = session.get("_resp_event")
+        if ev and not ev.is_set():
+            ev.set()
+
     def _get_config_tts_provider(self):
         prov_id = self.config.get("tts_provider", "")
         if not prov_id:
@@ -658,6 +675,7 @@ class GalgamePlugin(Star):
                 "history": [],
                 "current_emotion": "neutral",
                 "pending_rapid_clicks": 0,
+                "_resp_event": asyncio.Event(),
                 "created_at": time.time(),
                 "_lock": asyncio.Lock(),
             }
@@ -716,7 +734,7 @@ class GalgamePlugin(Star):
                     logger.info(f"[pipeline] end signal → collected {len(parts)} parts")
                     break
                 elif msg_type in ("plain", "complete"):
-                    if data_text:
+                    if data_text and not data_text.lstrip().startswith("{"):
                         parts.append(data_text)
                 elif msg_type == "image":
                     parts.append(data_text)
@@ -787,6 +805,15 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.exception(f"[pipeline] push failed: {e}")
             return {"error": "回复生成失败"}, 500
+
+        if not raw_reply and text.strip() and not matched_prefix:
+            ev = session.get("_resp_event", asyncio.Event())
+            ev.clear()
+            try:
+                await asyncio.wait_for(ev.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                pass
+            raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         emotion_tags = _get_emotion_tags(self.config)
         clean_text, current_emotion = _extract_emotion(raw_reply, emotion_tags)
