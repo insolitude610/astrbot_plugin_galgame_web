@@ -354,6 +354,12 @@ class GalgamePlugin(Star):
             ["POST"],
             "Notify rapid click/keyboard activity",
         )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/assets/batch-delete",
+            self._api_assets_batch_delete,
+            ["POST"],
+            "Batch delete multiple asset files",
+        )
 
     # ---- standalone web server ----
 
@@ -1004,6 +1010,20 @@ class GalgamePlugin(Star):
             return {"copied": dst_path.name, "source": source}
         except OSError as e:
             return {"error": str(e)}, 500
+
+    async def _api_assets_batch_delete(self):
+        data = await request.get_json() or {}
+        filenames = data.get("filenames", [])
+        if not filenames:
+            return {"error": "no filenames"}, 400
+        deleted = []
+        for name in filenames:
+            safe = _safe_path(name, ASSETS_DIR)
+            if safe and safe.is_file():
+                safe.unlink()
+                deleted.append(name)
+        logger.info(f"Batch deleted {len(deleted)} assets")
+        return {"deleted": deleted}
 
     async def _api_rapid_action(self):
         data = await request.get_json()
