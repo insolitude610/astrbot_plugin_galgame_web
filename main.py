@@ -567,6 +567,9 @@ class GalgamePlugin(Star):
         old_dir = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
         if not old_dir.is_dir():
             return
+        marker = ASSETS_DIR / ".migrated"
+        if marker.exists():
+            return
         existing = set(
             f.name for f in ASSETS_DIR.iterdir()
         ) if ASSETS_DIR.is_dir() else set()
@@ -583,6 +586,7 @@ class GalgamePlugin(Star):
                 pass
         if migrated:
             logger.info(f"Migrated {migrated} assets from old location to {ASSETS_DIR}")
+        marker.touch()
 
     def _save_audio(self, audio_b64: str) -> str:
         if "," in audio_b64:
