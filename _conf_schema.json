@@ -67,6 +67,18 @@
     "default": 1.0,
     "hint": "立绘整体缩放倍数。1.0 为原始大小，建议范围 0.5 ~ 2.0"
   },
+  "sprite_bottom": {
+    "description": "立绘底部位置",
+    "type": "float",
+    "default": 28.0,
+    "hint": "立绘底部距离视口底部的 vh 距离。数值越小立绘越靠下（越低）。建议范围 5 ~ 45。配合缩放可避免穿帮。"
+  },
+  "sprite_left": {
+    "description": "立绘水平位置",
+    "type": "float",
+    "default": 50.0,
+    "hint": "立绘水平锚点在视口中的 % 位置。50=居中，<50=偏左，>50=偏右。建议范围 30 ~ 70。"
+  },
   "sprite_mode": {
     "description": "立绘渲染模式",
     "type": "string",

@@ -51,8 +51,8 @@ html, body {
 #sprite-single {
   display: none;
   position: absolute;
-  bottom: 28vh;
-  left: 50%;
+  bottom: calc(var(--sprite-bottom, 28) * 1vh);
+  left: calc(var(--sprite-left, 50) * 1%);
   translate: -50% 0;
   width: min(40vw, 500px);
   height: min(55vh, 700px);
@@ -79,8 +79,8 @@ html, body {
 #sprite-container {
   display: none;
   position: absolute;
-  bottom: 28vh;
-  left: 50%;
+  bottom: calc(var(--sprite-bottom, 28) * 1vh);
+  left: calc(var(--sprite-left, 50) * 1%);
   translate: -50% 0;
   width: min(42vw, 520px);
   height: min(58vh, 720px);
