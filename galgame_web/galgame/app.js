@@ -192,6 +192,8 @@ function applyConfig(cfg) {
   backgroundFile = cfg.background || "";
   el.characterName.textContent = characterName;
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
+  document.documentElement.style.setProperty("--sprite-bottom", cfg.sprite_bottom != null ? cfg.sprite_bottom : 28);
+  document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
 }
 
 function applyBackground() {

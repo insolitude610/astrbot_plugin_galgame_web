@@ -841,6 +841,8 @@ class GalgamePlugin(Star):
             "character_name": self.config.get("character_name", ""),
             "background": resolved["background"],
             "sprite_scale": self.config.get("sprite_scale", 1.0),
+            "sprite_bottom": self.config.get("sprite_bottom", 28.0),
+            "sprite_left": self.config.get("sprite_left", 50.0),
         }
 
     async def _api_assets_list(self):
