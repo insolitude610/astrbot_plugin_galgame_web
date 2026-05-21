@@ -318,6 +318,42 @@ html, body {
   cursor: not-allowed;
 }
 
+/* ---- Mic Button ---- */
+
+#mic-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#mic-btn:hover {
+  color: rgba(200, 170, 255, 0.95);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#mic-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+#mic-btn.recording {
+  color: #ef4444;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
 #settings-link {
   position: fixed;
   top: 12px;

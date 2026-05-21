@@ -16,6 +16,78 @@ var typewriterTimer = null;
 var mouthTimer = null;
 var isAudioPlaying = false;
 
+/* ---- voice recording ---- */
+
+var audioCtx = null;
+var mediaStream = null;
+var scriptNode = null;
+var pcmChunks = [];
+var SAMPLE_RATE = 16000;
+
+function pcmToWavBlob(pcm, rate) {
+  var bufLen = pcm.length;
+  var buffer = new ArrayBuffer(44 + bufLen * 2);
+  var view = new DataView(buffer);
+
+  function wstr(off, s) {
+    for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+  }
+
+  wstr(0, "RIFF");
+  view.setUint32(4, 36 + bufLen * 2, true);
+  wstr(8, "WAVE");
+  wstr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  wstr(36, "data");
+  view.setUint32(40, bufLen * 2, true);
+
+  for (var i = 0; i < bufLen; i++) {
+    var s = Math.max(-32768, Math.min(32767, pcm[i]));
+    view.setInt16(44 + i * 2, s, true);
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+async function toggleRecording() {
+  if (audioCtx && audioCtx.state !== "closed") {
+    scriptNode.disconnect();
+    mediaStream.getTracks().forEach(function (t) { t.stop(); });
+    audioCtx.close();
+    audioCtx = null;
+    var blob = pcmToWavBlob(pcmChunks, SAMPLE_RATE);
+    var reader = new FileReader();
+    reader.onload = function () { sendMessage(reader.result); };
+    reader.readAsDataURL(blob);
+    el.micBtn.classList.remove("recording");
+  } else {
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      var source = audioCtx.createMediaStreamSource(mediaStream);
+      scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+      pcmChunks = [];
+      scriptNode.onaudioprocess = function (e) {
+        var input = e.inputBuffer.getChannelData(0);
+        var buf = new Float32Array(input.length);
+        buf.set(input);
+        pcmChunks.push(buf);
+      };
+      source.connect(scriptNode);
+      scriptNode.connect(audioCtx.destination);
+      el.micBtn.classList.add("recording");
+    } catch (err) {
+      console.warn("Microphone access denied:", err);
+    }
+  }
+}
+
 /* ---- DOM refs ---- */
 var el = {
   bg: document.getElementById("background"),
@@ -35,6 +107,7 @@ var el = {
   ttsAudio: document.getElementById("tts-audio"),
   historyPanel: document.getElementById("history-panel"),
   historyList: document.getElementById("history-list"),
+  micBtn: document.getElementById("mic-btn"),
 };
 
 /* ---- API helpers ---- */
@@ -371,18 +444,21 @@ function showError(msg) {
 function disableInput() {
   el.userInput.disabled = true;
   el.sendBtn.disabled = true;
+  el.micBtn.disabled = true;
 }
 
 function enableInput() {
   el.userInput.disabled = false;
   el.sendBtn.disabled = false;
+  el.micBtn.disabled = false;
   el.userInput.focus();
 }
 
 /* ---- input handling ---- */
 
 function setupInput() {
-  el.sendBtn.addEventListener("click", sendMessage);
+  el.sendBtn.addEventListener("click", function () { sendMessage(); });
+  el.micBtn.addEventListener("click", toggleRecording);
   el.userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -391,18 +467,18 @@ function setupInput() {
   });
 }
 
-async function sendMessage() {
+async function sendMessage(audioData) {
   var text = el.userInput.value.trim();
-  if (!text || !sessionId) return;
+  if ((!text && !audioData) || !sessionId) return;
 
   el.userInput.value = "";
   disableInput();
 
+  var body = { session_id: sessionId, text: text };
+  if (audioData) body.audio_data = audioData;
+
   try {
-    var resp = await apiPost("send", {
-      session_id: sessionId,
-      text: text,
-    });
+    var resp = await apiPost("send", body);
     if (resp.reply) {
       switchExpression(resp.emotion || "neutral");
       typewriterAppend(resp.reply);
