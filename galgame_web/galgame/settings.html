@@ -173,6 +173,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   margin-top: 12px;
 }
 .card {
+  position: relative;
   background: #0d1b2a;
   border-radius: 8px;
   overflow: hidden;
@@ -183,6 +184,12 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .card-name { font-size: 11px; color: #aaa; word-break: break-all; }
 .card-actions { margin-top: 6px; }
 .card-actions .btn { padding: 3px 8px; font-size: 11px; }
+.card-check {
+  position: absolute; top: 4px; left: 4px;
+  width: 18px; height: 18px; accent-color: #8b5cf6;
+  cursor: pointer; z-index: 1;
+}
+.card-check:not(:checked) { opacity: 0.35; }
 </style>
 </head>
 <body>
@@ -225,6 +232,13 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 
 <!-- All files grid -->
 <h3 style="margin-top: 28px;">所有已上传文件</h3>
+<div id="batch-bar" style="display:none; margin-bottom:8px; align-items:center; gap:12px;">
+  <label style="font-size:12px;color:#aaa;cursor:pointer;user-select:none;">
+    <input type="checkbox" id="select-all" onchange="toggleSelectAll()" style="margin-right:4px;accent-color:#8b5cf6;">
+    全选
+  </label>
+  <button class="btn btn-danger" id="batch-delete-btn" onclick="batchDeleteSelected()" disabled>删除已选 (0)</button>
+</div>
 <div class="section" style="border-color: #444; opacity: 1;">
   <div id="grid-container"></div>
   <div class="loading" id="loading">加载中...</div>
@@ -238,6 +252,55 @@ var BG_KEYS = ["background"];
 
 var allFiles = [];
 var config = {};
+var selectedFiles = {};
+
+function updateBatchBar() {
+  var bar = document.getElementById("batch-bar");
+  var sa = document.getElementById("select-all");
+  var btn = document.getElementById("batch-delete-btn");
+  var count = Object.keys(selectedFiles).length;
+  bar.style.display = allFiles.length > 0 ? "flex" : "none";
+  sa.checked = allFiles.length > 0 && count === allFiles.length;
+  sa.indeterminate = count > 0 && count < allFiles.length;
+  btn.textContent = "删除已选 (" + count + ")";
+  btn.disabled = count === 0;
+}
+
+function toggleSelectAll() {
+  var sa = document.getElementById("select-all");
+  if (sa.checked) {
+    for (var i = 0; i < allFiles.length; i++) selectedFiles[allFiles[i].name] = true;
+  } else {
+    selectedFiles = {};
+  }
+  renderFileGrid();
+  updateBatchBar();
+}
+
+function toggleFileSelect(name) {
+  if (selectedFiles[name]) { delete selectedFiles[name]; }
+  else { selectedFiles[name] = true; }
+  updateBatchBar();
+}
+
+async function batchDeleteSelected() {
+  var names = Object.keys(selectedFiles);
+  if (names.length === 0) return;
+  if (!confirm("确定删除 " + names.length + " 个文件？")) return;
+  setStatus("批量删除中...");
+  try {
+    var data = await apiPost("assets/batch-delete", { filenames: names });
+    if (data.deleted && data.deleted.length > 0) {
+      setStatus("已删除 " + data.deleted.length + " 个文件", "success");
+      selectedFiles = {};
+      await loadFiles();
+    } else {
+      setStatus(data.error || "批量删除失败", "error");
+    }
+  } catch(e) {
+    setStatus("批量删除失败: " + e.message, "error");
+  }
+}
 
 async function apiGet(endpoint) {
   var resp = await fetch(API_BASE + "/" + endpoint);
@@ -453,6 +516,13 @@ function renderFileGrid() {
     var card = document.createElement("div");
     card.className = "card";
 
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "card-check";
+    cb.checked = !!selectedFiles[f.name];
+    (function(fn) { cb.onchange = function() { toggleFileSelect(fn); }; })(f.name);
+    card.appendChild(cb);
+
     var img = document.createElement("img");
     img.className = "card-img";
     img.alt = f.name;
@@ -539,7 +609,9 @@ async function loadFiles() {
       rawFiles[i].url = "./assets/" + encodeURIComponent(rawFiles[i].name);
     }
     allFiles = rawFiles;
+    selectedFiles = {};
     renderAll();
+    updateBatchBar();
   } catch(e) {
     setStatus("加载失败: " + e.message, "error");
   }
