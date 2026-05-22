@@ -49,17 +49,30 @@ def _get_emotion_tags(config: dict) -> list[str]:
         return keys
     return list(DEFAULT_EMOTION_TAGS)
 
-def _extract_emotion(text: str, emotion_tags: list[str]) -> tuple[str, str]:
-    m = EMOTION_PATTERN.search(text)
-    if m and m.group(1).lower() in emotion_tags:
-        return EMOTION_PATTERN.sub("", text).strip(), m.group(1).lower()
-
-    for tag in emotion_tags:
-        p = re.compile(rf"\[{re.escape(tag)}\]", re.IGNORECASE)
-        if p.search(text):
-            return p.sub("", text).strip(), tag.lower()
-
-    return text.strip(), "neutral"
+def _extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
+    """Extract inline [emotion:xxx] tags. Returns (clean_text, [(emotion, byte_position), ...])"""
+    segments = []
+    emotions = []
+    last_end = 0
+    for m in EMOTION_PATTERN.finditer(text):
+        tag = m.group(1).lower()
+        if tag in emotion_tags:
+            segments.append(text[last_end:m.start()])
+            emotions.append((tag, sum(len(s) for s in segments)))
+            last_end = m.end()
+    segments.append(text[last_end:])
+    clean = "".join(segments).strip()
+    # Fallback: check for bare [tagname] format
+    if not emotions:
+        for tag in emotion_tags:
+            p = re.compile(rf"\[{re.escape(tag)}\]", re.IGNORECASE)
+            for m in p.finditer(text):
+                emotions.append((tag.lower(), m.start()))
+                clean = re.sub(rf"\[{re.escape(tag)}\]", "", text, flags=re.IGNORECASE).strip()
+                break
+            if emotions:
+                break
+    return clean, emotions
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
@@ -624,9 +637,10 @@ class GalgamePlugin(Star):
             "\n\n回复规则：\n"
             "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
             "2. 回复长度控制在 1-4 句话，不要过长\n"
-            "3. 回复末尾必须加上情绪标签，格式为 [emotion:xxx]\n"
+            "3. 在回复中任意位置插入情绪标签 [emotion:xxx] 来切换表情\n"
             "   可选情绪：" + emotions + "\n"
-            "   根据对话内容选择最贴合当前心情的情绪标签\n"
+            "   同一句话中可以多次使用不同标签，例如：\n"
+            "   '我[emotion:happy]今天真开心！[emotion:surprised]你怎么来了？'\n"
             "4. 不要在标签前后加任何多余文字\n"
             "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"
         )
@@ -830,12 +844,13 @@ class GalgamePlugin(Star):
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         emotion_tags = _get_emotion_tags(self.config)
-        clean_text, current_emotion = _extract_emotion(raw_reply, emotion_tags)
+        clean_text, emotions = _extract_emotions(raw_reply, emotion_tags)
+        final_emotion = emotions[-1][0] if emotions else "neutral"
 
         async with session["_lock"]:
             session["history"].append({"role": "user", "content": text})
             session["history"].append({"role": "assistant", "content": clean_text})
-            session["current_emotion"] = current_emotion
+            session["current_emotion"] = final_emotion
             if len(session["history"]) > 40:
                 session["history"] = session["history"][-40:]
 
@@ -869,7 +884,11 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to sync conversation to DB: {e}")
 
-        return {"reply": clean_text, "emotion": current_emotion}
+        return {
+            "reply": clean_text,
+            "emotion": final_emotion,
+            "emotions": [[emo, pos] for emo, pos in emotions],
+        }
 
     async def _api_history(self):
         session_id = request.args.get("session_id", "")
