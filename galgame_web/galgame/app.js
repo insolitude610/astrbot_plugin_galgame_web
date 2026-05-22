@@ -365,12 +365,15 @@ function switchExpression(emotion) {
 
 /* ---- typewriter ---- */
 
-function typewriterAppend(text) {
+function typewriterAppend(text, emotionMap) {
   var elText = el.dialogText;
   if (typewriterTimer) {
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
   }
+
+  emotionMap = emotionMap || {};
+  var emotionPositions = Object.keys(emotionMap).map(Number).sort(function(a,b){return a-b;});
 
   elText.textContent = "";
   var i = 0;
@@ -378,9 +381,18 @@ function typewriterAppend(text) {
     if (i < text.length) {
       i++;
       elText.textContent = text.substring(0, i);
+      // Check if we passed an emotion position
+      while (emotionPositions.length && emotionPositions[0] < i) {
+        var pos = emotionPositions.shift();
+        switchExpression(emotionMap[pos]);
+      }
       typewriterTimer = setTimeout(tick, 60);
     } else {
       typewriterTimer = null;
+      // Apply any remaining emotions
+      while (emotionPositions.length) {
+        switchExpression(emotionMap[emotionPositions.shift()]);
+      }
       var cursor = document.createElement("span");
       cursor.className = "cursor";
       elText.appendChild(cursor);
@@ -496,8 +508,10 @@ async function sendMessage(audioData) {
   try {
     var resp = await apiPost("send", body);
     if (resp.reply) {
-      switchExpression(resp.emotion || "neutral");
-      typewriterAppend(resp.reply);
+      var emotionMap = {};
+      var emotionList = resp.emotions || [];
+      emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
+      typewriterAppend(resp.reply, emotionMap);
       finishResponse();
     } else if (resp.error) {
       showError(resp.error);
