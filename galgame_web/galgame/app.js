@@ -109,7 +109,6 @@ var el = {
   layerHairFront: document.getElementById("layer-hair-front"),
   layerMouth: document.getElementById("layer-mouth"),
   layerEyes: document.getElementById("layer-eyes"),
-  layerOrb: document.getElementById("layer-orb"),
   dialogText: document.getElementById("dialog-text"),
   characterName: document.getElementById("character-name"),
   userInput: document.getElementById("user-input"),
@@ -316,7 +315,6 @@ function applySprites() {
     safeImg(el.layerHairBack, assetUrl(layers.hair_back));
     safeImg(el.layerHairFront, assetUrl(layers.hair_front));
     safeImg(el.layerMouth, assetUrl(layers.mouth_closed));
-    safeImg(el.layerOrb, assetUrl(layers.orb));
     safeImg(el.layerEyes, assetUrl(layers.eyes_open));
     if (layers.mouth_open || layers.mouth_closed) {
       el.layerMouth.classList.add("visible");
