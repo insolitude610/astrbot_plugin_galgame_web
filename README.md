@@ -267,8 +267,6 @@ Same light-gray background, same 3:4 composition.
 4. 抠出后部头发 → `hair_back.png`
 5. 从表情脸图中裁出嘴部 → `mouth_open.png` / `mouth_closed.png`
 
-> 可以用 [sprite-gen-AIHubmix](https://github.com/insolitude610/sprite-gen-AIHubmix) 自动化生成 + 拆层流程。
-
 ---
 
 ## API 响应格式
@@ -359,4 +357,3 @@ MIT
 **相关项目：**
 - [AstrBot](https://github.com/AstrBotDevs/AstrBot)
 - [AstrBot 插件开发指南](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [sprite-gen-AIHubmix](https://github.com/insolitude610/sprite-gen-AIHubmix) — 立绘生成 + 拆层自动化工具
