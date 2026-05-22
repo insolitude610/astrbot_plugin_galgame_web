@@ -107,6 +107,8 @@ html, body {
 #layer-hair-front        { z-index: 5; animation: sway-front 6s ease-in-out infinite; }
 #layer-mouth             { z-index: 4; display: none; }
 #layer-mouth.visible     { display: block; }
+#layer-eyes              { z-index: 5; display: none; }
+#layer-eyes.visible      { display: block; }
 #layer-orb               { z-index: 0; animation: orb-float 3s ease-in-out infinite; }
 
 .face { transition: opacity 0.4s ease; }
@@ -151,6 +153,18 @@ html, body {
 
 #layer-mouth.speaking {
   animation: mouth-flap 0.2s steps(1) infinite;
+}
+
+/* ---- blink animation on eye layer ---- */
+
+@keyframes eye-blink {
+  0%, 93%, 100% { transform: scaleY(1); }
+  96%           { transform: scaleY(0.05); }
+}
+
+#layer-eyes {
+  transform-origin: center 40%;
+  animation: eye-blink var(--eye-blink-dur, 4s) ease-in-out infinite;
 }
 
 /* ===== LAYER 3: UI Layer ===== */

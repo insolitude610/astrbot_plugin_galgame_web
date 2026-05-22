@@ -119,6 +119,8 @@
       "hair_front":  {"description": "头发前 (留空=自动)", "type": "string", "default": ""},
       "mouth_open":  {"description": "张嘴 (留空=自动)", "type": "string", "default": ""},
       "mouth_closed":{"description": "闭嘴 (留空=自动)", "type": "string", "default": ""},
+      "eyes_open":   {"description": "睁眼 (留空=自动)", "type": "string", "default": ""},
+      "eyes_closed": {"description": "闭眼 (留空=自动)", "type": "string", "default": ""},
       "orb":         {"description": "球体 (留空=自动)", "type": "string", "default": ""}
     }
   }

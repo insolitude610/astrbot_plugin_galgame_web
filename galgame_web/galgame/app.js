@@ -108,6 +108,7 @@ var el = {
   layerHead: document.getElementById("layer-head"),
   layerHairFront: document.getElementById("layer-hair-front"),
   layerMouth: document.getElementById("layer-mouth"),
+  layerEyes: document.getElementById("layer-eyes"),
   layerOrb: document.getElementById("layer-orb"),
   dialogText: document.getElementById("dialog-text"),
   characterName: document.getElementById("character-name"),
@@ -311,8 +312,12 @@ function applySprites() {
     el.layerHairFront.src = assetUrl(layers.hair_front);
     el.layerMouth.src = assetUrl(layers.mouth_closed);
     el.layerOrb.src = assetUrl(layers.orb);
+    el.layerEyes.src = assetUrl(layers.eyes_open);
     if (layers.mouth_open || layers.mouth_closed) {
       el.layerMouth.classList.add("visible");
+    }
+    if (layers.eyes_open || layers.eyes_closed) {
+      el.layerEyes.classList.add("visible");
     }
     loadExpressionToLayer(currentEmotion);
   } else {
