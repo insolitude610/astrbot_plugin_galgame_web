@@ -843,6 +843,8 @@ class GalgamePlugin(Star):
                 pass
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
+        raw_reply = raw_reply.replace("\\n", "\n")
+
         emotion_tags = _get_emotion_tags(self.config)
         clean_text, emotions = _extract_emotions(raw_reply, emotion_tags)
         final_emotion = emotions[-1][0] if emotions else "neutral"
