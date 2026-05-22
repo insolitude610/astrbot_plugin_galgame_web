@@ -699,6 +699,7 @@ class GalgamePlugin(Star):
             return {"error": "internal error"}, 500
 
     async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> str:
+        t0 = time.time()
         message_id = str(uuid.uuid4())
         webchat_sid = f"webchat!{self._webchat_username}!{session_id}"
 
@@ -723,20 +724,26 @@ class GalgamePlugin(Star):
             "enable_streaming": False,
         }
 
+        t1 = time.time()
         chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
         await chat_queue.put((self._webchat_username, session_id, payload))
-        logger.info(f"[pipeline] pushed to chat_queue key={session_id[:8]}, polling back_queue...")
+        logger.info(f"[pipeline] pushed to chat_queue key={session_id[:8]}, polling back_queue... (setup={t1 - t0:.3f}s)")
 
         parts = []
+        first_recv = True
         try:
             while True:
                 result = await asyncio.wait_for(back_queue.get(), timeout=120)
+                if first_recv:
+                    t2 = time.time()
+                    logger.info(f"[pipeline] first resp after {(t2 - t1) * 1000:.0f}ms")
+                    first_recv = False
                 msg_type = result.get("type", "")
                 data_text = result.get("data", "")
                 logger.info(f"[pipeline] recv type={msg_type!r} data={data_text[:80]!r}")
 
                 if msg_type == "end":
-                    logger.info(f"[pipeline] end signal → collected {len(parts)} parts")
+                    logger.info(f"[pipeline] end signal → collected {len(parts)} parts (total={time.time() - t0:.3f}s)")
                     break
                 elif msg_type in ("plain", "complete"):
                     if data_text and not data_text.lstrip().startswith("{"):
@@ -806,7 +813,9 @@ class GalgamePlugin(Star):
         pipeline_text = text + rapid_hint
 
         try:
+            t_pipe = time.time()
             raw_reply = await self._push_through_pipeline(pipeline_text, session_id, audio_path)
+            logger.info(f"[perf] pipeline roundtrip: {time.time() - t_pipe:.2f}s")
         except Exception as e:
             logger.exception(f"[pipeline] push failed: {e}")
             return {"error": "回复生成失败"}, 500
