@@ -26,7 +26,7 @@
 
 ## 快速开始
 
-> **注意：** 目前 `layered`（多层伪 Live2D）模式尚未完善——身体层尺寸未对齐、头发前后层/球体层缺少素材。当前版本**强烈建议使用 `single`（单图表情差分）模式**，所有核心功能（表情切换、呼吸动画、嘴部口型、眨眼、TTS、打字机、快速点击检测）在 single 模式下均可正常工作。layered 模式计划后续版本完善。
+> **注意：** `layered`（多层伪 Live2D）模式已改为统一画布架构（所有层同尺寸），body/face/mouth/eyes 层可正常叠放对齐，但 **hair_back/hair_front/orb 层尚未提供素材**（需手工 PS 拆分），且整体尚未充分测试。**日常使用推荐 `single` 模式**。如需体验 layered 模式，将 `layers/layered/` 下的 PNG 拷入 `assets/` 目录，配置 `sprite_mode` 为 `layered` 即可。
 
 ### 安装
 
