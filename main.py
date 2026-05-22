@@ -26,7 +26,7 @@ from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queu
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
 DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-EMOTION_PATTERN = re.compile(r"\{emotion:(\w+)\}")
+EMOTION_PATTERN = re.compile(r"\{emotion_(\w+)\}")
 
 def _get_emotion_tags(config: dict) -> list[str]:
     expressions = config.get("expressions", {})
@@ -65,10 +65,10 @@ def _extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
     # Fallback: check for bare {tagname} format
     if not emotions:
         for tag in emotion_tags:
-            p = re.compile(rf"\{{emotion:\s*{re.escape(tag)}\s*\}}", re.IGNORECASE)
+            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 emotions.append((tag.lower(), m.start()))
-                clean = re.sub(rf"\{{emotion:\s*{re.escape(tag)}\s*\}}", "", text, flags=re.IGNORECASE).strip()
+                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
                 break
             if emotions:
                 break
@@ -83,12 +83,12 @@ DEFAULT_GALGAME_PROMPT = (
     "回复规则：\n"
     "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
     "2. 回复长度控制在 1-4 句话，不要过长\n"
-    "3. 在回复中任意位置插入情绪标签 {emotion:xxx} 来切换表情\n"
+    "3. 在回复中任意位置插入情绪标签 {emotion_xxx} 来切换表情\n"
     "   可选情绪：{{emotions}}\n"
     "   同一句话中可以多次使用不同标签\n"
     "4. 不要在标签前后加任何多余文字\n"
     "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可\n"
-    "6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片或文件"
+    "6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件"
 )
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
