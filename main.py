@@ -68,7 +68,7 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "orb"]
+LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "eyes_open", "eyes_closed", "orb"]
 
 PLATFORM_ID = "webchat"
 
