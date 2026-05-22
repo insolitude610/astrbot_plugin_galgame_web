@@ -411,8 +411,12 @@ class GalgamePlugin(Star):
             return
         parts = key.split("_", 1)
         prefix, base = parts[0], parts[1]
+        sprite_mode = self.config.get("sprite_mode", "single")
         try:
-            if prefix in ("single", "expr") and base in EXPRESSION_KEYS:
+            if prefix == "single" and sprite_mode == "single" and base in EXPRESSION_KEYS:
+                if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
+                    self.config["expressions"][base] = filename
+            elif prefix == "expr" and sprite_mode == "layered" and base in EXPRESSION_KEYS:
                 if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
                     self.config["expressions"][base] = filename
             elif prefix == "layer" and base in LAYER_KEYS:
