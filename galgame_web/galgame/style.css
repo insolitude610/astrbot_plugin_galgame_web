@@ -109,7 +109,6 @@ html, body {
 #layer-mouth.visible     { display: block; }
 #layer-eyes              { z-index: 5; display: none; }
 #layer-eyes.visible      { display: block; }
-#layer-orb               { z-index: 0; animation: orb-float 3s ease-in-out infinite; }
 
 .face { transition: opacity 0.4s ease; }
 .face.switching { opacity: 0; }
@@ -137,13 +136,6 @@ html, body {
   0%, 100% { transform: rotate(0deg); }
   40%      { transform: rotate(0.5deg); }
   80%      { transform: rotate(-0.3deg); }
-}
-
-@keyframes orb-float {
-  0%, 100% { transform: translate(0, 0); }
-  25%      { transform: translate(6px, -10px); }
-  50%      { transform: translate(-4px, -4px); }
-  75%      { transform: translate(-6px, -14px); }
 }
 
 @keyframes mouth-flap {
