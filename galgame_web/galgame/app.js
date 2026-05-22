@@ -303,16 +303,21 @@ function applyHistoryPalette(hue, sat) {
   root.setProperty("--history-overlay-bg", "linear-gradient(" + hslToRgba(hue, sat * 0.18, 0.22, 0.68) + "," + hslToRgba(hue, sat * 0.15, 0.16, 0.65) + "), var(--history-bg-img)");
 }
 
+function safeImg(el, src) {
+  if (src) { el.src = src; el.style.display = ""; }
+  else { el.src = ""; el.style.display = "none"; }
+}
+
 function applySprites() {
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    el.layerBody.src = assetUrl(layers.body);
-    el.layerHairBack.src = assetUrl(layers.hair_back);
-    el.layerHairFront.src = assetUrl(layers.hair_front);
-    el.layerMouth.src = assetUrl(layers.mouth_closed);
-    el.layerOrb.src = assetUrl(layers.orb);
-    el.layerEyes.src = assetUrl(layers.eyes_open);
+    safeImg(el.layerBody, assetUrl(layers.body));
+    safeImg(el.layerHairBack, assetUrl(layers.hair_back));
+    safeImg(el.layerHairFront, assetUrl(layers.hair_front));
+    safeImg(el.layerMouth, assetUrl(layers.mouth_closed));
+    safeImg(el.layerOrb, assetUrl(layers.orb));
+    safeImg(el.layerEyes, assetUrl(layers.eyes_open));
     if (layers.mouth_open || layers.mouth_closed) {
       el.layerMouth.classList.add("visible");
     }
