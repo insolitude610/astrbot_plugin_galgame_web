@@ -35,11 +35,20 @@ function renderFrame() {
   var img = isBlinking && canvasBlinkImg ? canvasBlinkImg : canvasOpenImg;
   var w = canvasW, h = canvasH;
   canvasCtx.clearRect(0, 0, w, h);
-  for (var y = 0; y < h; y += waveStep) {
-    var fade = (h - y) / h;
-    var off = Math.sin(y * 0.04 + canvasTime) * 4 * fade;
+
+  var hairLine = Math.floor(h * 0.3);
+
+  // body: static, no wave
+  canvasCtx.drawImage(img, 0, hairLine, w, h - hairLine, 0, hairLine, w, h - hairLine);
+
+  // hair: per-row sine displacement, quadratic decay toward roots
+  for (var y = 0; y < hairLine; y += waveStep) {
+    var fade = (hairLine - y) / hairLine;
+    fade = fade * fade;
+    var off = Math.sin(y * 0.04 + canvasTime) * 3 * fade;
     canvasCtx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
   }
+
   canvasTime += 0.05;
   waveRafId = requestAnimationFrame(renderFrame);
 }
