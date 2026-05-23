@@ -85,48 +85,32 @@ html, body {
   width: min(42vw, 520px);
   height: min(58vh, 720px);
   scale: var(--sprite-scale, 1);
+  transform-origin: bottom center;
   filter: drop-shadow(0 4px 40px rgba(0,0,0,0.5));
 }
 
 #sprite-container.active {
   display: block;
+  animation: breathe-layered 4.5s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
 }
 
-.layer {
-  position: absolute;
-  inset: 0;
+#sprite-canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
-#layer-body              { z-index: 1; }
-#layer-hair-back         { z-index: 2; }
-#layer-head              { z-index: 3; }
-#layer-hair-front        { z-index: 5; }
-#layer-mouth             { z-index: 4; display: none; }
-#layer-mouth.visible     { display: block; }
-#layer-eyes              { z-index: 5; display: none; }
-#layer-eyes.visible      { display: block; }
+@keyframes breathe-layered {
+  0%, 100% { transform: scaleY(1) scaleX(1) translateY(0); }
+  45%      { transform: scaleY(1.018) scaleX(0.995) translateY(-4px); }
+}
 
-.face { transition: opacity 0.4s ease; }
-.face.switching { opacity: 0; }
-
-/* ---- animations ---- */
+/* ---- single-mode animations (kept) ---- */
 
 @keyframes breathe {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-8px); }
-}
-
-@keyframes mouth-flap {
-  0%, 100% { opacity: 1; }
-  33%      { opacity: 0; }
-}
-
-#layer-mouth.speaking {
-  animation: mouth-flap 0.2s steps(1) infinite;
 }
 
 /* ===== LAYER 3: UI Layer ===== */
