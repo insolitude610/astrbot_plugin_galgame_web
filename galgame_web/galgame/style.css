@@ -101,10 +101,10 @@ html, body {
   pointer-events: none;
 }
 
-#layer-body              { z-index: 1; animation: breathe 4s ease-in-out infinite; }
-#layer-hair-back         { z-index: 2; animation: sway-back 5s ease-in-out infinite; }
-#layer-head              { z-index: 3; animation: head-tilt 7s ease-in-out infinite; }
-#layer-hair-front        { z-index: 5; animation: sway-front 6s ease-in-out infinite; }
+#layer-body              { z-index: 1; }
+#layer-hair-back         { z-index: 2; }
+#layer-head              { z-index: 3; }
+#layer-hair-front        { z-index: 5; }
 #layer-mouth             { z-index: 4; display: none; }
 #layer-mouth.visible     { display: block; }
 #layer-eyes              { z-index: 5; display: none; }
@@ -120,24 +120,6 @@ html, body {
   50%      { transform: translateY(-8px); }
 }
 
-@keyframes sway-back {
-  0%, 100% { transform: rotate(0deg); }
-  25%      { transform: rotate(-2deg); }
-  75%      { transform: rotate(2deg); }
-}
-
-@keyframes sway-front {
-  0%, 100% { transform: rotate(0deg); }
-  30%      { transform: rotate(1.5deg); }
-  70%      { transform: rotate(-1.5deg); }
-}
-
-@keyframes head-tilt {
-  0%, 100% { transform: rotate(0deg); }
-  40%      { transform: rotate(0.5deg); }
-  80%      { transform: rotate(-0.3deg); }
-}
-
 @keyframes mouth-flap {
   0%, 100% { opacity: 1; }
   33%      { opacity: 0; }
@@ -145,18 +127,6 @@ html, body {
 
 #layer-mouth.speaking {
   animation: mouth-flap 0.2s steps(1) infinite;
-}
-
-/* ---- blink animation on eye layer ---- */
-
-@keyframes eye-blink {
-  0%, 93%, 100% { transform: scaleY(1); }
-  96%           { transform: scaleY(0.05); }
-}
-
-#layer-eyes {
-  transform-origin: center 40%;
-  animation: eye-blink var(--eye-blink-dur, 4s) ease-in-out infinite;
 }
 
 /* ===== LAYER 3: UI Layer ===== */
