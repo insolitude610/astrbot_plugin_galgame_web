@@ -859,7 +859,7 @@ class GalgamePlugin(Star):
             ev = session.get("_resp_event", asyncio.Event())
             ev.clear()
             try:
-                await asyncio.wait_for(ev.wait(), timeout=30)
+                await asyncio.wait_for(ev.wait(), timeout=120)
             except asyncio.TimeoutError:
                 pass
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
