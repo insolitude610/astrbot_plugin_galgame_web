@@ -82,8 +82,8 @@ html, body {
   bottom: calc(var(--sprite-bottom, 28) * 1vh);
   left: calc(var(--sprite-left, 50) * 1%);
   translate: -50% 0;
-  width: min(42vw, 520px);
-  height: min(58vh, 720px);
+  width: min(40vw, 500px);
+  height: min(55vh, 700px);
   scale: var(--sprite-scale, 1);
   transform-origin: bottom center;
   filter: drop-shadow(0 4px 40px rgba(0,0,0,0.5));
@@ -103,7 +103,7 @@ html, body {
 
 @keyframes breathe-layered {
   0%, 100% { transform: scaleY(1) scaleX(1) translateY(0); }
-  45%      { transform: scaleY(1.018) scaleX(0.995) translateY(-4px); }
+  45%      { transform: scaleY(1.01) scaleX(0.997) translateY(-2px); }
 }
 
 /* ---- single-mode animations (kept) ---- */
