@@ -16,6 +16,95 @@ var typewriterTimer = null;
 var mouthTimer = null;
 var isAudioPlaying = false;
 
+/* ---- animation engine ---- */
+var animRunning = false;
+var animRafId = null;
+var animStartTime = 0;
+var blinkScale = 1.0;
+var blinkStart = 0;
+var blinkDuration = 0.15;
+var nextBlinkTime = 0;
+var mouseX = 0, mouseY = 0;
+var springX = 0, springY = 0;
+var springVX = 0, springVY = 0;
+var pxLayers = null;
+
+var animCfg;
+
+function buildAnimConfig() {
+  var rnd = function() { return Math.random() * Math.PI * 2; };
+  return {
+    body:     { ty:  [{f:0.25,a:6,ph:rnd()},  {f:0.47,a:1.2,ph:rnd()}, {f:0.08,a:2.5,ph:rnd()}] },
+    hairBack: { rot: [{f:0.18,a:1.8,ph:rnd()}, {f:0.33,a:0.6,ph:rnd()}, {f:0.055,a:0.8,ph:rnd()}] },
+    head:     { rot: [{f:0.14,a:0.4,ph:rnd()}, {f:0.26,a:0.15,ph:rnd()}],
+                ty:  [{f:0.25,a:4,ph:rnd()}] },
+    hairFront:{ rot: [{f:0.22,a:1.2,ph:rnd()}, {f:0.38,a:0.5,ph:rnd()}, {f:0.07,a:0.9,ph:rnd()}] },
+    eyes:     { ty:  [{f:0.25,a:4,ph:rnd()}] },
+    mouth:    { ty:  [{f:0.25,a:4,ph:rnd()}] }
+  };
+}
+
+function startAnimLoop() {
+  if (animRunning) return;
+  if (spriteMode !== "layered") return;
+  if (!el.layerBody) return;
+  animRunning = true;
+  animStartTime = performance.now();
+  nextBlinkTime = 3 + Math.random() * 5;
+  (function tick(ts) {
+    if (!animRunning) return;
+    var t = (ts - animStartTime) * 0.001;
+
+    for (var k in animCfg) {
+      var c = animCfg[k]; c._ty = 0; c._rot = 0;
+      var o = c;
+      if (o.ty)  for (var i=0;i<o.ty.length;i++)  c._ty  += Math.sin(t*o.ty[i].f*Math.PI*2+o.ty[i].ph)*o.ty[i].a;
+      if (o.rot) for (var i=0;i<o.rot.length;i++) c._rot += Math.sin(t*o.rot[i].f*Math.PI*2+o.rot[i].ph)*o.rot[i].a;
+    }
+
+    if (pxLayers) {
+      var fx = (mouseX-springX)*0.08, fy = (mouseY-springY)*0.08;
+      springVX+=fx; springVX*=0.85; springX+=springVX;
+      springVY+=fy; springVY*=0.85; springY+=springVY;
+    }
+
+    if (t >= nextBlinkTime) {
+      if (!blinkStart) blinkStart = t;
+      var bt = t - blinkStart;
+      if (bt >= blinkDuration) { blinkStart=0; nextBlinkTime=t+3+Math.random()*5; blinkScale=1; }
+      else { var bp=bt/blinkDuration; blinkScale = bp<0.3? 1-bp/0.3*0.95 : 0.05+(bp-0.3)/0.7*0.95; }
+    }
+
+    var map = { body: el.layerBody, hairBack: el.layerHairBack, head: el.layerHead,
+                hairFront: el.layerHairFront, eyes: el.layerEyes, mouth: el.layerMouth };
+    for (var k in animCfg) {
+      var dl = map[k]; if (!dl) continue;
+      var c = animCfg[k];
+      var tx = pxLayers ? springX * (pxLayers[k]||0) : 0;
+      var ty = (c._ty||0);
+      var rot = (c._rot||0);
+      var sc = (k==='eyes') ? blinkScale : 1;
+      dl.style.transform = 'translateY('+ty.toFixed(2)+'px) translateX('+tx.toFixed(2)+'px) rotate('+rot.toFixed(3)+'deg) scaleY('+sc.toFixed(3)+')';
+    }
+
+    animRafId = requestAnimationFrame(tick);
+  })(animStartTime);
+}
+
+function stopAnimLoop() {
+  animRunning = false;
+  if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+}
+
+function setupParallax() {
+  pxLayers = { body:2, hairBack:4, head:6, mouth:6, eyes:6, hairFront:10 };
+  document.addEventListener("mousemove", function(e) {
+    mouseX = (e.clientX / innerWidth - 0.5) * 2;
+    mouseY = (e.clientY / innerHeight - 0.5) * 2;
+  });
+  document.addEventListener("mouseleave", function() { mouseX=0; mouseY=0; });
+}
+
 /* ---- voice recording ---- */
 
 var audioCtx = null;
@@ -179,6 +268,7 @@ async function init() {
   setupInput();
   setupRapidDetection();
   applySprites();
+  if (spriteMode === "layered") { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
 }
 
 function applyConfig(cfg) {
@@ -323,7 +413,9 @@ function applySprites() {
       el.layerEyes.classList.add("visible");
     }
     loadExpressionToLayer(currentEmotion);
+    if (!animRunning) { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
   } else {
+    stopAnimLoop();
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     loadExpressionToSingle(currentEmotion);
@@ -627,6 +719,12 @@ async function notifyRapidAction(count) {
 init();
 
 window.addEventListener("beforeunload", function () {
+  stopAnimLoop();
   if (typewriterTimer) clearTimeout(typewriterTimer);
   if (mouthTimer) clearInterval(mouthTimer);
+});
+
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) stopAnimLoop();
+  else if (spriteMode === "layered") startAnimLoop();
 });
