@@ -13,8 +13,126 @@ var characterName = "小星";
 var backgroundFile = "";
 
 var typewriterTimer = null;
-var mouthTimer = null;
 var isAudioPlaying = false;
+
+/* ---- canvas-based layered renderer ---- */
+var canvasEl = null;
+var canvasCtx = null;
+var canvasOpenImg = null;
+var canvasBlinkImg = null;
+var canvasTime = 0;
+var waveRafId = null;
+var isBlinking = false;
+var blinkSchedulerId = null;
+var canvasFadeTimer = null;
+var canvasW = 0, canvasH = 0;
+var waveStep = 2;
+var currentExpr = "neutral";
+var expressionsBlink = {};
+
+function renderFrame() {
+  if (!canvasCtx || !canvasOpenImg) return;
+  var img = isBlinking && canvasBlinkImg ? canvasBlinkImg : canvasOpenImg;
+  var w = canvasW, h = canvasH;
+  canvasCtx.clearRect(0, 0, w, h);
+  for (var y = 0; y < h; y += waveStep) {
+    var fade = (h - y) / h;
+    var off = Math.sin(y * 0.04 + canvasTime) * 4 * fade;
+    canvasCtx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
+  }
+  canvasTime += 0.05;
+  waveRafId = requestAnimationFrame(renderFrame);
+}
+
+function scheduleBlink() {
+  if (spriteMode !== "layered" || !canvasBlinkImg) return;
+  var delay = 3000 + Math.random() * 3000;
+  blinkSchedulerId = setTimeout(function() {
+    if (spriteMode !== "layered") return;
+    isBlinking = true;
+    setTimeout(function() {
+      isBlinking = false;
+      scheduleBlink();
+    }, 130);
+  }, delay);
+}
+
+function stopCanvasRender() {
+  if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
+  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+  if (canvasFadeTimer) { clearTimeout(canvasFadeTimer); canvasFadeTimer = null; }
+}
+
+function startCanvasRender(exprVal, blinkVal) {
+  if (!canvasEl) return;
+  canvasCtx = canvasEl.getContext("2d");
+  var img = new Image();
+  img.onload = function() {
+    canvasW = img.naturalWidth;
+    canvasH = img.naturalHeight;
+    if (canvasW > 2000) waveStep = 3;
+    canvasEl.width = canvasW;
+    canvasEl.height = canvasH;
+    canvasEl.style.opacity = "1";
+    canvasOpenImg = img;
+    loadBlinkVariant(blinkVal);
+    waveRafId = requestAnimationFrame(renderFrame);
+    scheduleBlink();
+  };
+  img.onerror = function() {
+    console.warn("Failed to load layered expression:", exprVal);
+  };
+  img.src = assetUrl(exprVal);
+}
+
+function loadBlinkVariant(blinkVal) {
+  if (!blinkVal) { canvasBlinkImg = null; return; }
+  var img = new Image();
+  img.onload = function() {
+    if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
+      canvasBlinkImg = img;
+    } else {
+      console.warn("Blink image size mismatch for", blinkVal, "expected", canvasW + "x" + canvasH, "got", img.naturalWidth + "x" + img.naturalHeight);
+      canvasBlinkImg = null;
+    }
+  };
+  img.onerror = function() {
+    console.warn("Blink variant not found:", blinkVal);
+    canvasBlinkImg = null;
+  };
+  img.src = assetUrl(blinkVal);
+}
+
+function canvasSwitchExpression(emotion) {
+  if (!canvasEl || !canvasCtx) return;
+  var exprVal = expressions[emotion] || expressions["neutral"];
+  if (!exprVal) return;
+  var blinkVal = expressionsBlink[emotion] || expressionsBlink["neutral"] || "";
+
+  var img = new Image();
+  img.onload = function() {
+    if (img.naturalWidth !== canvasW || img.naturalHeight !== canvasH) {
+      canvasW = img.naturalWidth;
+      canvasH = img.naturalHeight;
+      if (canvasW > 2000) waveStep = 3;
+      canvasEl.width = canvasW;
+      canvasEl.height = canvasH;
+    }
+    canvasEl.style.opacity = "0";
+    if (canvasFadeTimer) clearTimeout(canvasFadeTimer);
+    canvasFadeTimer = setTimeout(function() {
+      canvasOpenImg = img;
+      isBlinking = false;
+      loadBlinkVariant(blinkVal);
+      canvasEl.style.opacity = "1";
+      canvasFadeTimer = null;
+    }, 300);
+  };
+  img.onerror = function() {
+    console.warn("Failed to load expression for canvas:", exprVal);
+  };
+  img.src = assetUrl(exprVal);
+}
 
 /* ---- voice recording ---- */
 
@@ -101,14 +219,9 @@ async function toggleRecording() {
 var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
+  spriteCanvas: document.getElementById("sprite-canvas"),
   spriteSingle: document.getElementById("sprite-single"),
   spriteSingleImg: document.getElementById("sprite-single-img"),
-  layerBody: document.getElementById("layer-body"),
-  layerHairBack: document.getElementById("layer-hair-back"),
-  layerHead: document.getElementById("layer-head"),
-  layerHairFront: document.getElementById("layer-hair-front"),
-  layerMouth: document.getElementById("layer-mouth"),
-  layerEyes: document.getElementById("layer-eyes"),
   dialogText: document.getElementById("dialog-text"),
   characterName: document.getElementById("character-name"),
   userInput: document.getElementById("user-input"),
@@ -187,6 +300,7 @@ function applyConfig(cfg) {
   rapidWindowMs = (cfg.rapid_window_seconds || 3) * 1000;
   ttsProvider = cfg.tts_provider || "";
   expressions = cfg.expressions || {};
+  expressionsBlink = cfg.expressions_blink || {};
   layers = cfg.layers || {};
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
@@ -311,36 +425,21 @@ function applySprites() {
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    safeImg(el.layerBody, assetUrl(layers.body));
-    safeImg(el.layerHairBack, assetUrl(layers.hair_back));
-    safeImg(el.layerHairFront, assetUrl(layers.hair_front));
-    safeImg(el.layerMouth, assetUrl(layers.mouth_closed));
-    safeImg(el.layerEyes, assetUrl(layers.eyes_open));
-    if (layers.mouth_open || layers.mouth_closed) {
-      el.layerMouth.classList.add("visible");
-    }
-    if (layers.eyes_open || layers.eyes_closed) {
-      el.layerEyes.classList.add("visible");
-    }
-    loadExpressionToLayer(currentEmotion);
+    canvasEl = el.spriteCanvas;
+    var exprVal = expressions[currentEmotion] || expressions["neutral"];
+    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
+    currentExpr = currentEmotion;
+    startCanvasRender(exprVal, blinkVal);
   } else {
+    stopCanvasRender();
+    canvasEl = null;
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     loadExpressionToSingle(currentEmotion);
   }
 }
 
-function loadExpressionToLayer(emotion) {
-  var src = assetUrl(expressions[emotion] || expressions["neutral"]);
-  if (!src) return;
-  var img = new Image();
-  img.onload = function () {
-    el.layerHead.src = src;
-    el.layerHead.classList.remove("switching");
-  };
-  el.layerHead.classList.add("switching");
-  img.src = src;
-}
+/* ---- expression ---- */
 
 function loadExpressionToSingle(emotion) {
   var src = assetUrl(expressions[emotion] || expressions["neutral"]);
@@ -354,13 +453,11 @@ function loadExpressionToSingle(emotion) {
   img.src = src;
 }
 
-/* ---- expression ---- */
-
 function switchExpression(emotion) {
   if (!emotion || emotion === currentEmotion) return;
   currentEmotion = emotion;
   if (spriteMode === "layered") {
-    loadExpressionToLayer(emotion);
+    canvasSwitchExpression(emotion);
   } else {
     loadExpressionToSingle(emotion);
   }
@@ -414,15 +511,12 @@ function playTTSAudio(base64data) {
 
   audio.onplay = function () {
     isAudioPlaying = true;
-    startMouthAnimation();
   };
   audio.onended = function () {
     isAudioPlaying = false;
-    stopMouthAnimation();
   };
   audio.onerror = function () {
     isAudioPlaying = false;
-    stopMouthAnimation();
   };
 
   audio.play().catch(function (e) {
@@ -430,36 +524,9 @@ function playTTSAudio(base64data) {
   });
 }
 
-/* ---- mouth animation ---- */
-
-function startMouthAnimation() {
-  if (spriteMode !== "layered") return;
-  if (!layers.mouth_open || !layers.mouth_closed) return;
-
-  var open = true;
-  el.layerMouth.classList.add("speaking");
-  el.layerMouth.classList.add("visible");
-  mouthTimer = setInterval(function () {
-    el.layerMouth.src = assetUrl(open ? layers.mouth_open : layers.mouth_closed);
-    open = !open;
-  }, 180);
-}
-
-function stopMouthAnimation() {
-  if (mouthTimer) {
-    clearInterval(mouthTimer);
-    mouthTimer = null;
-  }
-  el.layerMouth.classList.remove("speaking");
-  if (layers.mouth_closed) {
-    el.layerMouth.src = assetUrl(layers.mouth_closed);
-  }
-}
-
 /* ---- response lifecycle ---- */
 
 function finishResponse() {
-  stopMouthAnimation();
   var elText = el.dialogText;
   var cur = elText.querySelector(".cursor");
   if (cur) cur.remove();
@@ -627,6 +694,15 @@ async function notifyRapidAction(count) {
 init();
 
 window.addEventListener("beforeunload", function () {
+  stopCanvasRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
-  if (mouthTimer) clearInterval(mouthTimer);
+});
+
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) stopCanvasRender();
+  else if (spriteMode === "layered" && !waveRafId) {
+    var exprVal = expressions[currentEmotion] || expressions["neutral"];
+    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
+    startCanvasRender(exprVal, blinkVal);
+  }
 });

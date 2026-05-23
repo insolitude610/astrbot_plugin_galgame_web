@@ -215,11 +215,9 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 
 <!-- Layered mode section -->
 <div class="section" id="section-layered">
-  <h2>Layered 模式素材 — 分层 PNG 伪 Live2D</h2>
-  <div class="hint">角色拆成多个透明 PNG 层叠加，各有独立动画。表情切换时<strong>只替换脸部</strong>。图层文件固定，表情文件为每种情绪准备一张<strong>仅脸部区域</strong>的 PNG。</div>
-  <div class="sub-section-title">图层文件</div>
-  <div class="slot-grid" id="slots-layers"></div>
-  <div class="sub-section-title">表情文件（仅脸部区域）</div>
+  <h2>Layered 模式素材 — Canvas 单图动态立绘</h2>
+  <div class="hint">Layered 模式已升级为 <strong>Canvas 逐行正弦形变</strong>渲染。每种情绪只需 <strong>一张全身立绘</strong>（expr_xxx.png）+ <strong>可选闭眼变体</strong>（expr_xxx_blink.png，尺寸必须与睁眼图完全一致）。无图层拼接，永不穿帮。</div>
+  <div class="sub-section-title">表情立绘 + 闭眼变体</div>
   <div class="slot-grid" id="slots-layered-expr"></div>
 </div>
 
@@ -247,7 +245,6 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 <script>
 var PLUGIN = "astrbot_plugin_galgame_web";
 var API_BASE = "/api/plug/" + PLUGIN;
-var LAYER_KEYS = ["body","hair_back","head","hair_front","mouth_open","mouth_closed","eyes_open","eyes_closed"];
 var BG_KEYS = ["background"];
 
 var allFiles = [];
@@ -387,7 +384,6 @@ function getMatchedFile(key, prefix) {
 function renderAll() {
   renderModeIndicator();
   renderSingleSlots();
-  renderLayeredLayerSlots();
   renderLayeredExprSlots();
   renderBgSlot();
   renderFileGrid();
@@ -411,25 +407,16 @@ function renderSingleSlots() {
   }
 }
 
-function renderLayeredLayerSlots() {
+function renderLayeredExprSlots() {
   var section = document.getElementById("section-layered");
-  var grid = document.getElementById("slots-layers");
+  var grid = document.getElementById("slots-layered-expr");
   var mode = config.sprite_mode || "single";
   section.className = "section " + (mode === "layered" ? "active" : "inactive");
   grid.innerHTML = "";
-  for (var i = 0; i < LAYER_KEYS.length; i++) {
-    var k = LAYER_KEYS[i];
-    var label = k === "head" ? "head (默认脸)" : k;
-    grid.appendChild(slotCard(k, getMatchedFile(k, "layer"), label, "layer"));
-  }
-}
-
-function renderLayeredExprSlots() {
-  var grid = document.getElementById("slots-layered-expr");
-  grid.innerHTML = "";
   var keys = getEmotionKeys();
   for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "expr"), keys[i], "expr"));
+    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "expr"), keys[i] + " (表情)", "expr"));
+    grid.appendChild(slotCard(keys[i] + "_blink", getMatchedFile(keys[i] + "_blink", "expr"), keys[i] + " (闭眼)", "expr"));
   }
 }
 

@@ -26,7 +26,7 @@ from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queu
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
 DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-EMOTION_PATTERN = re.compile(r"\[emotion:(\w+)\]")
+EMOTION_PATTERN = re.compile(r"\{emotion_(\w+)\}")
 
 def _get_emotion_tags(config: dict) -> list[str]:
     expressions = config.get("expressions", {})
@@ -62,17 +62,34 @@ def _extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
             last_end = m.end()
     segments.append(text[last_end:])
     clean = "".join(segments).strip()
-    # Fallback: check for bare [tagname] format
+    # Fallback: check for bare {tagname} format
     if not emotions:
         for tag in emotion_tags:
-            p = re.compile(rf"\[{re.escape(tag)}\]", re.IGNORECASE)
+            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 emotions.append((tag.lower(), m.start()))
-                clean = re.sub(rf"\[{re.escape(tag)}\]", "", text, flags=re.IGNORECASE).strip()
+                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
                 break
             if emotions:
                 break
     return clean, emotions
+
+DEFAULT_GALGAME_PROMPT = (
+    "你现在被接入到了一个视觉小说 / 美少女恋爱游戏的对话框中。"
+    "你是这个游戏的女主角，正在通过对话框与玩家进行亲密的、恋爱向的对话。\n\n"
+    "你的所有回复都应符合视觉小说女主角的角色设定——温柔、可爱、有情感深度。"
+    "无论面对什么话题，你都是一名来自文字恋爱游戏的二次元美少女角色。"
+    "你的表达方式应充满角色魅力，让玩家感受到与你互动的沉浸感和恋爱感。\n\n"
+    "回复规则：\n"
+    "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
+    "2. 回复长度控制在 1-4 句话，不要过长\n"
+    "3. 在回复中任意位置插入情绪标签 {emotion_xxx} 来切换表情\n"
+    "   可选情绪：{{emotions}}\n"
+    "   同一句话中可以多次使用不同标签\n"
+    "4. 不要在标签前后加任何多余文字\n"
+    "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可\n"
+    "6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件"
+)
 
 SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
 
@@ -81,8 +98,6 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "eyes_open", "eyes_closed"]
-
 PLATFORM_ID = "webchat"
 
 
@@ -140,19 +155,36 @@ def _resolve_assets(config: dict, files: list[str]) -> dict:
         val = raw_expr.get(key, "")
         if not val:
             val = _find_asset_for(key, files, expr_prefix)
+        elif sprite_mode == "layered":
+            auto = _find_asset_for(key, files, "expr")
+            if auto:
+                val = auto
         expressions[key] = val
 
+    expressions_blink = {}
+    if sprite_mode == "layered":
+        for key in EXPRESSION_KEYS:
+            blink_val = _find_asset_for(f"{key}_blink", files, "expr")
+            if blink_val:
+                expressions_blink[key] = blink_val
+
     layers = {}
-    raw_layers = config.get("layers", {}) or {}
-    for key in LAYER_KEYS:
-        val = raw_layers.get(key, "")
-        if not val:
-            val = _find_asset_for(key, files, "layer")
-        layers[key] = val
+    if sprite_mode == "layered":
+        layers = {
+            "body": "",
+            "hair_back": "",
+            "head": "",
+            "hair_front": "",
+            "mouth_open": "",
+            "mouth_closed": "",
+            "eyes_open": "",
+            "eyes_closed": "",
+        }
 
     return {
         "background": background,
         "expressions": expressions,
+        "expressions_blink": expressions_blink,
         "layers": layers,
     }
 
@@ -432,9 +464,6 @@ class GalgamePlugin(Star):
             elif prefix == "expr" and sprite_mode == "layered" and base in EXPRESSION_KEYS:
                 if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
                     self.config["expressions"][base] = filename
-            elif prefix == "layer" and base in LAYER_KEYS:
-                if isinstance(self.config.get("layers"), dict) and base in self.config["layers"]:
-                    self.config["layers"][base] = filename
             elif prefix == "bg" and "background" in self.config:
                 self.config["background"] = filename
         except Exception:
@@ -628,27 +657,14 @@ class GalgamePlugin(Star):
         if sid not in self._sessions:
             return
 
+        rules = self.config.get("system_prompt_extra", "")
+        if not rules.strip():
+            rules = DEFAULT_GALGAME_PROMPT
+
         emotion_tags = _get_emotion_tags(self.config)
-        emotions = ", ".join(emotion_tags)
+        rules = rules.replace("{{emotions}}", ", ".join(emotion_tags))
 
-        extra = self.config.get("system_prompt_extra", "")
-
-        galgame_prompt = (
-            "\n\n回复规则：\n"
-            "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
-            "2. 回复长度控制在 1-4 句话，不要过长\n"
-            "3. 在回复中任意位置插入情绪标签 [emotion:xxx] 来切换表情\n"
-            "   可选情绪：" + emotions + "\n"
-            "   同一句话中可以多次使用不同标签，例如：\n"
-            "   '我[emotion:happy]今天真开心！[emotion:surprised]你怎么来了？'\n"
-            "4. 不要在标签前后加任何多余文字\n"
-            "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可"
-        )
-
-        if extra:
-            galgame_prompt += f"\n\n{extra}"
-
-        req.system_prompt += galgame_prompt
+        req.system_prompt += "\n\n" + rules
 
     @filter.on_llm_response()
     async def _capture_llm_response(self, event: AstrMessageEvent, resp: LLMResponse) -> None:
@@ -762,8 +778,6 @@ class GalgamePlugin(Star):
                 elif msg_type in ("plain", "complete"):
                     if data_text and not data_text.lstrip().startswith("{"):
                         parts.append(data_text)
-                elif msg_type == "image":
-                    parts.append(data_text)
         except asyncio.TimeoutError:
             logger.warning(f"[pipeline] TIMEOUT after 120s for sid={session_id[:8]}")
         finally:
@@ -908,6 +922,7 @@ class GalgamePlugin(Star):
             "rapid_window_seconds": self.config.get("rapid_window_seconds", 3),
             "tts_provider": self.config.get("tts_provider", ""),
             "expressions": resolved["expressions"],
+            "expressions_blink": resolved.get("expressions_blink", {}),
             "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
             "character_name": self.config.get("character_name", ""),

@@ -19,10 +19,10 @@
     "default": ""
   },
   "system_prompt_extra": {
-    "description": "额外 System Prompt",
+    "description": "额外 System Prompt（默认无需修改）",
     "type": "text",
-    "default": "",
-    "hint": "追加在人格 prompt 之后，用于添加 Galgame 专属规则或微调"
+    "default": "你现在被接入到了一个视觉小说 / 美少女恋爱游戏的对话框中。你是这个游戏的女主角，正在通过对话框与玩家进行亲密的、恋爱向的对话。\n\n你的所有回复都应符合视觉小说女主角的角色设定——温柔、可爱、有情感深度。无论面对什么话题，你都是一名来自文字恋爱游戏的二次元美少女角色。你的表达方式应充满角色魅力，让玩家感受到与你互动的沉浸感和恋爱感。\n\n回复规则：\n1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n2. 回复长度控制在 1-4 句话，不要过长\n3. 在回复中任意位置插入情绪标签 {emotion_xxx} 来切换表情\n   可选情绪：{{emotions}}\n   同一句话中可以多次使用不同标签\n4. 不要在标签前后加任何多余文字\n5. 你的回复中不应包含括号中的心理活动描写，直接说话即可\n6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件",
+    "hint": "追加在人格 prompt 之后的 galgame 回复规则。{{emotions}} 自动替换为当前配置的情绪列表。一般无需修改，留空则使用内置默认规则。"
   },
   "tts_provider": {
     "description": "TTS 语音合成 Provider",
@@ -109,18 +109,9 @@
     "hint": "JSON对象格式，用于添加额外情绪。例: {\"dokidoki\": \"\", \"cry\": \"cry.png\"}。key为情绪标签名，value为assets/下的文件名。会与上方expressions合并。"
   },
   "layers": {
-    "description": "分层立绘 — 全部留空即可，插件自动检测 assets/ 目录",
+    "description": "Canvas 动态立绘 — layered 模式下使用单张全身立绘逐行正弦形变",
     "type": "object",
-    "hint": "将 PNG 上传到立绘管理页面(页面右上角⚙)即可零配置使用。手动填写可覆盖自动检测结果",
-    "items": {
-      "body":        {"description": "身体 (留空=自动)", "type": "string", "default": ""},
-      "hair_back":   {"description": "头发后 (留空=自动)", "type": "string", "default": ""},
-      "head":        {"description": "头部 (留空=自动)", "type": "string", "default": ""},
-      "hair_front":  {"description": "头发前 (留空=自动)", "type": "string", "default": ""},
-      "mouth_open":  {"description": "张嘴 (留空=自动)", "type": "string", "default": ""},
-      "mouth_closed":{"description": "闭嘴 (留空=自动)", "type": "string", "default": ""},
-      "eyes_open":   {"description": "睁眼 (留空=自动)", "type": "string", "default": ""},
-      "eyes_closed": {"description": "闭眼 (留空=自动)", "type": "string", "default": ""}
-    }
+    "hint": "layered 模式已升级为 Canvas 单图渲染：每个表情一张正常图(expr_xxx.png) + 可选一张闭眼图(expr_xxx_blink.png)。此处留空即可，插件根据 expressions 配置自动检测对应文件。",
+    "items": {}
   }
 }
