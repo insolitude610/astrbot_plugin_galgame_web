@@ -2,31 +2,32 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持多层 PNG 伪 Live2D 独立动画、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
+一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持 Canvas 逐行正弦形变动态立绘、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
 
 ## 功能亮点
 
-- **多层 PNG 伪 Live2D** —— 身体/头发/脸部/嘴部各自独立动画，不依赖 Live2D SDK
-- **情绪实时切换** —— AI 回复中标记 `[emotion:happy]` 等标签，立绘表情自动淡入淡出
+- **Canvas 单图动态立绘** —— 一张全身立绘即可实现头发飘动 + 眨眼 + 呼吸，零穿帮
+- **逐行正弦形变** —— Canvas 2D 对单张图逐像素行施加正弦偏移，模拟微风吹拂发丝
+- **眨眼系统** —— 每情绪可配 `_blink` 闭眼变体图，随机 3~6 秒眨眼一次，真正换图而非压扁
+- **情绪实时切换** —— AI 回复中标记 `{emotion_happy}` 等标签，立绘表情 Canvas fade 过渡
 - **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
 - **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等），受限于同步 API 架构暂不可用
 - **打字机效果** —— 回复文字逐字显示
-- **嘴型同步** —— 播放语音时嘴部自动开合
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
-- **双层渲染模式** —— 支持完整分层 PNG（layered）或单张立绘 + 表情差分（single）
+- **双层渲染模式** —— `single` 单张立绘静态切换 或 `layered` Canvas 动态形变
 - **对话历史面板** —— 内建聊天记录查看，气泡式展示，背景色自适应
 - **语音输入** —— 浏览器麦克风录音，经 AstrBot STT 管道自动转文字
-- **AstrBot 指令全兼容** —— `/help /reset /new` 等所有已注册指令通过管道分发
-- **立绘位置可调** —— `sprite_bottom` / `sprite_left` 配置项，自由调整角色站位
+- **AstrBot 指令全兼容** —— `/reset /new` 等所有已注册指令通过管道分发
+- **立绘位置可调** —— `sprite_bottom` / `sprite_left` / `sprite_scale` 配置项
 - **批量删除** —— 立绘管理页多选文件一键删除
-- **纯 CSS 动画** —— 呼吸、头发摆动、球体漂浮、对话框滑入，零依赖
+- **纯 CSS / Canvas 动画** —— 呼吸（CSS squash & stretch）+ 头发飘动（Canvas）+ 对话框滑入
 - **同步请求/响应** —— `send` API 返回完整回复（文本 + 情绪），前端本地播打字机动画
-- **会话持久化** —— 对话历史自动存盘，重启/重载后保留；localStorage 记录 session_id，关掉页面再打开可继续对话
-- **立绘管理页面** —— 浏览器内拖拽上传 / 预览 / 删除 PNG，自动匹配情绪/图层
+- **会话持久化** —— 对话历史自动存盘，重启后保留；localStorage 记录 session_id
+- **立绘管理页面** —— 浏览器内上传 / 预览 / 删除 PNG，自动匹配情绪文件
 
 ## 快速开始
 
-> **注意：** `layered`（多层伪 Live2D）模式已改为统一画布架构（所有层同尺寸），body/face/mouth/eyes 层可正常叠放对齐，但 **hair_back/hair_front/orb 层尚未提供素材**（需手工 PS 拆分），且整体尚未充分测试。**日常使用推荐 `single` 模式**。如需体验 layered 模式，将 `layers/layered/` 下的 PNG 拷入 `assets/` 目录，配置 `sprite_mode` 为 `layered` 即可。
+> **推荐**：日常使用 `single` 模式最简单——每情绪一张全身 PNG 即可。`layered` 模式需要额外提供闭眼变体图（`_blink` 后缀），详见[渲染模式说明](#渲染模式与立绘说明)。
 
 ### 安装
 
@@ -44,7 +45,7 @@
 | 角色人格 | 选择已在 AstrBot 配置好的 Persona | AstrBot 预设或自建 |
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o |
 | TTS Provider | 语音合成（暂不可用） | 等待后续修复 |
-| 立绘渲染模式 | `single` 单图 或 `layered` 多层 | layered 效果更好 |
+| 立绘渲染模式 | `single` 单图 或 `layered` Canvas 动态 | layered 效果更好 |
 | 立绘缩放比例 | 整体缩放倍数 | 默认 1.0，建议 0.5 ~ 2.0 |
 | 立绘底部位置 | vh 距离底部，越小越靠下 | 默认 28，建议 5 ~ 45 |
 | 立绘水平位置 | 水平锚点 % 位置 | 默认 50（居中） |
@@ -85,52 +86,58 @@ http://localhost:6186
 | 配置项 | 应上传的文件 | 说明 |
 |--------|------------|------|
 | `neutral` | 完整半身立绘（普通表情） | **必须**，其他情绪缺省时回落此图 |
-| `happy` | 完整半身立绘（开心表情） | AI 标记 `[emotion:happy]` 时显示 |
+| `happy` | 完整半身立绘（开心表情） | AI 标记 `{emotion_happy}` 时显示 |
 | `sad` | 完整半身立绘（悲伤表情） | 同上 |
 | `angry` | 完整半身立绘（生气表情） | |
 | `surprised` | 完整半身立绘（惊讶表情） | |
 | `blush` | 完整半身立绘（害羞表情） | |
 | `thinking` | 完整半身立绘（思考表情） | |
 
-**不需要**：任何图层文件（`body`、`head`、`hair_*`、`mouth_*` 等），这些仅 layered 模式使用。
-
-**视觉效果**：角色整体缓慢上下浮动（呼吸动画），表情切换时 fade 过渡。
+**视觉效果**：角色整体缓慢上下浮动（CSS 呼吸动画），表情切换时 fade 过渡。
 
 ---
 
 ### Layered 模式（`sprite_mode: layered`）
 
-**原理**：角色被拆成多个透明 PNG 图层叠在一起，每一层有独立的 CSS 动画。AI 切换情绪时**只替换脸部那一层**，身体/头发/嘴部不动。
+**原理**：Canvas 2D 对**一张完整全身立绘**逐像素行施加正弦横向偏移，实现头发飘动 + CSS 挤压拉伸呼吸 + 闭眼图换图眨眼。不再使用多层 PNG 叠加。
 
-**需要上传的图片分为两类**：
+**核心特性**：
 
-#### A. 图层文件（固定不动，与情绪无关）
+| 动画效果 | 实现方式 |
+|---------|---------|
+| 呼吸起伏 | CSS `@keyframes breathe-layered`（`scaleY(1.018)` + `scaleX(0.995)` + `translateY(-4px)`），`transform-origin: bottom center` |
+| 头发飘动 | Canvas 逐行正弦偏移：`offset = sin(y × 0.04 + time) × 4 × (h-y)/h`，发梢振幅最大、根部不动 |
+| 眨眼 | 定时换图：随机 3~6 秒闭眼 130ms，切到 `_blink` 变体后立即切回 |
+| 表情切换 | Canvas opacity fade out 300ms → 换源图 → fade in |
 
-| 图层 | 应上传的文件 | CSS 动画 | 说明 |
-|------|------------|----------|------|
-| `body` | **只有脖颈以下身体**的透明 PNG | 上下呼吸浮动（4s） | 不能包含头部，因为头上要叠 face 层 |
-| `head` | **只有脸部五官**的透明 PNG（默认表情） | 轻微倾斜（7s） | 这是初始脸。表情切换时此层被替换 |
-| `hair_back` | 只有后部头发的透明 PNG | 慢速左右摆（5s） | 可选 |
-| `hair_front` | 只有前刘海/侧发的透明 PNG | 相位偏移摆动（6s） | 可选 |
-| `mouth_open` | 只有嘴部的透明 PNG（张嘴） | TTS 播放时快速交替 | 需要配套 `mouth_closed` 才生效 |
-| `mouth_closed` | 只有嘴部的透明 PNG（闭嘴） | TTS 结束/未播放时显示 | |
-| `orb` | 头顶漂浮物的透明 PNG | 随机漂浮（3s） | 可选 |
-
-#### B. 表情文件（每种情绪一张，运行时替换 `head` 层）
+**需要上传的图片**：
 
 | 配置项 | 应上传的文件 | 说明 |
 |--------|------------|------|
-| `neutral` | **仅脸部区域**的透明 PNG（普通表情） | 必须，回落图 |
-| `happy` | 仅脸部区域的透明 PNG（开心） | AI 标记 `[emotion:happy]` 时替换 head 层 |
-| `sad` | 仅脸部区域的透明 PNG（悲伤） | |
-| `angry` | 仅脸部区域的透明 PNG（生气） | |
-| `surprised` | 仅脸部区域的透明 PNG（惊讶） | |
-| `blush` | 仅脸部区域的透明 PNG（害羞） | |
-| `thinking` | 仅脸部区域的透明 PNG（思考） | |
+| `neutral` | 完整半身立绘（普通表情） | **必须** |
+| `neutral_blink` | 完整半身立绘（普通表情闭眼） | 可选，尺寸必须与 `neutral` 一致 |
+| `happy` | 完整半身立绘（开心表情） | |
+| `happy_blink` | 完整半身立绘（开心表情闭眼） | 可选 |
+| `sad` | 完整半身立绘（悲伤表情） | |
+| `sad_blink` | 完整半身立绘（悲伤表情闭眼） | 可选 |
+| `angry` | 完整半身立绘（生气表情） | |
+| `angry_blink` | 完整半身立绘（生气表情闭眼） | 可选 |
+| `surprised` | 完整半身立绘（惊讶表情） | |
+| `surprised_blink` | 完整半身立绘（惊讶表情闭眼） | 可选 |
+| `blush` | 完整半身立绘（害羞表情） | |
+| `blush_blink` | 完整半身立绘（害羞表情闭眼） | 可选 |
+| `thinking` | 完整半身立绘（思考表情） | |
+| `thinking_blink` | 完整半身立绘（思考表情闭眼） | 可选 |
 
-> **关键区别**：Layered 模式下表情文件**只应该包含脸部**，而不是全身。因为 body 层已有身体，head 层只用换脸。
+> **重要**：`_blink` 变体图必须与对应睁眼图**像素尺寸完全一致**、人物位置完全对齐。如果 `_blink` 图缺失或尺寸不匹配，该情绪将跳过眨眼功能，其余动画正常。
 
-**视觉效果**：身体呼吸 + 头发各自飘动 + 表情切换只换脸 + TTS 说话时嘴部自动张合 + 球体漂浮。这是伪 Live2D 效果。
+**素材量对比（v0.4 vs v0.3）**：
+
+| | v0.3 Layered | v0.4 Layered |
+|---|---|---|
+| 按情绪分 | body/head/mouth/hair × 8 张 + 表情 × 7 张 = 15 张 | 表情 × 7 张 + blink × (0~7) 张 = 7~14 张 |
+| 复杂度 | 需 PS 拆图层、对齐像素 | 一整张图即可，零拆图 |
+| 穿帮风险 | 各层独立动画，缝隙必露 | **零穿帮**，单图统一形变 |
 
 ---
 
@@ -138,12 +145,14 @@ http://localhost:6186
 
 | | Single 模式 | Layered 模式 |
 |----|-----------|------------|
-| 表情图内容 | 完整半身立绘 | **仅脸部区域** |
-| 需要图层文件 | 不需要 | body / head / mouth 等 |
-| 表情切换范围 | 全身替换 | 仅替换脸部 |
-| 头发飘动 | 无 | 有（需上传 hair_* 层） |
-| 嘴型同步 | 无 | 有（需上传 mouth_*） |
-| 实现难度 | 低 | 中（需拆层） |
+| 表情图内容 | 完整半身立绘 | 完整半身立绘 |
+| 需要额外图层 | 不需要 | 不需要（单图渲染） |
+| 表情切换范围 | 全身替换 | Canvas 源图替换 |
+| 头发飘动 | 无 | 有（Canvas 逐行正弦形变） |
+| 眨眼 | 无 | 有（需上传 `_blink` 变体） |
+| 呼吸动画 | CSS translateY | CSS squash & stretch |
+| 实现难度 | 低（一张图一个表情） | 低（一张图 + 可选闭眼图） |
+| 穿帮风险 | 无 | **无**（单图统一形变） |
 
 ---
 
@@ -151,7 +160,7 @@ http://localhost:6186
 
 ### 工作原理
 
-插件后端会在 system prompt 中要求 AI 在回复末尾附上 `[emotion:xxx]` 标签。后端解析标签后，将回复文本和情绪一并返回给前端，前端根据情绪名查 `expressions` 映射表，将立绘切换为对应表情图。
+插件后端会在 system prompt 中要求 AI 在回复中插入 `{emotion_xxx}` 标签。后端解析标签后，将回复文本和情绪序列一并返回给前端，前端根据情绪名在打字机动画中实时切换立绘表情。
 
 ### 默认情绪列表
 
@@ -173,7 +182,7 @@ http://localhost:6186
 {"dokidoki": "dokidoki.png", "cry": "", "smirk": "smirk.png"}
 ```
 
-- **key**：情绪标签名，AI 会用 `[emotion:key]` 标记
+- **key**：情绪标签名，AI 会用 `{emotion_key}` 标记
 - **value**：`assets/` 下的文件名（留空则自动匹配 `key.png`）
 
 后端会自动将自定义情绪与默认 7 种合并，system prompt 会列出全部情绪标签。注意：新增情绪后需上传对应的表情图。
@@ -194,23 +203,23 @@ http://localhost:6186
 
 上传到 `assets/` 后，按文件名**子串匹配**自动关联到对应配置项：
 
-| 配置项 | 推荐文件名 | 主要匹配关键字 |
-|--------|-----------|--------------|
-| 表情 neutral | `neutral.png` | `neutral` |
-| 表情 happy | `happy.png` | `happy` |
-| 表情 sad | `sad.png` | `sad` |
-| 表情 angry | `angry.png` | `angry` |
-| 表情 surprised | `surprised.png` | `surprised` |
-| 表情 blush | `blush.png` | `blush` |
-| 表情 thinking | `thinking.png` | `thinking` |
-| 图层 body | `body.png` | `body` |
-| 图层 head | `head.png` | `head` |
-| 图层 hair_back | `hair_back.png` | `hair_back` |
-| 图层 hair_front | `hair_front.png` | `hair_front` |
-| 图层 mouth_open | `mouth_open.png` | `mouth_open` |
-| 图层 mouth_closed | `mouth_closed.png` | `mouth_closed` |
-| 图层 orb | `orb.png` | `orb` |
-| 背景 background | `background.png` 或 `bg.png` | `background` 或 `bg` |
+| 配置项 | 推荐文件名（Single） | 推荐文件名（Layered） | 匹配关键字 |
+|--------|-------------------|---------------------|----------|
+| 表情 neutral | `single_neutral.png` | `expr_neutral.png` | `neutral` |
+| 表情 happy | `single_happy.png` | `expr_happy.png` | `happy` |
+| 表情 sad | `single_sad.png` | `expr_sad.png` | `sad` |
+| 表情 angry | `single_angry.png` | `expr_angry.png` | `angry` |
+| 表情 surprised | `single_surprised.png` | `expr_surprised.png` | `surprised` |
+| 表情 blush | `single_blush.png` | `expr_blush.png` | `blush` |
+| 表情 thinking | `single_thinking.png` | `expr_thinking.png` | `thinking` |
+| 闭眼变体 neutral | — | `expr_neutral_blink.png` | `neutral_blink` |
+| 闭眼变体 happy | — | `expr_happy_blink.png` | `happy_blink` |
+| 闭眼变体 sad | — | `expr_sad_blink.png` | `sad_blink` |
+| 闭眼变体 angry | — | `expr_angry_blink.png` | `angry_blink` |
+| 闭眼变体 surprised | — | `expr_surprised_blink.png` | `surprised_blink` |
+| 闭眼变体 blush | — | `expr_blush_blink.png` | `blush_blink` |
+| 闭眼变体 thinking | — | `expr_thinking_blink.png` | `thinking_blink` |
+| 背景 background | `bg_background.png` | `bg_background.png` | `background` 或 `bg` |
 
 ---
 
@@ -259,13 +268,13 @@ Facial expression: [表情描述].
 Same light-gray background, same 3:4 composition.
 ```
 
-**获取分层图的方法**：AI 只能出完整图，需用 GIMP/Photoshop 拆分：
+**闭眼变体 prompt：**
 
-1. 从主体立绘中去背景
-2. 从脖子位置切开 → 上半为 `head.png`、下半为 `body.png`
-3. 抠出刘海和侧发 → `hair_front.png`
-4. 抠出后部头发 → `hair_back.png`
-5. 从表情脸图中裁出嘴部 → `mouth_open.png` / `mouth_closed.png`
+```
+Same character. Identical appearance and pose.
+Eyes gently closed, peaceful/blinking expression.
+Same background, same composition.
+```
 
 ---
 
@@ -292,12 +301,23 @@ Same light-gray background, same 3:4 composition.
   └─ /api/* → 代理至 AstrBot Core (Quart :6185) → fetch 同步请求
 ```
 
-- 前端: 原生 HTML/CSS/JS，无框架依赖
+- 前端: 原生 HTML/CSS/JS，Canvas 2D 渲染，无框架依赖
 - 后端: Python `http.server` + AstrBot Star API
 - 通信: `fetch()` 同步请求/响应，通过本地代理与 AstrBot Core 交互，JWT Bearer 认证
 - 管道: 所有对话经 webchat 管道分发，接入记忆/感知/安全等全插件栈
 
 ## 变更记录
+
+### v0.4.0
+
+- **Layered 模式重写** —— 废弃多层 PNG 叠加，改为 Canvas 单图逐行正弦形变渲染
+- **眨眼系统** —— 每情绪可选 `_blink` 闭眼变体图，真正换图眨眼（替换旧的 scaleY 压扁方案）
+- **呼吸动画升级** —— 从 JS 多频正弦波改为纯 CSS `scaleY` + `scaleX` 挤压拉伸（`transform-origin: bottom center`）
+- **表情切换渐变** —— Canvas opacity fade out → 换源 → fade in（300ms 过渡）
+- **素材简化** —— 不再需要拆分 body/head/hair/mouth 等图层，一张全身立绘即可
+- 删除 `LAYER_KEYS`、口型同步、多层动画引擎（净减 81 行代码）
+- 后端新增 `expressions_blink` 自动检测与 API 返回
+- Single 模式完全不变
 
 ### v0.3.0
 
