@@ -29,6 +29,7 @@ var canvasW = 0, canvasH = 0;
 var waveStep = 2;
 var currentExpr = "neutral";
 var expressionsBlink = {};
+var activeFace = "a";
 
 function renderFrame() {
   if (!canvasCtx || !canvasOpenImg) return;
@@ -230,7 +231,8 @@ var el = {
   spriteContainer: document.getElementById("sprite-container"),
   spriteCanvas: document.getElementById("sprite-canvas"),
   spriteSingle: document.getElementById("sprite-single"),
-  spriteSingleImg: document.getElementById("sprite-single-img"),
+  spriteFaceA: document.getElementById("sprite-face-a"),
+  spriteFaceB: document.getElementById("sprite-face-b"),
   dialogText: document.getElementById("dialog-text"),
   characterName: document.getElementById("character-name"),
   userInput: document.getElementById("user-input"),
@@ -472,6 +474,9 @@ function applySprites() {
     canvasEl = null;
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
+    activeFace = "a";
+    el.spriteFaceA.classList.remove("hidden");
+    el.spriteFaceB.classList.add("hidden");
     loadExpressionToSingle(currentEmotion);
   }
 }
@@ -481,12 +486,15 @@ function applySprites() {
 function loadExpressionToSingle(emotion) {
   var src = assetUrl(expressions[emotion] || expressions["neutral"]);
   if (!src) return;
+  var hiddenFace = activeFace === "a" ? el.spriteFaceB : el.spriteFaceA;
+  var visibleFace = activeFace === "a" ? el.spriteFaceA : el.spriteFaceB;
   var img = new Image();
   img.onload = function () {
-    el.spriteSingleImg.src = src;
-    el.spriteSingleImg.classList.remove("switching");
+    hiddenFace.src = src;
+    hiddenFace.classList.remove("hidden");
+    visibleFace.classList.add("hidden");
+    activeFace = activeFace === "a" ? "b" : "a";
   };
-  el.spriteSingleImg.classList.add("switching");
   img.src = src;
 }
 
