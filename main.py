@@ -98,8 +98,6 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-LAYER_KEYS = ["body", "hair_back", "head", "hair_front", "mouth_open", "mouth_closed", "eyes_open", "eyes_closed"]
-
 PLATFORM_ID = "webchat"
 
 
@@ -163,17 +161,30 @@ def _resolve_assets(config: dict, files: list[str]) -> dict:
                 val = auto
         expressions[key] = val
 
+    expressions_blink = {}
+    if sprite_mode == "layered":
+        for key in EXPRESSION_KEYS:
+            blink_val = _find_asset_for(f"{key}_blink", files, "expr")
+            if blink_val:
+                expressions_blink[key] = blink_val
+
     layers = {}
-    raw_layers = config.get("layers", {}) or {}
-    for key in LAYER_KEYS:
-        val = raw_layers.get(key, "")
-        if not val:
-            val = _find_asset_for(key, files, "layer")
-        layers[key] = val
+    if sprite_mode == "layered":
+        layers = {
+            "body": "",
+            "hair_back": "",
+            "head": "",
+            "hair_front": "",
+            "mouth_open": "",
+            "mouth_closed": "",
+            "eyes_open": "",
+            "eyes_closed": "",
+        }
 
     return {
         "background": background,
         "expressions": expressions,
+        "expressions_blink": expressions_blink,
         "layers": layers,
     }
 
@@ -453,9 +464,6 @@ class GalgamePlugin(Star):
             elif prefix == "expr" and sprite_mode == "layered" and base in EXPRESSION_KEYS:
                 if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
                     self.config["expressions"][base] = filename
-            elif prefix == "layer" and base in LAYER_KEYS:
-                if isinstance(self.config.get("layers"), dict) and base in self.config["layers"]:
-                    self.config["layers"][base] = filename
             elif prefix == "bg" and "background" in self.config:
                 self.config["background"] = filename
         except Exception:
@@ -914,6 +922,7 @@ class GalgamePlugin(Star):
             "rapid_window_seconds": self.config.get("rapid_window_seconds", 3),
             "tts_provider": self.config.get("tts_provider", ""),
             "expressions": resolved["expressions"],
+            "expressions_blink": resolved.get("expressions_blink", {}),
             "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
             "character_name": self.config.get("character_name", ""),

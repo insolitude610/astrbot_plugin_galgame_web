@@ -13,110 +13,125 @@ var characterName = "小星";
 var backgroundFile = "";
 
 var typewriterTimer = null;
-var mouthTimer = null;
 var isAudioPlaying = false;
 
-/* ---- animation engine ---- */
-var animRunning = false;
-var animRafId = null;
-var animStartTime = 0;
-var blinkScale = 1.0;
-var blinkStart = 0;
-var blinkDuration = 0.15;
-var nextBlinkTime = 0;
-var mouseX = 0, mouseY = 0;
-var springX = 0, springY = 0;
-var springVX = 0, springVY = 0;
-var pxLayers = null;
+/* ---- canvas-based layered renderer ---- */
+var canvasEl = null;
+var canvasCtx = null;
+var canvasOpenImg = null;
+var canvasBlinkImg = null;
+var canvasTime = 0;
+var waveRafId = null;
+var isBlinking = false;
+var blinkSchedulerId = null;
+var canvasFadeTimer = null;
+var canvasW = 0, canvasH = 0;
+var waveStep = 2;
+var currentExpr = "neutral";
+var expressionsBlink = {};
 
-var animCfg;
-
-function buildAnimConfig() {
-  var rnd = function() { return Math.random() * Math.PI * 2; };
-  return {
-    body:     { ty:  [{f:0.25,a:6,ph:rnd()},  {f:0.47,a:1.2,ph:rnd()}, {f:0.08,a:2.5,ph:rnd()}] },
-    hairBack: { rot: [{f:0.18,a:1.8,ph:rnd()}, {f:0.33,a:0.6,ph:rnd()}, {f:0.055,a:0.8,ph:rnd()}] },
-    head:     { rot: [{f:0.14,a:0.4,ph:rnd()}, {f:0.26,a:0.15,ph:rnd()}],
-                ty:  [{f:0.25,a:4,ph:rnd()}] },
-    hairFront:{ rot: [{f:0.22,a:1.2,ph:rnd()}, {f:0.38,a:0.5,ph:rnd()}, {f:0.07,a:0.9,ph:rnd()}] }
-  };
-}
-
-function startAnimLoop() {
-  if (animRunning) return;
-  if (spriteMode !== "layered") return;
-  if (!el.layerBody) return;
-  console.log("[anim] startAnimLoop called, mode=" + spriteMode + " body.el=" + !!el.layerBody + " head.el=" + !!el.layerHead);
-  animRunning = true;
-  animStartTime = performance.now();
-  nextBlinkTime = 3 + Math.random() * 5;
-  function tick(ts) {
-    if (!animRunning) return;
-    var t = (ts - animStartTime) * 0.001;
-    var fadeIn = Math.min(1, t / 1.5);
-
-    if (t < 1) console.log("[anim] tick t=" + t.toFixed(3) + " fadeIn=" + fadeIn.toFixed(3) + " body_ty=" + ((animCfg.body._ty||0)*fadeIn).toFixed(2));
-
-    for (var k in animCfg) {
-      var c = animCfg[k]; c._ty = 0; c._rot = 0;
-      var o = c;
-      if (o.ty)  for (var i=0;i<o.ty.length;i++)  c._ty  += Math.sin(t*o.ty[i].f*Math.PI*2+o.ty[i].ph)*o.ty[i].a;
-      if (o.rot) for (var i=0;i<o.rot.length;i++) c._rot += Math.sin(t*o.rot[i].f*Math.PI*2+o.rot[i].ph)*o.rot[i].a;
-      c._ty *= fadeIn;
-      c._rot *= fadeIn;
-    }
-
-    if (pxLayers) {
-      var fx = (mouseX-springX)*0.08, fy = (mouseY-springY)*0.08;
-      springVX+=fx; springVX*=0.85; springX+=springVX;
-      springVY+=fy; springVY*=0.85; springY+=springVY;
-    }
-
-    if (t >= nextBlinkTime) {
-      if (!blinkStart) blinkStart = t;
-      var bt = t - blinkStart;
-      if (bt >= blinkDuration) { blinkStart=0; nextBlinkTime=t+3+Math.random()*5; blinkScale=1; }
-      else { var bp=bt/blinkDuration; blinkScale = bp<0.3? 1-bp/0.3*0.95 : 0.05+(bp-0.3)/0.7*0.95; }
-    }
-
-    var map = { body: el.layerBody, hairBack: el.layerHairBack, head: el.layerHead,
-                hairFront: el.layerHairFront };
-    for (var k in animCfg) {
-      var dl = map[k]; if (!dl) continue;
-      var c = animCfg[k];
-      var tx = pxLayers ? springX * (pxLayers[k]||0) : 0;
-      var ty = (c._ty||0);
-      var rot = (c._rot||0);
-      dl.style.transform = 'translateY('+ty.toFixed(2)+'px) translateX('+tx.toFixed(2)+'px) rotate('+rot.toFixed(3)+'deg)';
-    }
-
-    // eyes and mouth follow head's Y position, eyes also get blink scale
-    var headTy = animCfg.head._ty || 0;
-    var headTx = pxLayers ? springX * (pxLayers.head||0) : 0;
-    if (el.layerEyes) {
-      el.layerEyes.style.transform = 'translateY('+headTy.toFixed(2)+'px) translateX('+headTx.toFixed(2)+'px) scaleY('+blinkScale.toFixed(3)+')';
-    }
-    if (el.layerMouth) {
-      el.layerMouth.style.transform = 'translateY('+headTy.toFixed(2)+'px) translateX('+headTx.toFixed(2)+'px)';
-    }
-
-    animRafId = requestAnimationFrame(tick);
+function renderFrame() {
+  if (!canvasCtx || !canvasOpenImg) return;
+  var img = isBlinking && canvasBlinkImg ? canvasBlinkImg : canvasOpenImg;
+  var w = canvasW, h = canvasH;
+  canvasCtx.clearRect(0, 0, w, h);
+  for (var y = 0; y < h; y += waveStep) {
+    var fade = (h - y) / h;
+    var off = Math.sin(y * 0.04 + canvasTime) * 4 * fade;
+    canvasCtx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
   }
-  animRafId = requestAnimationFrame(tick);
+  canvasTime += 0.05;
+  waveRafId = requestAnimationFrame(renderFrame);
 }
 
-function stopAnimLoop() {
-  animRunning = false;
-  if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+function scheduleBlink() {
+  if (spriteMode !== "layered" || !canvasBlinkImg) return;
+  var delay = 3000 + Math.random() * 3000;
+  blinkSchedulerId = setTimeout(function() {
+    if (spriteMode !== "layered") return;
+    isBlinking = true;
+    setTimeout(function() {
+      isBlinking = false;
+      scheduleBlink();
+    }, 130);
+  }, delay);
 }
 
-function setupParallax() {
-  pxLayers = { body:2, hairBack:4, head:6, mouth:6, eyes:6, hairFront:10 };
-  document.addEventListener("mousemove", function(e) {
-    mouseX = (e.clientX / innerWidth - 0.5) * 2;
-    mouseY = (e.clientY / innerHeight - 0.5) * 2;
-  });
-  document.addEventListener("mouseleave", function() { mouseX=0; mouseY=0; });
+function stopCanvasRender() {
+  if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
+  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+  if (canvasFadeTimer) { clearTimeout(canvasFadeTimer); canvasFadeTimer = null; }
+}
+
+function startCanvasRender(exprVal, blinkVal) {
+  if (!canvasEl) return;
+  canvasCtx = canvasEl.getContext("2d");
+  var img = new Image();
+  img.onload = function() {
+    canvasW = img.naturalWidth;
+    canvasH = img.naturalHeight;
+    if (canvasW > 2000) waveStep = 3;
+    canvasEl.width = canvasW;
+    canvasEl.height = canvasH;
+    canvasEl.style.opacity = "1";
+    canvasOpenImg = img;
+    loadBlinkVariant(blinkVal);
+    waveRafId = requestAnimationFrame(renderFrame);
+    scheduleBlink();
+  };
+  img.onerror = function() {
+    console.warn("Failed to load layered expression:", exprVal);
+  };
+  img.src = assetUrl(exprVal);
+}
+
+function loadBlinkVariant(blinkVal) {
+  if (!blinkVal) { canvasBlinkImg = null; return; }
+  var img = new Image();
+  img.onload = function() {
+    if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
+      canvasBlinkImg = img;
+    } else {
+      console.warn("Blink image size mismatch for", blinkVal, "expected", canvasW + "x" + canvasH, "got", img.naturalWidth + "x" + img.naturalHeight);
+      canvasBlinkImg = null;
+    }
+  };
+  img.onerror = function() {
+    console.warn("Blink variant not found:", blinkVal);
+    canvasBlinkImg = null;
+  };
+  img.src = assetUrl(blinkVal);
+}
+
+function canvasSwitchExpression(emotion) {
+  if (!canvasEl || !canvasCtx) return;
+  var exprVal = expressions[emotion] || expressions["neutral"];
+  if (!exprVal) return;
+  var blinkVal = expressionsBlink[emotion] || expressionsBlink["neutral"] || "";
+
+  var img = new Image();
+  img.onload = function() {
+    if (img.naturalWidth !== canvasW || img.naturalHeight !== canvasH) {
+      canvasW = img.naturalWidth;
+      canvasH = img.naturalHeight;
+      if (canvasW > 2000) waveStep = 3;
+      canvasEl.width = canvasW;
+      canvasEl.height = canvasH;
+    }
+    canvasEl.style.opacity = "0";
+    if (canvasFadeTimer) clearTimeout(canvasFadeTimer);
+    canvasFadeTimer = setTimeout(function() {
+      canvasOpenImg = img;
+      isBlinking = false;
+      loadBlinkVariant(blinkVal);
+      canvasEl.style.opacity = "1";
+      canvasFadeTimer = null;
+    }, 300);
+  };
+  img.onerror = function() {
+    console.warn("Failed to load expression for canvas:", exprVal);
+  };
+  img.src = assetUrl(exprVal);
 }
 
 /* ---- voice recording ---- */
@@ -204,14 +219,9 @@ async function toggleRecording() {
 var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
+  spriteCanvas: document.getElementById("sprite-canvas"),
   spriteSingle: document.getElementById("sprite-single"),
   spriteSingleImg: document.getElementById("sprite-single-img"),
-  layerBody: document.getElementById("layer-body"),
-  layerHairBack: document.getElementById("layer-hair-back"),
-  layerHead: document.getElementById("layer-head"),
-  layerHairFront: document.getElementById("layer-hair-front"),
-  layerMouth: document.getElementById("layer-mouth"),
-  layerEyes: document.getElementById("layer-eyes"),
   dialogText: document.getElementById("dialog-text"),
   characterName: document.getElementById("character-name"),
   userInput: document.getElementById("user-input"),
@@ -282,7 +292,6 @@ async function init() {
   setupInput();
   setupRapidDetection();
   applySprites();
-  if (spriteMode === "layered") { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
 }
 
 function applyConfig(cfg) {
@@ -291,6 +300,7 @@ function applyConfig(cfg) {
   rapidWindowMs = (cfg.rapid_window_seconds || 3) * 1000;
   ttsProvider = cfg.tts_provider || "";
   expressions = cfg.expressions || {};
+  expressionsBlink = cfg.expressions_blink || {};
   layers = cfg.layers || {};
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
@@ -412,52 +422,24 @@ function safeImg(el, src) {
 }
 
 function applySprites() {
-  console.log("[anim] applySprites called, spriteMode=" + spriteMode);
-  console.log("[anim] container.active=" + el.spriteContainer.classList.contains("active"));
-  console.log("[anim] single.active=" + el.spriteSingle.classList.contains("active"));
-  console.log("[anim] body.src=" + (layers.body||"<empty>") + " head.src=" + (expressions[currentEmotion]||expressions["neutral"]||"<empty>"));
-
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    safeImg(el.layerBody, assetUrl(layers.body));
-    safeImg(el.layerHairBack, assetUrl(layers.hair_back));
-    safeImg(el.layerHairFront, assetUrl(layers.hair_front));
-    safeImg(el.layerMouth, assetUrl(layers.mouth_closed));
-    safeImg(el.layerEyes, assetUrl(layers.eyes_open));
-    if (layers.mouth_open || layers.mouth_closed) {
-      el.layerMouth.classList.add("visible");
-    }
-    if (layers.eyes_open || layers.eyes_closed) {
-      el.layerEyes.classList.add("visible");
-    }
-    loadExpressionToLayer(currentEmotion);
-    console.log("[anim] after load: head.src=" + (el.layerHead.src||"").slice(-30));
-    console.log("[anim] after switch: container.active=" + el.spriteContainer.classList.contains("active") + " single.active=" + el.spriteSingle.classList.contains("active"));
-    if (!animRunning) { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
+    canvasEl = el.spriteCanvas;
+    var exprVal = expressions[currentEmotion] || expressions["neutral"];
+    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
+    currentExpr = currentEmotion;
+    startCanvasRender(exprVal, blinkVal);
   } else {
-    stopAnimLoop();
+    stopCanvasRender();
+    canvasEl = null;
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     loadExpressionToSingle(currentEmotion);
   }
 }
 
-function loadExpressionToLayer(emotion) {
-  var exprVal = expressions[emotion] || expressions["neutral"];
-  console.log("[anim] loadExprToLayer emotion=" + emotion + " exprVal=" + exprVal + " neutral=" + expressions["neutral"]);
-  var src = assetUrl(exprVal);
-  console.log("[anim] assetUrl(" + exprVal + ")=" + src);
-  if (!src) return;
-  var img = new Image();
-  img.onerror = function() { console.log("[anim] layerHead image FAILED to load: " + src); };
-  img.onload = function () {
-    el.layerHead.src = src;
-    el.layerHead.classList.remove("switching");
-  };
-  el.layerHead.classList.add("switching");
-  img.src = src;
-}
+/* ---- expression ---- */
 
 function loadExpressionToSingle(emotion) {
   var src = assetUrl(expressions[emotion] || expressions["neutral"]);
@@ -471,13 +453,11 @@ function loadExpressionToSingle(emotion) {
   img.src = src;
 }
 
-/* ---- expression ---- */
-
 function switchExpression(emotion) {
   if (!emotion || emotion === currentEmotion) return;
   currentEmotion = emotion;
   if (spriteMode === "layered") {
-    loadExpressionToLayer(emotion);
+    canvasSwitchExpression(emotion);
   } else {
     loadExpressionToSingle(emotion);
   }
@@ -531,15 +511,12 @@ function playTTSAudio(base64data) {
 
   audio.onplay = function () {
     isAudioPlaying = true;
-    startMouthAnimation();
   };
   audio.onended = function () {
     isAudioPlaying = false;
-    stopMouthAnimation();
   };
   audio.onerror = function () {
     isAudioPlaying = false;
-    stopMouthAnimation();
   };
 
   audio.play().catch(function (e) {
@@ -547,36 +524,9 @@ function playTTSAudio(base64data) {
   });
 }
 
-/* ---- mouth animation ---- */
-
-function startMouthAnimation() {
-  if (spriteMode !== "layered") return;
-  if (!layers.mouth_open || !layers.mouth_closed) return;
-
-  var open = true;
-  el.layerMouth.classList.add("speaking");
-  el.layerMouth.classList.add("visible");
-  mouthTimer = setInterval(function () {
-    el.layerMouth.src = assetUrl(open ? layers.mouth_open : layers.mouth_closed);
-    open = !open;
-  }, 180);
-}
-
-function stopMouthAnimation() {
-  if (mouthTimer) {
-    clearInterval(mouthTimer);
-    mouthTimer = null;
-  }
-  el.layerMouth.classList.remove("speaking");
-  if (layers.mouth_closed) {
-    el.layerMouth.src = assetUrl(layers.mouth_closed);
-  }
-}
-
 /* ---- response lifecycle ---- */
 
 function finishResponse() {
-  stopMouthAnimation();
   var elText = el.dialogText;
   var cur = elText.querySelector(".cursor");
   if (cur) cur.remove();
@@ -744,12 +694,15 @@ async function notifyRapidAction(count) {
 init();
 
 window.addEventListener("beforeunload", function () {
-  stopAnimLoop();
+  stopCanvasRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
-  if (mouthTimer) clearInterval(mouthTimer);
 });
 
 document.addEventListener("visibilitychange", function () {
-  if (document.hidden) stopAnimLoop();
-  else if (spriteMode === "layered") startAnimLoop();
+  if (document.hidden) stopCanvasRender();
+  else if (spriteMode === "layered" && !waveRafId) {
+    var exprVal = expressions[currentEmotion] || expressions["neutral"];
+    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
+    startCanvasRender(exprVal, blinkVal);
+  }
 });
