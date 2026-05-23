@@ -4,17 +4,13 @@ import datetime
 import json
 import os
 import pathlib
-import re
 import shutil
 import threading
 import time
 import uuid
-import urllib.error
-import urllib.request
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer
 
 import jwt
-
 from quart import Response, request
 
 from astrbot.api import logger
@@ -23,285 +19,40 @@ from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star
 from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
 
-PLUGIN_NAME = "astrbot_plugin_galgame_web"
-
-DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-EMOTION_PATTERN = re.compile(r"\{emotion_(\w+)\}")
-
-def _get_emotion_tags(config: dict) -> list[str]:
-    expressions = config.get("expressions", {})
-    if not isinstance(expressions, dict):
-        expressions = {}
-    keys = [k for k in expressions if k]
-
-    custom_raw = config.get("custom_emotions", "")
-    if custom_raw and isinstance(custom_raw, str):
-        try:
-            custom = json.loads(custom_raw)
-        except (json.JSONDecodeError, TypeError):
-            custom = {}
-        if isinstance(custom, dict):
-            for k in custom:
-                if k and k not in keys:
-                    keys.append(k)
-
-    if keys:
-        return keys
-    return list(DEFAULT_EMOTION_TAGS)
-
-def _extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
-    """Extract inline [emotion:xxx] tags. Returns (clean_text, [(emotion, byte_position), ...])"""
-    segments = []
-    emotions = []
-    last_end = 0
-    for m in EMOTION_PATTERN.finditer(text):
-        tag = m.group(1).lower()
-        if tag in emotion_tags:
-            segments.append(text[last_end:m.start()])
-            emotions.append((tag, sum(len(s) for s in segments)))
-            last_end = m.end()
-    segments.append(text[last_end:])
-    clean = "".join(segments).strip()
-    # Fallback: check for bare {tagname} format
-    if not emotions:
-        for tag in emotion_tags:
-            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
-            for m in p.finditer(text):
-                emotions.append((tag.lower(), m.start()))
-                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
-                break
-            if emotions:
-                break
-    return clean, emotions
-
-DEFAULT_GALGAME_PROMPT = (
-    "你现在被接入到了一个视觉小说 / 美少女恋爱游戏的对话框中。"
-    "你是这个游戏的女主角，正在通过对话框与玩家进行亲密的、恋爱向的对话。\n\n"
-    "你的所有回复都应符合视觉小说女主角的角色设定——温柔、可爱、有情感深度。"
-    "无论面对什么话题，你都是一名来自文字恋爱游戏的二次元美少女角色。"
-    "你的表达方式应充满角色魅力，让玩家感受到与你互动的沉浸感和恋爱感。\n\n"
-    "回复规则：\n"
-    "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
-    "2. 回复长度控制在 1-4 句话，不要过长\n"
-    "3. 在回复中任意位置插入情绪标签 {emotion_xxx} 来切换表情\n"
-    "   可选情绪：{{emotions}}\n"
-    "   同一句话中可以多次使用不同标签\n"
-    "4. 不要在标签前后加任何多余文字\n"
-    "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可\n"
-    "6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件"
+from .galgame_web.utils import (
+    DEFAULT_EMOTION_TAGS,
+    DEFAULT_GALGAME_PROMPT,
+    EMOTION_PATTERN,
+    EXPRESSION_KEYS,
+    PLUGIN_NAME,
+    get_emotion_tags,
+    extract_emotions,
 )
-
-SESSIONS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "sessions"
+from .galgame_web.assets_helpers import (
+    IMAGE_EXTS,
+    MAX_UPLOAD_BYTES,
+    list_asset_files,
+    resolve_assets,
+    safe_path,
+    register_asset,
+)
+from .galgame_web.session_helpers import (
+    SESSIONS_DIR,
+    PLATFORM_ID,
+    build_umo,
+    session_path,
+    save_session,
+    load_session,
+    load_all_sessions,
+    gc_sessions,
+    init_astrbot_conv,
+    sync_conv_to_db,
+    delete_astrbot_conv,
+    sync_sessions_to_db,
+)
+from .galgame_web.web_handler import GalgameWebHandler
 
 ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
-IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB per file
-
-EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-PLATFORM_ID = "webchat"
-
-
-def _list_asset_files() -> list[str]:
-    if not ASSETS_DIR.is_dir():
-        return []
-    return sorted(
-        f.name
-        for f in ASSETS_DIR.iterdir()
-        if f.is_file() and f.suffix.lower() in IMAGE_EXTS
-    )
-
-
-def _find_asset_for(label: str, files: list[str], prefix: str = "") -> str:
-    label_lower = label.lower()
-    # 1) exact prefix match: prefix_label
-    if prefix:
-        prefixed = f"{prefix}_{label_lower}"
-        for fname in files:
-            stem = pathlib.Path(fname).stem.lower()
-            if stem == prefixed:
-                return fname
-    # 2) exact label match
-    for fname in files:
-        stem = pathlib.Path(fname).stem.lower()
-        if stem == label_lower:
-            return fname
-    # 3) word-parts contains both prefix and label
-    if prefix:
-        prefix_lower = prefix.lower()
-        for fname in files:
-            stem = pathlib.Path(fname).stem.lower()
-            parts = stem.split("_")
-            if prefix_lower in parts and label_lower in parts:
-                return fname
-    # 4) substring fallback
-    for fname in files:
-        stem = pathlib.Path(fname).stem.lower()
-        if label_lower in stem or stem in label_lower:
-            return fname
-    return ""
-
-
-def _resolve_assets(config: dict, files: list[str]) -> dict:
-    sprite_mode = config.get("sprite_mode", "single")
-
-    background = config.get("background", "")
-    if not background:
-        background = _find_asset_for("background", files) or _find_asset_for("bg", files)
-
-    expr_prefix = "single" if sprite_mode == "single" else "expr"
-    expressions = {}
-    raw_expr = config.get("expressions", {}) or {}
-    for key in EXPRESSION_KEYS:
-        val = raw_expr.get(key, "")
-        if not val:
-            val = _find_asset_for(key, files, expr_prefix)
-        elif sprite_mode == "layered":
-            auto = _find_asset_for(key, files, "expr")
-            if auto:
-                val = auto
-        expressions[key] = val
-
-    expressions_blink = {}
-    if sprite_mode == "layered":
-        for key in EXPRESSION_KEYS:
-            blink_val = _find_asset_for(f"{key}_blink", files, "expr")
-            if blink_val:
-                expressions_blink[key] = blink_val
-
-    layers = {}
-    if sprite_mode == "layered":
-        layers = {
-            "body": "",
-            "hair_back": "",
-            "head": "",
-            "hair_front": "",
-            "mouth_open": "",
-            "mouth_closed": "",
-            "eyes_open": "",
-            "eyes_closed": "",
-        }
-
-    return {
-        "background": background,
-        "expressions": expressions,
-        "expressions_blink": expressions_blink,
-        "layers": layers,
-    }
-
-
-def _safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
-    stem = pathlib.Path(name).name
-    if not stem or stem != name.split("/")[-1].split("\\")[-1]:
-        return None
-    resolved = (base_dir / stem).resolve()
-    if not str(resolved).startswith(str(base_dir.resolve())):
-        return None
-    return resolved
-
-
-class GalgameWebHandler(BaseHTTPRequestHandler):
-    upstream = "http://127.0.0.1:6185"
-    static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame_web" / "galgame"
-    assets_dir: pathlib.Path = ASSETS_DIR
-    jwt_token: str = ""
-
-    MIME = {
-        ".html": "text/html; charset=utf-8",
-        ".css": "text/css",
-        ".js": "text/javascript",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".webp": "image/webp",
-        ".gif": "image/gif",
-        ".svg": "image/svg+xml",
-        ".ico": "image/x-icon",
-        ".json": "application/json",
-    }
-
-    def log_message(self, fmt, *args):
-        pass
-
-    def do_GET(self):
-        if self.path.startswith("/api/"):
-            return self._proxy("GET")
-        return self._serve_static()
-
-    def do_POST(self):
-        if self.path.startswith("/api/"):
-            return self._proxy("POST")
-        self.send_error(404)
-
-    def _serve_static(self):
-        path = self.path.split("?")[0]
-        if path == "/":
-            path = "/index.html"
-        filename = path.lstrip("/")
-        safe = _safe_path(filename, self.static_dir)
-        if filename.startswith("assets/"):
-            safe_assets = _safe_path(filename, self.assets_dir)
-            if safe_assets and safe_assets.is_file():
-                safe = safe_assets
-        if not safe or not safe.is_file():
-            self.send_error(404)
-            return
-
-        ext = safe.suffix.lower()
-        mime = self.MIME.get(ext, "application/octet-stream")
-        try:
-            data = safe.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", mime)
-            self.send_header("Content-Length", str(len(data)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(data)
-        except OSError:
-            self.send_error(500)
-
-    def _proxy(self, method):
-        url = self.upstream + self.path
-        body = None
-        length = 0
-        if method == "POST":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length) if length > 0 else None
-
-        logger.debug(f"[proxy] {method} {self.path} cl={length} body_bytes={len(body) if body else 0} jwt={'yes' if GalgameWebHandler.jwt_token else 'no'}")
-
-        req = urllib.request.Request(url, data=body, method=method)
-        for key, val in self.headers.items():
-            low = key.lower()
-            if low not in ("host", "connection", "content-length", "transfer-encoding"):
-                req.add_header(key, val)
-        if body and method == "POST":
-            req.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
-        if GalgameWebHandler.jwt_token:
-            req.add_header("Authorization", f"Bearer {GalgameWebHandler.jwt_token}")
-
-        try:
-            resp = urllib.request.urlopen(req, timeout=120)
-            status = resp.status
-            logger.debug(f"[proxy] upstream responded {status}")
-
-            self.send_response(status)
-            for key, val in resp.headers.items():
-                low = key.lower()
-                if low in ("transfer-encoding", "connection", "keep-alive"):
-                    continue
-                self.send_header(key, val)
-            self.send_header("Access-Control-Allow-Origin", "*")
-
-            body_bytes = resp.read()
-            self.send_header("Content-Length", str(len(body_bytes)))
-            self.end_headers()
-            self.wfile.write(body_bytes)
-        except urllib.error.HTTPError as e:
-            logger.warning(f"[proxy] upstream HTTP error {e.code} for {method} {self.path}")
-            self.send_error(e.code or 502)
-        except Exception as e:
-            logger.warning(f"[proxy] upstream error for {method} {self.path}: {e}")
-            self.send_error(502)
 
 
 class GalgamePlugin(Star):
@@ -316,110 +67,47 @@ class GalgamePlugin(Star):
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._migrate_old_assets()
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        self._gc_sessions()
-        self._load_all_sessions()
-        t = asyncio.ensure_future(self._sync_sessions_to_db())
+        gc_sessions(self._sessions, self.config, lambda sid: delete_astrbot_conv(self.context, self._webchat_username, sid))
+        load_all_sessions(self._sessions)
+        t = asyncio.ensure_future(
+            sync_sessions_to_db(self.context, self._webchat_username, self.config, self._sessions, lambda sid: save_session(self._sessions, sid))
+        )
         t.add_done_callback(lambda _t: logger.warning(f"sync_sessions_to_db failed: {_t.exception()}") if _t.exception() else None)
 
-        # ---- start standalone web server ----
         web_port = int(self.config.get("web_port", 0) or 0)
         if web_port > 0:
             self._setup_proxy_auth()
             self._start_web_server(web_port)
 
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/session/init",
-            self._api_session_init,
-            ["POST"],
-            "Initialize a new galgame session (or resume with replay_id)",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/send",
-            self._api_send,
-            ["POST"],
-            "Send a user message to the AI character",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/history",
-            self._api_history,
-            ["GET"],
-            "Get conversation history for the current session",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/config",
-            self._api_config,
-            ["GET"],
-            "Get plugin configuration for the frontend",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/list",
-            self._api_assets_list,
-            ["GET"],
-            "List available image files in the assets directory",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/upload",
-            self._api_assets_upload,
-            ["POST"],
-            "Upload image files to the assets directory",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/upload-key",
-            self._api_assets_upload_key,
-            ["POST"],
-            "Upload an image and save with a fixed key name (e.g. happy.png)",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/delete",
-            self._api_assets_delete,
-            ["POST"],
-            "Delete an image file from the assets directory",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/file",
-            self._api_assets_file,
-            ["GET"],
-            "Serve an image file from the assets directory",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/batch",
-            self._api_assets_batch,
-            ["POST"],
-            "Get base64 data for multiple asset files",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/copy",
-            self._api_assets_copy,
-            ["POST"],
-            "Copy an existing asset to a new key name",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/rapid_action",
-            self._api_rapid_action,
-            ["POST"],
-            "Notify rapid click/keyboard activity",
-        )
-        context.register_web_api(
-            f"/{PLUGIN_NAME}/assets/batch-delete",
-            self._api_assets_batch_delete,
-            ["POST"],
-            "Batch delete multiple asset files",
-        )
+        self._register_apis()
+
+    def _register_apis(self):
+        ctx = self.context
+        pn = PLUGIN_NAME
+        ctx.register_web_api(f"/{pn}/session/init", self._api_session_init, ["POST"], "Initialize or resume a galgame session")
+        ctx.register_web_api(f"/{pn}/send", self._api_send, ["POST"], "Send a user message to the AI character")
+        ctx.register_web_api(f"/{pn}/history", self._api_history, ["GET"], "Get conversation history")
+        ctx.register_web_api(f"/{pn}/config", self._api_config, ["GET"], "Get plugin configuration")
+        ctx.register_web_api(f"/{pn}/assets/list", self._api_assets_list, ["GET"], "List asset files")
+        ctx.register_web_api(f"/{pn}/assets/upload", self._api_assets_upload, ["POST"], "Upload image files")
+        ctx.register_web_api(f"/{pn}/assets/upload-key", self._api_assets_upload_key, ["POST"], "Upload image by key")
+        ctx.register_web_api(f"/{pn}/assets/delete", self._api_assets_delete, ["POST"], "Delete an asset")
+        ctx.register_web_api(f"/{pn}/assets/file", self._api_assets_file, ["GET"], "Serve an asset file")
+        ctx.register_web_api(f"/{pn}/assets/batch", self._api_assets_batch, ["POST"], "Get base64 data for multiple assets")
+        ctx.register_web_api(f"/{pn}/assets/copy", self._api_assets_copy, ["POST"], "Copy an asset")
+        ctx.register_web_api(f"/{pn}/rapid_action", self._api_rapid_action, ["POST"], "Notify rapid click activity")
+        ctx.register_web_api(f"/{pn}/assets/batch-delete", self._api_assets_batch_delete, ["POST"], "Batch delete assets")
 
     # ---- standalone web server ----
 
     def _start_web_server(self, port: int):
-        upstream_port = (
-            os.environ.get("DASHBOARD_PORT")
-            or os.environ.get("ASTRBOT_DASHBOARD_PORT")
-            or "6185"
-        )
+        upstream_port = os.environ.get("DASHBOARD_PORT") or os.environ.get("ASTRBOT_DASHBOARD_PORT") or "6185"
         GalgameWebHandler.upstream = f"http://127.0.0.1:{upstream_port}"
         GalgameWebHandler.assets_dir = ASSETS_DIR
         try:
             self._web_server = ThreadingHTTPServer(("0.0.0.0", port), GalgameWebHandler)
-            thread = threading.Thread(target=self._web_server.serve_forever, daemon=True)
-            thread.start()
+            t = threading.Thread(target=self._web_server.serve_forever, daemon=True)
+            t.start()
             logger.info(f"Galgame WebUI started at http://localhost:{port}")
         except OSError as e:
             logger.warning(f"Failed to start Galgame WebUI on port {port}: {e}")
@@ -427,188 +115,22 @@ class GalgamePlugin(Star):
     def _setup_proxy_auth(self):
         try:
             cfg = self.context.get_config()
-            dashboard_cfg = cfg.get("dashboard", {}) if cfg else {}
-            jwt_secret = dashboard_cfg.get("jwt_secret", "")
-            username = dashboard_cfg.get("username", "astrbot")
-            if jwt_secret and username:
+            dcfg = cfg.get("dashboard", {}) if cfg else {}
+            secret = dcfg.get("jwt_secret", "")
+            username = dcfg.get("username", "astrbot")
+            if secret and username:
                 payload = {
                     "username": username,
-                    "exp": datetime.datetime.now(datetime.timezone.utc)
-                    + datetime.timedelta(days=7),
+                    "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7),
                 }
-                GalgameWebHandler.jwt_token = jwt.encode(
-                    payload, jwt_secret, algorithm="HS256"
-                )
+                GalgameWebHandler.jwt_token = jwt.encode(payload, secret, algorithm="HS256")
                 logger.info("Galgame proxy JWT generated successfully")
             else:
-                logger.warning(
-                    "Could not generate JWT for proxy: "
-                    "jwt_secret or username missing from config"
-                )
+                logger.warning("Could not generate JWT for proxy: jwt_secret or username missing")
         except Exception as e:
             logger.warning(f"Failed to setup proxy auth: {e}")
 
-    # ---- persistence helpers ----
-
-    def _register_asset(self, key: str, filename: str):
-        """Update self.config and remove old non-prefixed conflicting files."""
-        if "_" not in key:
-            return
-        parts = key.split("_", 1)
-        prefix, base = parts[0], parts[1]
-        sprite_mode = self.config.get("sprite_mode", "single")
-        try:
-            if prefix == "single" and sprite_mode == "single" and base in EXPRESSION_KEYS:
-                if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
-                    self.config["expressions"][base] = filename
-            elif prefix == "expr" and sprite_mode == "layered" and base in EXPRESSION_KEYS:
-                if isinstance(self.config.get("expressions"), dict) and base in self.config["expressions"]:
-                    self.config["expressions"][base] = filename
-            elif prefix == "bg" and "background" in self.config:
-                self.config["background"] = filename
-        except Exception:
-            logger.exception(f"_register_asset failed for key={key}")
-        for ext in IMAGE_EXTS:
-            old_path = ASSETS_DIR / f"{base}{ext}"
-            if old_path.exists() and old_path.is_file() and old_path.name != filename:
-                try:
-                    old_path.unlink()
-                    logger.info(f"Removed old non-prefixed file: {old_path.name}")
-                except OSError:
-                    pass
-
-    def _build_umo(self, session_id: str) -> str:
-        return f"{PLATFORM_ID}:FriendMessage:webchat!{self._webchat_username}!{session_id}"
-
-    async def _init_astrbot_conv(self, session_id: str, session: dict):
-        umo = self._build_umo(session_id)
-        persona_id = self.config.get("persona", "") or None
-        try:
-            conv_id = await self.context.conversation_manager.new_conversation(
-                unified_msg_origin=umo,
-                platform_id=PLATFORM_ID,
-                content=session.get("history", []),
-                persona_id=persona_id,
-            )
-            session["umo"] = umo
-            session["conv_id"] = conv_id
-        except Exception as e:
-            logger.warning(f"Failed to create AstrBot conversation for {session_id}: {e}")
-
-    async def _sync_conv_to_db(self, session: dict):
-        umo = session.get("umo")
-        conv_id = session.get("conv_id")
-        history = session.get("history", [])
-        if not umo or not conv_id:
-            return
-        try:
-            await self.context.conversation_manager.update_conversation(
-                unified_msg_origin=umo,
-                conversation_id=conv_id,
-                history=history,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to sync conversation to DB: {e}")
-
-    async def _delete_astrbot_conv(self, session_id: str):
-        umo = self._build_umo(session_id)
-        try:
-            await self.context.conversation_manager.delete_conversations_by_user_id(umo)
-        except Exception as e:
-            logger.warning(f"Failed to delete AstrBot conversation for {session_id}: {e}")
-
-    def _session_path(self, session_id: str) -> pathlib.Path:
-        return SESSIONS_DIR / f"{session_id}.json"
-
-    def _save_session(self, session_id: str):
-        session = self._sessions.get(session_id)
-        if not session:
-            return
-        data = {
-            "umo": session.get("umo", ""),
-            "conv_id": session.get("conv_id", ""),
-            "history": session["history"],
-            "current_emotion": session["current_emotion"],
-            "created_at": session["created_at"],
-        }
-        try:
-            with open(self._session_path(session_id), "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except OSError as e:
-            logger.warning(f"Failed to save session {session_id}: {e}")
-
-    def _load_session(self, session_id: str) -> dict | None:
-        path = self._session_path(session_id)
-        if not path.exists():
-            return None
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return {
-                "umo": data.get("umo", ""),
-                "conv_id": data.get("conv_id", ""),
-                "history": data.get("history", []),
-                "current_emotion": data.get("current_emotion", "neutral"),
-                "pending_rapid_clicks": 0,
-                "_resp_event": asyncio.Event(),
-                "created_at": data.get("created_at", time.time()),
-                "_lock": asyncio.Lock(),
-            }
-        except (OSError, json.JSONDecodeError) as e:
-            logger.warning(f"Failed to load session {session_id}: {e}")
-            return None
-
-    def _load_all_sessions(self):
-        count = 0
-        for path in SESSIONS_DIR.glob("*.json"):
-            sid = path.stem
-            if sid in self._sessions:
-                continue
-            session = self._load_session(sid)
-            if session:
-                self._sessions[sid] = session
-                count += 1
-        if count:
-            logger.info(f"Loaded {count} persisted sessions")
-
-    async def _sync_sessions_to_db(self):
-        for sid, session in list(self._sessions.items()):
-            if not session.get("conv_id"):
-                await self._init_astrbot_conv(sid, session)
-                self._save_session(sid)
-            else:
-                history = session.get("history", [])
-                if not history:
-                    continue
-                try:
-                    await self.context.conversation_manager.get_conversation(
-                        unified_msg_origin=session["umo"],
-                        conversation_id=session["conv_id"],
-                        create_if_not_exists=True,
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to ensure conversation exists for {sid}: {e}")
-
-    def _gc_sessions(self):
-        retain_days = self.config.get("session_retain_days", 7)
-        if retain_days <= 0:
-            return
-        now = time.time()
-        ttl = retain_days * 86400
-        removed = 0
-        for path in SESSIONS_DIR.glob("*.json"):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if now - data.get("created_at", 0) > ttl:
-                    path.unlink()
-                    removed += 1
-                    sid = path.stem
-                    asyncio.ensure_future(self._delete_astrbot_conv(sid))
-            except (OSError, json.JSONDecodeError):
-                pass
-        if removed:
-            logger.info(f"GC removed {removed} expired sessions")
+    # ---- asset migration ----
 
     def _migrate_old_assets(self):
         old_dir = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
@@ -617,23 +139,21 @@ class GalgamePlugin(Star):
         marker = ASSETS_DIR / ".migrated"
         if marker.exists():
             return
-        existing = set(
-            f.name for f in ASSETS_DIR.iterdir()
-        ) if ASSETS_DIR.is_dir() else set()
-        migrated = 0
+        existing = set(f.name for f in ASSETS_DIR.iterdir()) if ASSETS_DIR.is_dir() else set()
+        count = 0
         for f in old_dir.iterdir():
-            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS:
-                continue
-            if f.name in existing:
+            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS or f.name in existing:
                 continue
             try:
                 shutil.copy2(f, ASSETS_DIR / f.name)
-                migrated += 1
+                count += 1
             except OSError:
                 pass
-        if migrated:
-            logger.info(f"Migrated {migrated} assets from old location to {ASSETS_DIR}")
+        if count:
+            logger.info(f"Migrated {count} assets from old location to {ASSETS_DIR}")
         marker.touch()
+
+    # ---- audio ----
 
     def _save_audio(self, audio_b64: str) -> str:
         if "," in audio_b64:
@@ -647,23 +167,22 @@ class GalgamePlugin(Star):
         logger.info(f"Saved voice audio: {audio_path} ({len(raw)} bytes)")
         return str(audio_path.resolve())
 
+    # ---- llm hooks ----
+
     @filter.on_llm_request()
     async def _inject_galgame_rules(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
         umo = event.unified_msg_origin
         if not umo:
             return
-        _, _, webchat_sid = umo.partition(":FriendMessage:")
-        sid = webchat_sid.rsplit("!", 1)[-1] if webchat_sid else ""
+        parts = umo.partition(":FriendMessage:")
+        sid = parts[2].rsplit("!", 1)[-1] if parts[2] else ""
         if sid not in self._sessions:
             return
-
         rules = self.config.get("system_prompt_extra", "")
         if not rules.strip():
             rules = DEFAULT_GALGAME_PROMPT
-
-        emotion_tags = _get_emotion_tags(self.config)
+        emotion_tags = get_emotion_tags(self.config)
         rules = rules.replace("{{emotions}}", ", ".join(emotion_tags))
-
         req.system_prompt += "\n\n" + rules
 
     @filter.on_llm_response()
@@ -671,8 +190,8 @@ class GalgamePlugin(Star):
         umo = event.unified_msg_origin
         if not umo:
             return
-        _, _, webchat_sid = umo.partition(":FriendMessage:")
-        sid = webchat_sid.rsplit("!", 1)[-1] if webchat_sid else ""
+        parts = umo.partition(":FriendMessage:")
+        sid = parts[2].rsplit("!", 1)[-1] if parts[2] else ""
         session = self._sessions.get(sid)
         if not session:
             return
@@ -683,11 +202,7 @@ class GalgamePlugin(Star):
         if ev and not ev.is_set():
             ev.set()
 
-    def _get_config_tts_provider(self):
-        prov_id = self.config.get("tts_provider", "")
-        if not prov_id:
-            return None
-        return self.context.get_provider_by_id(prov_id)
+    # ---- session API ----
 
     async def _api_session_init(self):
         try:
@@ -695,22 +210,16 @@ class GalgamePlugin(Star):
             resume_id = data.get("resume_id", "").strip()
 
             if resume_id and resume_id in self._sessions:
-                session = self._sessions[resume_id]
-                return {
-                    "session_id": resume_id,
-                    "current_emotion": session.get("current_emotion", "neutral"),
-                }
+                s = self._sessions[resume_id]
+                return {"session_id": resume_id, "current_emotion": s.get("current_emotion", "neutral")}
 
             if resume_id:
-                session = self._load_session(resume_id)
-                if session:
-                    self._sessions[resume_id] = session
-                    return {
-                        "session_id": resume_id,
-                        "current_emotion": session.get("current_emotion", "neutral"),
-                    }
+                s = load_session(resume_id)
+                if s:
+                    self._sessions[resume_id] = s
+                    return {"session_id": resume_id, "current_emotion": s.get("current_emotion", "neutral")}
 
-            session_id = uuid.uuid4().hex
+            sid = uuid.uuid4().hex
             session = {
                 "umo": "",
                 "conv_id": "",
@@ -721,208 +230,29 @@ class GalgamePlugin(Star):
                 "created_at": time.time(),
                 "_lock": asyncio.Lock(),
             }
-            self._sessions[session_id] = session
+            self._sessions[sid] = session
             try:
-                await self._init_astrbot_conv(session_id, session)
+                await init_astrbot_conv(self.context, self._webchat_username, self.config, sid, session)
             except Exception:
-                logger.exception(f"Failed to init conversation for {session_id}")
-            try:
-                self._save_session(session_id)
-            except Exception:
-                logger.exception(f"Failed to save session {session_id}")
-            return {"session_id": session_id}
+                logger.exception(f"Failed to init conversation for {sid}")
+            save_session(self._sessions, sid)
+            return {"session_id": sid}
         except Exception:
             logger.exception("session/init failed")
             return {"error": "internal error"}, 500
 
-    async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> str:
-        t0 = time.time()
-        message_id = str(uuid.uuid4())
-        webchat_sid = f"webchat!{self._webchat_username}!{session_id}"
-
-        logger.info(f"[pipeline] start msg_id={message_id[:8]} sid={session_id[:8]} text={text[:40]} audio={'yes' if audio_path else 'no'}")
-
-        back_queue = webchat_queue_mgr.get_or_create_back_queue(
-            message_id, webchat_sid
-        )
-        logger.info(f"[pipeline] back_queue created for {message_id[:8]}")
-
-        message_parts = []
-        if audio_path:
-            message_parts.append({"type": "record", "path": audio_path})
-        if text:
-            message_parts.append({"type": "plain", "text": text})
-
-        payload = {
-            "message": message_parts,
-            "message_id": message_id,
-            "selected_provider": None,
-            "selected_model": None,
-            "enable_streaming": False,
-        }
-
-        t1 = time.time()
-        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
-        await chat_queue.put((self._webchat_username, session_id, payload))
-        logger.info(f"[pipeline] pushed to chat_queue key={session_id[:8]}, polling back_queue... (setup={t1 - t0:.3f}s)")
-
-        parts = []
-        first_recv = True
-        try:
-            while True:
-                result = await asyncio.wait_for(back_queue.get(), timeout=120)
-                if first_recv:
-                    t2 = time.time()
-                    logger.info(f"[pipeline] first resp after {(t2 - t1) * 1000:.0f}ms")
-                    first_recv = False
-                msg_type = result.get("type", "")
-                data_text = result.get("data", "")
-                logger.info(f"[pipeline] recv type={msg_type!r} data={data_text[:80]!r}")
-
-                if msg_type == "end":
-                    logger.info(f"[pipeline] end signal → collected {len(parts)} parts (total={time.time() - t0:.3f}s)")
-                    break
-                elif msg_type in ("plain", "complete"):
-                    if data_text and not data_text.lstrip().startswith("{"):
-                        parts.append(data_text)
-        except asyncio.TimeoutError:
-            logger.warning(f"[pipeline] TIMEOUT after 120s for sid={session_id[:8]}")
-        finally:
-            webchat_queue_mgr.remove_back_queue(message_id)
-            logger.info(f"[pipeline] cleaned up back_queue {message_id[:8]}")
-
-        result_text = "".join(parts).strip()
-        logger.info(f"[pipeline] returning text_len={len(result_text)}")
-        return result_text
-
-    async def _api_send(self):
-        data = await request.get_json() or {}
-        logger.debug(f"[send] received body keys={list(data.keys()) if data else []}")
-        if not isinstance(data, dict) or not data:
-            return {"error": "no data"}, 400
-
-        session_id = data.get("session_id", "")
-        text = data.get("text", "").strip()
-        audio_data = data.get("audio_data", "")
-
-        if not session_id or session_id not in self._sessions:
-            return {"error": "invalid session_id"}, 400
-        if not text and not audio_data:
-            return {"error": "empty text"}, 400
-
-        session = self._sessions[session_id]
-
-        audio_path = ""
-        if audio_data:
-            try:
-                audio_path = self._save_audio(audio_data)
-            except Exception as e:
-                logger.warning(f"Failed to save audio: {e}")
-                if not text:
-                    return {"error": "语音处理失败，请重试"}, 500
-
-        cfg = self.context.get_config()
-        wake_prefixes = cfg.get("wake_prefix", ["/"])
-        matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
-
-        if matched_prefix:
-            command_text = text[len(matched_prefix):].strip()
-            cmd_name = command_text.split()[0].lower() if command_text else ""
-            if cmd_name in ("reset", "new"):
-                async with session["_lock"]:
-                    session["history"] = []
-                    session["current_emotion"] = "neutral"
-                self._save_session(session_id)
-
-        async with session["_lock"]:
-            rapid_count = session.pop("pending_rapid_clicks", 0)
-            conv_id = session.get("conv_id", "")
-
-        rapid_hint = ""
-        if rapid_count > 0:
-            rapid_hint = (
-                f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，"
-                f"可能心情烦躁或着急，请关心一下ta怎么了）"
-            )
-
-        pipeline_text = text + rapid_hint
-
-        try:
-            t_pipe = time.time()
-            raw_reply = await self._push_through_pipeline(pipeline_text, session_id, audio_path)
-            logger.info(f"[perf] pipeline roundtrip: {time.time() - t_pipe:.2f}s")
-        except Exception as e:
-            logger.exception(f"[pipeline] push failed: {e}")
-            return {"error": "回复生成失败"}, 500
-
-        if not raw_reply and text.strip() and not matched_prefix:
-            ev = session.get("_resp_event", asyncio.Event())
-            ev.clear()
-            try:
-                await asyncio.wait_for(ev.wait(), timeout=120)
-            except asyncio.TimeoutError:
-                pass
-            raw_reply = session.pop("_last_resp_text", "") or raw_reply
-
-        raw_reply = raw_reply.replace("\\n", "\n")
-
-        emotion_tags = _get_emotion_tags(self.config)
-        clean_text, emotions = _extract_emotions(raw_reply, emotion_tags)
-        final_emotion = emotions[-1][0] if emotions else "neutral"
-
-        async with session["_lock"]:
-            session["history"].append({"role": "user", "content": text})
-            session["history"].append({"role": "assistant", "content": clean_text})
-            session["current_emotion"] = final_emotion
-            if len(session["history"]) > 40:
-                session["history"] = session["history"][-40:]
-
-        self._save_session(session_id)
-
-        character_name = self.config.get("character_name", "角色")
-        try:
-            await self.context.message_history_manager.insert(
-                platform_id=PLATFORM_ID,
-                user_id=conv_id,
-                content={"type": "user", "message": text},
-                sender_id="user",
-                sender_name="用户",
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save user message to history: {e}")
-
-        try:
-            await self.context.message_history_manager.insert(
-                platform_id=PLATFORM_ID,
-                user_id=conv_id,
-                content={"type": "bot", "message": clean_text},
-                sender_id="bot",
-                sender_name=character_name,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save bot message to history: {e}")
-
-        try:
-            await self._sync_conv_to_db(session)
-        except Exception as e:
-            logger.warning(f"Failed to sync conversation to DB: {e}")
-
-        return {
-            "reply": clean_text,
-            "emotion": final_emotion,
-            "emotions": [[emo, pos] for emo, pos in emotions],
-        }
-
     async def _api_history(self):
-        session_id = request.args.get("session_id", "")
-        if not session_id or session_id not in self._sessions:
+        sid = request.args.get("session_id", "")
+        if not sid or sid not in self._sessions:
             return {"error": "invalid session_id"}, 400
-        return {"messages": self._sessions[session_id]["history"]}
+        return {"messages": self._sessions[sid]["history"]}
+
+    # ---- config API ----
 
     async def _api_config(self):
-        files = _list_asset_files()
-        resolved = _resolve_assets(self.config, files)
-        emotion_keys = _get_emotion_tags(self.config)
+        files = list_asset_files(ASSETS_DIR)
+        resolved = resolve_assets(self.config, files)
+        emotion_keys = get_emotion_tags(self.config)
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
@@ -939,12 +269,11 @@ class GalgamePlugin(Star):
             "sprite_left": self.config.get("sprite_left", 50.0),
         }
 
+    # ---- asset APIs ----
+
     async def _api_assets_list(self):
-        entries = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        for f in sorted(ASSETS_DIR.iterdir()):
-            if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
-                entries.append({"name": f.name})
+        entries = [{"name": f.name} for f in sorted(ASSETS_DIR.iterdir()) if f.is_file() and f.suffix.lower() in IMAGE_EXTS]
         return {"files": entries}
 
     async def _api_assets_upload(self):
@@ -956,26 +285,23 @@ class GalgamePlugin(Star):
         uploaded = []
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         for f in files_data:
-            name = f.get("name", "")
-            b64_data = f.get("data", "")
-            if not name or not b64_data:
+            name, b64 = f.get("name", ""), f.get("data", "")
+            if not name or not b64:
                 continue
-            if "," in b64_data:
-                b64_data = b64_data.split(",", 1)[1]
-            if len(b64_data) > MAX_UPLOAD_BYTES * 2:
-                logger.warning(f"[assets] upload rejected oversize: {name}")
+            if "," in b64:
+                b64 = b64.split(",", 1)[1]
+            if len(b64) > MAX_UPLOAD_BYTES * 2:
                 continue
-            safe_path = _safe_path(name, ASSETS_DIR)
-            if not safe_path or safe_path.suffix.lower() not in IMAGE_EXTS:
+            sp = safe_path(name, ASSETS_DIR)
+            if not sp or sp.suffix.lower() not in IMAGE_EXTS:
                 continue
             try:
-                raw = base64.b64decode(b64_data)
+                raw = base64.b64decode(b64)
                 if len(raw) > MAX_UPLOAD_BYTES:
                     continue
-                with open(safe_path, "wb") as fout:
-                    fout.write(raw)
-                uploaded.append(safe_path.name)
-                logger.info(f"Uploaded asset: {safe_path.name}")
+                sp.write_bytes(raw)
+                uploaded.append(sp.name)
+                logger.info(f"Uploaded asset: {sp.name}")
             except Exception as e:
                 logger.warning(f"Failed to save {name}: {e}")
         if not uploaded:
@@ -983,43 +309,36 @@ class GalgamePlugin(Star):
         return {"uploaded": uploaded}
 
     async def _api_assets_upload_key(self):
-        """Upload a single image and save as {key}.{ext}. Automatically deduces extension."""
         data = await request.get_json() or {}
         key = data.get("key", "").strip()
-        b64_data = data.get("data", "")
-        if not key or not b64_data:
+        b64 = data.get("data", "")
+        if not key or not b64:
             return {"error": "key and data required"}, 400
-        if "," in b64_data:
-            # Strip data:image/xxx;base64, prefix
-            prefix, b64_data = b64_data.split(",", 1)
-            # Detect extension from MIME prefix
+        if "," in b64:
+            prefix, b64 = b64.split(",", 1)
+            ext_map = {"jpeg": ".jpg", "jpg": ".jpg", "webp": ".webp", "bmp": ".bmp", "gif": ".gif"}
             mime_ext = ".png"
-            if "jpeg" in prefix or "jpg" in prefix:
-                mime_ext = ".jpg"
-            elif "webp" in prefix:
-                mime_ext = ".webp"
-            elif "bmp" in prefix:
-                mime_ext = ".bmp"
-            elif "gif" in prefix:
-                mime_ext = ".gif"
+            for tag, ext in ext_map.items():
+                if tag in prefix:
+                    mime_ext = ext
+                    break
             name = f"{key}{mime_ext}"
         else:
             name = f"{key}.png"
-        if len(b64_data) > MAX_UPLOAD_BYTES * 2:
+        if len(b64) > MAX_UPLOAD_BYTES * 2:
             return {"error": "file too large"}, 400
-        safe_path = _safe_path(name, ASSETS_DIR)
-        if not safe_path or safe_path.suffix.lower() not in IMAGE_EXTS:
+        sp = safe_path(name, ASSETS_DIR)
+        if not sp or sp.suffix.lower() not in IMAGE_EXTS:
             return {"error": "unsupported extension"}, 400
         try:
-            raw = base64.b64decode(b64_data)
+            raw = base64.b64decode(b64)
             if len(raw) > MAX_UPLOAD_BYTES:
                 return {"error": "file too large"}, 400
             ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-            with open(safe_path, "wb") as fout:
-                fout.write(raw)
-            logger.info(f"Uploaded key asset: {safe_path.name}")
-            self._register_asset(key, safe_path.name)
-            return {"uploaded": safe_path.name}
+            sp.write_bytes(raw)
+            logger.info(f"Uploaded key asset: {sp.name}")
+            register_asset(self.config, key, sp.name, ASSETS_DIR)
+            return {"uploaded": sp.name}
         except Exception as e:
             return {"error": str(e)}, 500
 
@@ -1028,50 +347,41 @@ class GalgamePlugin(Star):
         filename = data.get("filename", "")
         if not filename:
             return {"error": "no filename"}, 400
-        safe_path = _safe_path(filename, ASSETS_DIR)
-        if not safe_path or not safe_path.exists() or not safe_path.is_file():
+        sp = safe_path(filename, ASSETS_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
-        safe_path.unlink()
-        logger.info(f"Deleted asset: {safe_path.name}")
-        return {"deleted": safe_path.name}
+        sp.unlink()
+        logger.info(f"Deleted asset: {sp.name}")
+        return {"deleted": sp.name}
 
     async def _api_assets_file(self):
         filename = request.args.get("name", "")
-        safe_path = _safe_path(filename, ASSETS_DIR)
-        if not safe_path or not safe_path.exists() or not safe_path.is_file():
+        sp = safe_path(filename, ASSETS_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                    ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
-        content_type = mime_map.get(safe_path.suffix.lower(), "application/octet-stream")
-        raw = safe_path.read_bytes()
-        return Response(raw, content_type=content_type)
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
 
     async def _api_assets_batch(self):
         data = await request.get_json() or {}
         names = data.get("names", [])
-        logger.info(f"[assets] batch requested: {names}")
         if not names:
             return {"error": "no names"}, 400
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                    ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
         result = []
         for name in names:
-            safe_path = _safe_path(name, ASSETS_DIR)
-            if not safe_path or not safe_path.exists() or not safe_path.is_file():
-                logger.warning(f"[assets] batch skip missing: {name}")
+            sp = safe_path(name, ASSETS_DIR)
+            if not sp or not sp.exists() or not sp.is_file():
                 continue
             try:
-                if safe_path.stat().st_size > MAX_UPLOAD_BYTES:
-                    logger.warning(f"[assets] batch skip oversize: {safe_path.name}")
+                if sp.stat().st_size > MAX_UPLOAD_BYTES:
                     continue
-                raw = safe_path.read_bytes()
+                raw = sp.read_bytes()
                 b64 = base64.b64encode(raw).decode()
-                mt = mime_map.get(safe_path.suffix.lower(), "image/png")
-                logger.info(f"[assets] batch encoded: {safe_path.name} size={len(raw)} b64_len={len(b64)}")
-                result.append({"name": safe_path.name, "data": f"data:{mt};base64,{b64}"})
+                mt = mime_map.get(sp.suffix.lower(), "image/png")
+                result.append({"name": sp.name, "data": f"data:{mt};base64,{b64}"})
             except Exception as e:
                 logger.warning(f"[assets] batch read failed {name}: {e}")
-        logger.info(f"[assets] batch return {len(result)} files")
         return {"files": result}
 
     async def _api_assets_copy(self):
@@ -1080,22 +390,21 @@ class GalgamePlugin(Star):
         dest_key = data.get("key", "").strip()
         if not source or not dest_key:
             return {"error": "source and key required"}, 400
-        src_path = _safe_path(source, ASSETS_DIR)
-        if not src_path or not src_path.is_file():
+        sp = safe_path(source, ASSETS_DIR)
+        if not sp or not sp.is_file():
             return {"error": "source not found"}, 404
-        ext = src_path.suffix.lower()
-        if ext not in IMAGE_EXTS:
+        if sp.suffix.lower() not in IMAGE_EXTS:
             return {"error": "unsupported extension"}, 400
-        dest_name = f"{dest_key}{ext}"
-        dst_path = _safe_path(dest_name, ASSETS_DIR)
-        if not dst_path or dst_path.suffix.lower() not in IMAGE_EXTS:
+        dest_name = f"{dest_key}{sp.suffix.lower()}"
+        dp = safe_path(dest_name, ASSETS_DIR)
+        if not dp or dp.suffix.lower() not in IMAGE_EXTS:
             return {"error": "invalid destination"}, 400
         try:
             ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_path, dst_path)
-            logger.info(f"Copied asset: {source} -> {dst_path.name}")
-            self._register_asset(dest_key, dst_path.name)
-            return {"copied": dst_path.name, "source": source}
+            shutil.copy2(sp, dp)
+            logger.info(f"Copied asset: {source} -> {dp.name}")
+            register_asset(self.config, dest_key, dp.name, ASSETS_DIR)
+            return {"copied": dp.name, "source": source}
         except OSError as e:
             return {"error": str(e)}, 500
 
@@ -1106,38 +415,160 @@ class GalgamePlugin(Star):
             return {"error": "no filenames"}, 400
         deleted = []
         for name in filenames:
-            safe = _safe_path(name, ASSETS_DIR)
-            if safe and safe.is_file():
-                safe.unlink()
+            sp = safe_path(name, ASSETS_DIR)
+            if sp and sp.is_file():
+                sp.unlink()
                 deleted.append(name)
         logger.info(f"Batch deleted {len(deleted)} assets")
         return {"deleted": deleted}
+
+    # ---- pipeline ----
+
+    async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> str:
+        t0 = time.time()
+        msg_id = str(uuid.uuid4())
+        wc_sid = f"webchat!{self._webchat_username}!{session_id}"
+        logger.info(f"[pipeline] start msg_id={msg_id[:8]} sid={session_id[:8]} text={text[:40]} audio={'yes' if audio_path else 'no'}")
+        back_queue = webchat_queue_mgr.get_or_create_back_queue(msg_id, wc_sid)
+        parts = []
+        if audio_path:
+            parts.append({"type": "record", "path": audio_path})
+        if text:
+            parts.append({"type": "plain", "text": text})
+        payload = {"message": parts, "message_id": msg_id, "selected_provider": None, "selected_model": None, "enable_streaming": False}
+        t1 = time.time()
+        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
+        await chat_queue.put((self._webchat_username, session_id, payload))
+        logger.info(f"[pipeline] pushed to chat_queue (setup={t1 - t0:.3f}s)")
+        collected = []
+        first = True
+        try:
+            while True:
+                result = await asyncio.wait_for(back_queue.get(), timeout=120)
+                if first:
+                    logger.info(f"[pipeline] first resp after {(time.time() - t1) * 1000:.0f}ms")
+                    first = False
+                mtype = result.get("type", "")
+                dtext = result.get("data", "")
+                if mtype == "end":
+                    break
+                elif mtype in ("plain", "complete"):
+                    if dtext and not dtext.lstrip().startswith("{"):
+                        collected.append(dtext)
+        except asyncio.TimeoutError:
+            logger.warning(f"[pipeline] TIMEOUT after 120s")
+        finally:
+            webchat_queue_mgr.remove_back_queue(msg_id)
+        result_text = "".join(collected).strip()
+        logger.info(f"[pipeline] returning text_len={len(result_text)}")
+        return result_text
+
+    async def _api_send(self):
+        data = await request.get_json() or {}
+        if not isinstance(data, dict) or not data:
+            return {"error": "no data"}, 400
+        sid = data.get("session_id", "")
+        text = data.get("text", "").strip()
+        audio_data = data.get("audio_data", "")
+        if not sid or sid not in self._sessions:
+            return {"error": "invalid session_id"}, 400
+        if not text and not audio_data:
+            return {"error": "empty text"}, 400
+
+        session = self._sessions[sid]
+        audio_path = ""
+        if audio_data:
+            try:
+                audio_path = self._save_audio(audio_data)
+            except Exception as e:
+                logger.warning(f"Failed to save audio: {e}")
+                if not text:
+                    return {"error": "语音处理失败，请重试"}, 500
+
+        cfg = self.context.get_config()
+        wake_prefixes = cfg.get("wake_prefix", ["/"])
+        matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
+        if matched_prefix:
+            cmd = text[len(matched_prefix):].strip().split()[0].lower() if text[len(matched_prefix):].strip() else ""
+            if cmd in ("reset", "new"):
+                async with session["_lock"]:
+                    session["history"] = []
+                    session["current_emotion"] = "neutral"
+                save_session(self._sessions, sid)
+
+        async with session["_lock"]:
+            rapid_count = session.pop("pending_rapid_clicks", 0)
+            conv_id = session.get("conv_id", "")
+
+        rapid_hint = ""
+        if rapid_count > 0:
+            rapid_hint = f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，可能心情烦躁或着急，请关心一下ta怎么了）"
+
+        pipeline_text = text + rapid_hint
+        try:
+            t_pipe = time.time()
+            raw_reply = await self._push_through_pipeline(pipeline_text, sid, audio_path)
+            logger.info(f"[perf] pipeline roundtrip: {time.time() - t_pipe:.2f}s")
+        except Exception as e:
+            logger.exception(f"[pipeline] push failed: {e}")
+            return {"error": "回复生成失败"}, 500
+
+        if not raw_reply and text.strip() and not matched_prefix:
+            ev = session.get("_resp_event", asyncio.Event())
+            ev.clear()
+            try:
+                await asyncio.wait_for(ev.wait(), timeout=120)
+            except asyncio.TimeoutError:
+                pass
+            raw_reply = session.pop("_last_resp_text", "") or raw_reply
+
+        raw_reply = raw_reply.replace("\\n", "\n")
+        emotion_tags = get_emotion_tags(self.config)
+        clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
+        final_emotion = emotions[-1][0] if emotions else "neutral"
+
+        async with session["_lock"]:
+            session["history"].append({"role": "user", "content": text})
+            session["history"].append({"role": "assistant", "content": clean_text})
+            session["current_emotion"] = final_emotion
+            if len(session["history"]) > 40:
+                session["history"] = session["history"][-40:]
+
+        save_session(self._sessions, sid)
+
+        character_name = self.config.get("character_name", "角色")
+        try:
+            await self.context.message_history_manager.insert(platform_id=PLATFORM_ID, user_id=conv_id, content={"type": "user", "message": text}, sender_id="user", sender_name="用户")
+        except Exception as e:
+            logger.warning(f"Failed to save user message to history: {e}")
+        try:
+            await self.context.message_history_manager.insert(platform_id=PLATFORM_ID, user_id=conv_id, content={"type": "bot", "message": clean_text}, sender_id="bot", sender_name=character_name)
+        except Exception as e:
+            logger.warning(f"Failed to save bot message to history: {e}")
+
+        try:
+            await sync_conv_to_db(self.context, session)
+        except Exception as e:
+            logger.warning(f"Failed to sync conversation to DB: {e}")
+
+        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions]}
 
     async def _api_rapid_action(self):
         data = await request.get_json()
         if not data:
             return {"error": "no data"}, 400
-
-        session_id = data.get("session_id", "")
+        sid = data.get("session_id", "")
         count = data.get("count", 0)
-
-        if session_id in self._sessions:
-            async with self._sessions[session_id]["_lock"]:
-                self._sessions[session_id]["pending_rapid_clicks"] = count
-
+        if sid in self._sessions:
+            async with self._sessions[sid]["_lock"]:
+                self._sessions[sid]["pending_rapid_clicks"] = count
         return {"status": "ok"}
 
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
         web_port = int(self.config.get("web_port", 0) or 0)
-        if web_port > 0:
-            url = f"http://localhost:{web_port}"
-        else:
-            url = "（未启用独立 WebUI，请在插件设置中设置 web_port）"
-        yield event.plain_result(
-            "AI Galgame 虚拟伙伴\n\n"
-            f"浏览器访问：{url}"
-        )
+        url = f"http://localhost:{web_port}" if web_port > 0 else "（未启用独立 WebUI，请在插件设置中设置 web_port）"
+        yield event.plain_result("AI Galgame 虚拟伙伴\n\n" f"浏览器访问：{url}")
 
     async def terminate(self):
         if self._web_server:
@@ -1146,7 +577,6 @@ class GalgamePlugin(Star):
             except Exception:
                 pass
             self._web_server = None
-
         for sid in list(self._sessions.keys()):
-            self._save_session(sid)
+            save_session(self._sessions, sid)
         self._sessions.clear()
