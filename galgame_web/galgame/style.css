@@ -35,7 +35,7 @@ html, body {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(255,200,160,0.10) 0%, rgba(30,20,40,0.35) 100%);
+  background: radial-gradient(ellipse at center, rgba(255,200,160,0.06) 0%, rgba(30,20,40,0.20) 100%);
   pointer-events: none;
 }
 
@@ -59,7 +59,7 @@ html, body {
   width: min(40vw, 500px);
   height: min(55vh, 700px);
   scale: var(--sprite-scale, 1);
-  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.25));
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.15));
 }
 
 #sprite-single.active {
@@ -90,7 +90,7 @@ html, body {
   width: min(40vw, 500px);
   height: min(55vh, 700px);
   scale: var(--sprite-scale, 1);
-  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.25));
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.15));
 }
 
 #sprite-container.active {
