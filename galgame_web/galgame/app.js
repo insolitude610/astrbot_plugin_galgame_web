@@ -71,6 +71,7 @@ function stopCanvasRender() {
   if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
   if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
   if (canvasFadeTimer) { clearTimeout(canvasFadeTimer); canvasFadeTimer = null; }
+  isBlinking = false;
 }
 
 function startCanvasRender(exprVal, blinkVal) {
@@ -87,7 +88,6 @@ function startCanvasRender(exprVal, blinkVal) {
     canvasOpenImg = img;
     loadBlinkVariant(blinkVal);
     waveRafId = requestAnimationFrame(renderFrame);
-    scheduleBlink();
   };
   img.onerror = function() {
     console.warn("Failed to load layered expression:", exprVal);
@@ -96,11 +96,13 @@ function startCanvasRender(exprVal, blinkVal) {
 }
 
 function loadBlinkVariant(blinkVal) {
-  if (!blinkVal) { canvasBlinkImg = null; return; }
+  canvasBlinkImg = null;
+  if (!blinkVal) return;
   var img = new Image();
   img.onload = function() {
     if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
       canvasBlinkImg = img;
+      if (!blinkSchedulerId) scheduleBlink();
     } else {
       console.warn("Blink image size mismatch for", blinkVal, "expected", canvasW + "x" + canvasH, "got", img.naturalWidth + "x" + img.naturalHeight);
       canvasBlinkImg = null;
@@ -133,6 +135,7 @@ function canvasSwitchExpression(emotion) {
     canvasFadeTimer = setTimeout(function() {
       canvasOpenImg = img;
       isBlinking = false;
+      if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
       loadBlinkVariant(blinkVal);
       canvasEl.style.opacity = "1";
       canvasFadeTimer = null;
