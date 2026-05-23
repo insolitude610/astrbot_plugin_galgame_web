@@ -38,9 +38,7 @@ function buildAnimConfig() {
     hairBack: { rot: [{f:0.18,a:1.8,ph:rnd()}, {f:0.33,a:0.6,ph:rnd()}, {f:0.055,a:0.8,ph:rnd()}] },
     head:     { rot: [{f:0.14,a:0.4,ph:rnd()}, {f:0.26,a:0.15,ph:rnd()}],
                 ty:  [{f:0.25,a:4,ph:rnd()}] },
-    hairFront:{ rot: [{f:0.22,a:1.2,ph:rnd()}, {f:0.38,a:0.5,ph:rnd()}, {f:0.07,a:0.9,ph:rnd()}] },
-    eyes:     { ty:  [{f:0.25,a:4,ph:rnd()}] },
-    mouth:    { ty:  [{f:0.25,a:4,ph:rnd()}] }
+    hairFront:{ rot: [{f:0.22,a:1.2,ph:rnd()}, {f:0.38,a:0.5,ph:rnd()}, {f:0.07,a:0.9,ph:rnd()}] }
   };
 }
 
@@ -82,15 +80,24 @@ function startAnimLoop() {
     }
 
     var map = { body: el.layerBody, hairBack: el.layerHairBack, head: el.layerHead,
-                hairFront: el.layerHairFront, eyes: el.layerEyes, mouth: el.layerMouth };
+                hairFront: el.layerHairFront };
     for (var k in animCfg) {
       var dl = map[k]; if (!dl) continue;
       var c = animCfg[k];
       var tx = pxLayers ? springX * (pxLayers[k]||0) : 0;
       var ty = (c._ty||0);
       var rot = (c._rot||0);
-      var sc = (k==='eyes') ? blinkScale : 1;
-      dl.style.transform = 'translateY('+ty.toFixed(2)+'px) translateX('+tx.toFixed(2)+'px) rotate('+rot.toFixed(3)+'deg) scaleY('+sc.toFixed(3)+')';
+      dl.style.transform = 'translateY('+ty.toFixed(2)+'px) translateX('+tx.toFixed(2)+'px) rotate('+rot.toFixed(3)+'deg)';
+    }
+
+    // eyes and mouth follow head's Y position, eyes also get blink scale
+    var headTy = animCfg.head._ty || 0;
+    var headTx = pxLayers ? springX * (pxLayers.head||0) : 0;
+    if (el.layerEyes) {
+      el.layerEyes.style.transform = 'translateY('+headTy.toFixed(2)+'px) translateX('+headTx.toFixed(2)+'px) scaleY('+blinkScale.toFixed(3)+')';
+    }
+    if (el.layerMouth) {
+      el.layerMouth.style.transform = 'translateY('+headTy.toFixed(2)+'px) translateX('+headTx.toFixed(2)+'px)';
     }
 
     animRafId = requestAnimationFrame(tick);
@@ -426,6 +433,7 @@ function applySprites() {
     }
     loadExpressionToLayer(currentEmotion);
     console.log("[anim] after load: head.src=" + (el.layerHead.src||"").slice(-30));
+    console.log("[anim] after switch: container.active=" + el.spriteContainer.classList.contains("active") + " single.active=" + el.spriteSingle.classList.contains("active"));
     if (!animRunning) { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
   } else {
     stopAnimLoop();
@@ -442,6 +450,7 @@ function loadExpressionToLayer(emotion) {
   console.log("[anim] assetUrl(" + exprVal + ")=" + src);
   if (!src) return;
   var img = new Image();
+  img.onerror = function() { console.log("[anim] layerHead image FAILED to load: " + src); };
   img.onload = function () {
     el.layerHead.src = src;
     el.layerHead.classList.remove("switching");
