@@ -48,6 +48,7 @@ function startAnimLoop() {
   if (animRunning) return;
   if (spriteMode !== "layered") return;
   if (!el.layerBody) return;
+  console.log("[anim] startAnimLoop called, mode=" + spriteMode + " body.el=" + !!el.layerBody + " head.el=" + !!el.layerHead);
   animRunning = true;
   animStartTime = performance.now();
   nextBlinkTime = 3 + Math.random() * 5;
@@ -55,6 +56,8 @@ function startAnimLoop() {
     if (!animRunning) return;
     var t = (ts - animStartTime) * 0.001;
     var fadeIn = Math.min(1, t / 1.5);
+
+    if (t < 1) console.log("[anim] tick t=" + t.toFixed(3) + " fadeIn=" + fadeIn.toFixed(3) + " body_ty=" + ((animCfg.body._ty||0)*fadeIn).toFixed(2));
 
     for (var k in animCfg) {
       var c = animCfg[k]; c._ty = 0; c._rot = 0;
@@ -402,6 +405,11 @@ function safeImg(el, src) {
 }
 
 function applySprites() {
+  console.log("[anim] applySprites called, spriteMode=" + spriteMode);
+  console.log("[anim] container.active=" + el.spriteContainer.classList.contains("active"));
+  console.log("[anim] single.active=" + el.spriteSingle.classList.contains("active"));
+  console.log("[anim] body.src=" + (layers.body||"<empty>") + " head.src=" + (expressions[currentEmotion]||expressions["neutral"]||"<empty>"));
+
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
@@ -417,6 +425,7 @@ function applySprites() {
       el.layerEyes.classList.add("visible");
     }
     loadExpressionToLayer(currentEmotion);
+    console.log("[anim] after load: head.src=" + (el.layerHead.src||"").slice(-30));
     if (!animRunning) { animCfg = buildAnimConfig(); startAnimLoop(); setupParallax(); }
   } else {
     stopAnimLoop();
