@@ -54,14 +54,15 @@ def resolve_assets(config: dict, files: list[str]) -> dict:
         background = find_asset_for("background", files) or find_asset_for("bg", files)
 
     expr_prefix = "single" if sprite_mode == "single" else "expr"
+    main_files = [f for f in files if "_blink" not in pathlib.Path(f).stem.lower()]
     expressions = {}
     raw_expr = config.get("expressions", {}) or {}
     for key in EXPRESSION_KEYS:
         val = raw_expr.get(key, "")
         if not val:
-            val = find_asset_for(key, files, expr_prefix)
+            val = find_asset_for(key, main_files, expr_prefix)
         elif sprite_mode == "layered":
-            auto = find_asset_for(key, files, "expr")
+            auto = find_asset_for(key, main_files, "expr")
             if auto:
                 val = auto
         expressions[key] = val
