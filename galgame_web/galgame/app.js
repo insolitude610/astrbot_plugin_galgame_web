@@ -15,53 +15,54 @@ var backgroundFile = "";
 var typewriterTimer = null;
 var isAudioPlaying = false;
 
-/* ---- canvas-based layered renderer ---- */
-var canvasEl = null;
-var canvasCtx = null;
-var canvasOpenImg = null;
-var canvasBlinkImg = null;
+/* ---- dual-canvas layered renderer ---- */
+var canvasA = null, canvasB = null;
+var ctxA = null, ctxB = null;
+var openImg = { a: null, b: null };
+var blinkImg = { a: null, b: null };
+var blinking = { a: false, b: false };
 var canvasTime = 0;
 var waveRafId = null;
-var isBlinking = false;
-var blinkSchedulerId = null;
-var canvasFadeTimer = null;
+var activeCanvas = "a";
 var canvasW = 0, canvasH = 0;
 var waveStep = 2;
 var currentExpr = "neutral";
 var expressionsBlink = {};
+var blinkSchedulerId = null;
 var activeFace = "a";
 
 function renderFrame() {
-  if (!canvasCtx || !canvasOpenImg) return;
-  var img = isBlinking && canvasBlinkImg ? canvasBlinkImg : canvasOpenImg;
+  if (spriteMode !== "layered") return;
+  var side = activeCanvas;
+  var ctx = side === "a" ? ctxA : ctxB;
+  var open = openImg[side];
+  var blink = blinkImg[side];
+  if (!ctx || !open) { waveRafId = requestAnimationFrame(renderFrame); return; }
+  var img = blinking[side] && blink ? blink : open;
   var w = canvasW, h = canvasH;
-  canvasCtx.clearRect(0, 0, w, h);
-
+  ctx.clearRect(0, 0, w, h);
   var hairLine = Math.floor(h * 0.3);
-
-  // body: static, no wave
-  canvasCtx.drawImage(img, 0, hairLine, w, h - hairLine, 0, hairLine, w, h - hairLine);
-
-  // hair: per-row sine displacement, quadratic decay toward roots
+  ctx.drawImage(img, 0, hairLine, w, h - hairLine, 0, hairLine, w, h - hairLine);
   for (var y = 0; y < hairLine; y += waveStep) {
     var fade = (hairLine - y) / hairLine;
     fade = fade * fade;
     var off = Math.sin(y * 0.04 + canvasTime) * 3 * fade;
-    canvasCtx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
+    ctx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
   }
-
   canvasTime += 0.05;
   waveRafId = requestAnimationFrame(renderFrame);
 }
 
 function scheduleBlink() {
-  if (spriteMode !== "layered" || !canvasBlinkImg) return;
+  if (spriteMode !== "layered") return;
+  var side = activeCanvas;
+  if (!blinkImg[side]) { blinkSchedulerId = null; return; }
   var delay = 3000 + Math.random() * 3000;
   blinkSchedulerId = setTimeout(function() {
     if (spriteMode !== "layered") return;
-    isBlinking = true;
+    blinking[activeCanvas] = true;
     setTimeout(function() {
-      isBlinking = false;
+      blinking[activeCanvas] = false;
       scheduleBlink();
     }, 130);
   }, delay);
@@ -70,79 +71,93 @@ function scheduleBlink() {
 function stopCanvasRender() {
   if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
   if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-  if (canvasFadeTimer) { clearTimeout(canvasFadeTimer); canvasFadeTimer = null; }
-  isBlinking = false;
+  blinking.a = false;
+  blinking.b = false;
 }
 
 function startCanvasRender(exprVal, blinkVal) {
-  if (!canvasEl) return;
-  canvasCtx = canvasEl.getContext("2d");
+  if (!canvasA) return;
+  activeCanvas = "a";
+  blinking.a = false; blinking.b = false;
+  openImg.a = null; openImg.b = null;
+  blinkImg.a = null; blinkImg.b = null;
+  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+
+  ctxA = canvasA.getContext("2d");
+  ctxB = canvasB.getContext("2d");
+  canvasA.classList.remove("hidden");
+  canvasB.classList.add("hidden");
+
   var img = new Image();
   img.onload = function() {
     canvasW = img.naturalWidth;
     canvasH = img.naturalHeight;
-    if (canvasW > 2000) waveStep = 3;
-    canvasEl.width = canvasW;
-    canvasEl.height = canvasH;
-    canvasEl.style.opacity = "1";
-    canvasOpenImg = img;
+    if (canvasW > 2000) waveStep = 3; else waveStep = 2;
+    canvasA.width = canvasW; canvasA.height = canvasH;
+    canvasB.width = canvasW; canvasB.height = canvasH;
+    openImg.a = img;
     loadBlinkVariant(blinkVal);
     waveRafId = requestAnimationFrame(renderFrame);
-  };
-  img.onerror = function() {
-    console.warn("Failed to load layered expression:", exprVal);
   };
   img.src = assetUrl(exprVal);
 }
 
 function loadBlinkVariant(blinkVal) {
-  canvasBlinkImg = null;
+  var side = activeCanvas;
+  blinkImg[side] = null;
   if (!blinkVal) return;
   var img = new Image();
   img.onload = function() {
     if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
-      canvasBlinkImg = img;
+      blinkImg[side] = img;
       if (!blinkSchedulerId) scheduleBlink();
     } else {
-      console.warn("Blink image size mismatch for", blinkVal, "expected", canvasW + "x" + canvasH, "got", img.naturalWidth + "x" + img.naturalHeight);
-      canvasBlinkImg = null;
+      console.warn("Blink image size mismatch for", blinkVal);
+      blinkImg[side] = null;
     }
   };
-  img.onerror = function() {
-    console.warn("Blink variant not found:", blinkVal);
-    canvasBlinkImg = null;
-  };
+  img.onerror = function() { blinkImg[side] = null; };
   img.src = assetUrl(blinkVal);
 }
 
 function canvasSwitchExpression(emotion) {
-  if (!canvasEl || !canvasCtx) return;
+  if (!canvasA || !ctxA) return;
+  var oldSide = activeCanvas;
+  var newSide = activeCanvas === "a" ? "b" : "a";
   var exprVal = expressions[emotion] || expressions["neutral"];
-  if (!exprVal) return;
   var blinkVal = expressionsBlink[emotion] || expressionsBlink["neutral"] || "";
 
   var img = new Image();
   img.onload = function() {
-    if (img.naturalWidth !== canvasW || img.naturalHeight !== canvasH) {
-      canvasW = img.naturalWidth;
-      canvasH = img.naturalHeight;
-      if (canvasW > 2000) waveStep = 3;
-      canvasEl.width = canvasW;
-      canvasEl.height = canvasH;
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    if (iw > 2000) waveStep = 3; else waveStep = 2;
+    if (iw !== canvasW || ih !== canvasH) {
+      canvasW = iw; canvasH = ih;
+      canvasA.width = iw; canvasA.height = ih;
+      canvasB.width = iw; canvasB.height = ih;
     }
-    canvasEl.style.opacity = "0";
-    if (canvasFadeTimer) clearTimeout(canvasFadeTimer);
-    canvasFadeTimer = setTimeout(function() {
-      canvasOpenImg = img;
-      isBlinking = false;
-      if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-      loadBlinkVariant(blinkVal);
-      canvasEl.style.opacity = "1";
-      canvasFadeTimer = null;
-    }, 300);
-  };
-  img.onerror = function() {
-    console.warn("Failed to load expression for canvas:", exprVal);
+    var newCtx = newSide === "a" ? ctxA : ctxB;
+    var hairLine = Math.floor(ih * 0.3);
+    newCtx.clearRect(0, 0, iw, ih);
+    newCtx.drawImage(img, 0, hairLine, iw, ih - hairLine, 0, hairLine, iw, ih - hairLine);
+    for (var y = 0; y < hairLine; y += waveStep) {
+      var fade = (hairLine - y) / hairLine;
+      fade = fade * fade;
+      var off = Math.sin(y * 0.04) * 3 * fade;
+      newCtx.drawImage(img, 0, y, iw, waveStep, off, y, iw, waveStep);
+    }
+    openImg[newSide] = img;
+
+    // crossfade
+    var oldEl = oldSide === "a" ? canvasA : canvasB;
+    var newEl = newSide === "a" ? canvasA : canvasB;
+    oldEl.classList.add("hidden");
+    newEl.classList.remove("hidden");
+    activeCanvas = newSide;
+
+    if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+    blinking[oldSide] = false;
+    loadBlinkVariant(blinkVal);
   };
   img.src = assetUrl(exprVal);
 }
@@ -232,7 +247,8 @@ async function toggleRecording() {
 var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
-  spriteCanvas: document.getElementById("sprite-canvas"),
+  canvasA: document.getElementById("sprite-canvas-a"),
+  canvasB: document.getElementById("sprite-canvas-b"),
   spriteSingle: document.getElementById("sprite-single"),
   spriteFaceA: document.getElementById("sprite-face-a"),
   spriteFaceB: document.getElementById("sprite-face-b"),
@@ -467,14 +483,15 @@ function applySprites() {
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    canvasEl = el.spriteCanvas;
+    canvasA = el.canvasA;
+    canvasB = el.canvasB;
     var exprVal = expressions[currentEmotion] || expressions["neutral"];
     var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
     currentExpr = currentEmotion;
     startCanvasRender(exprVal, blinkVal);
   } else {
     stopCanvasRender();
-    canvasEl = null;
+    canvasA = null; canvasB = null;
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     activeFace = "a";
