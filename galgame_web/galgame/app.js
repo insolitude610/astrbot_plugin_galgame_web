@@ -51,15 +51,18 @@ function startAnimLoop() {
   animRunning = true;
   animStartTime = performance.now();
   nextBlinkTime = 3 + Math.random() * 5;
-  (function tick(ts) {
+  function tick(ts) {
     if (!animRunning) return;
     var t = (ts - animStartTime) * 0.001;
+    var fadeIn = Math.min(1, t / 1.5);
 
     for (var k in animCfg) {
       var c = animCfg[k]; c._ty = 0; c._rot = 0;
       var o = c;
       if (o.ty)  for (var i=0;i<o.ty.length;i++)  c._ty  += Math.sin(t*o.ty[i].f*Math.PI*2+o.ty[i].ph)*o.ty[i].a;
       if (o.rot) for (var i=0;i<o.rot.length;i++) c._rot += Math.sin(t*o.rot[i].f*Math.PI*2+o.rot[i].ph)*o.rot[i].a;
+      c._ty *= fadeIn;
+      c._rot *= fadeIn;
     }
 
     if (pxLayers) {
@@ -88,7 +91,8 @@ function startAnimLoop() {
     }
 
     animRafId = requestAnimationFrame(tick);
-  })(animStartTime);
+  }
+  animRafId = requestAnimationFrame(tick);
 }
 
 function stopAnimLoop() {
