@@ -436,7 +436,10 @@ function applySprites() {
 }
 
 function loadExpressionToLayer(emotion) {
-  var src = assetUrl(expressions[emotion] || expressions["neutral"]);
+  var exprVal = expressions[emotion] || expressions["neutral"];
+  console.log("[anim] loadExprToLayer emotion=" + emotion + " exprVal=" + exprVal + " neutral=" + expressions["neutral"]);
+  var src = assetUrl(exprVal);
+  console.log("[anim] assetUrl(" + exprVal + ")=" + src);
   if (!src) return;
   var img = new Image();
   img.onload = function () {
