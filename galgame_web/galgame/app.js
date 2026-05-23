@@ -272,6 +272,24 @@ function assetUrl(filename) {
 
 /* ---- init ---- */
 
+function restoreLastMessage() {
+  if (!sessionId) return;
+  apiGet("history", { session_id: sessionId }).then(function(data) {
+    var msgs = data.messages || [];
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "assistant") {
+        el.dialogText.textContent = msgs[i].content;
+        var cursor = document.createElement("span");
+        cursor.className = "cursor";
+        el.dialogText.appendChild(cursor);
+        return;
+      }
+    }
+  }).catch(function(e) {
+    console.warn("restoreLastMessage failed:", e);
+  });
+}
+
 async function init() {
   try {
     var config = await apiGet("config");
@@ -284,6 +302,7 @@ async function init() {
   applyBackground();
 
   var savedId = localStorage.getItem("galgame_session_id") || "";
+  var isResuming = false;
   try {
     var resp = await apiPost("session/init", { resume_id: savedId });
     if (!resp || !resp.session_id) {
@@ -292,6 +311,12 @@ async function init() {
     } else {
       sessionId = resp.session_id;
       localStorage.setItem("galgame_session_id", sessionId);
+      if (resp.current_emotion) {
+        currentEmotion = resp.current_emotion;
+      }
+      if (savedId === resp.session_id) {
+        isResuming = true;
+      }
     }
   } catch (err) {
     console.error("Failed to init session:", err);
@@ -301,6 +326,9 @@ async function init() {
   setupInput();
   setupRapidDetection();
   applySprites();
+  if (isResuming) {
+    restoreLastMessage();
+  }
 }
 
 function applyConfig(cfg) {

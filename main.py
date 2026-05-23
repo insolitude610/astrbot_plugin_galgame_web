@@ -695,13 +695,20 @@ class GalgamePlugin(Star):
             resume_id = data.get("resume_id", "").strip()
 
             if resume_id and resume_id in self._sessions:
-                return {"session_id": resume_id}
+                session = self._sessions[resume_id]
+                return {
+                    "session_id": resume_id,
+                    "current_emotion": session.get("current_emotion", "neutral"),
+                }
 
             if resume_id:
                 session = self._load_session(resume_id)
                 if session:
                     self._sessions[resume_id] = session
-                    return {"session_id": resume_id}
+                    return {
+                        "session_id": resume_id,
+                        "current_emotion": session.get("current_emotion", "neutral"),
+                    }
 
             session_id = uuid.uuid4().hex
             session = {
