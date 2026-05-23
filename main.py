@@ -157,6 +157,10 @@ def _resolve_assets(config: dict, files: list[str]) -> dict:
         val = raw_expr.get(key, "")
         if not val:
             val = _find_asset_for(key, files, expr_prefix)
+        elif sprite_mode == "layered":
+            auto = _find_asset_for(key, files, "expr")
+            if auto:
+                val = auto
         expressions[key] = val
 
     layers = {}
