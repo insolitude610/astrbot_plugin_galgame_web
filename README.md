@@ -140,6 +140,13 @@ http://localhost:6186
 
 或从 [VRoid Hub](https://hub.vroid.com/) 直接下载数十万个免费模型。
 
+> **注意事项**：
+> - VRM 渲染需要浏览器支持 WebGL。绝大多数现代浏览器（Chrome/Edge/Firefox）均可正常使用
+> - VRoid Studio 导出的 .vrm 文件通常 10-50MB，首次加载需 2-10 秒。加载期间显示空白，请耐心等待
+> - `blush` 表情映射为 `relaxed`、`thinking` 映射为 `neutral`，因为标准 VRM 0.0 预设不包含这两个 blend shape
+> - 如果模型无法加载，检查浏览器控制台是否有 WebGL 相关错误，或尝试将模型重新导出为 VRM 0.0 格式
+> - 如遇到黑屏，确保 `sprite_mode` 配置为 `vrm` 且 `.vrm` 文件已成功上传到 `assets/` 目录
+
 ---
 
 ### 两种模式对照速查
@@ -147,7 +154,7 @@ http://localhost:6186
 | | Single 模式 | VRM 模式 |
 |----|-----------|------------|
 | 素材 | 每情绪 1 张 PNG | 1 个 .vrm 文件 |
-| 渲染 | CSS + Canvas 2D | Three.js WebGL |
+| 渲染 | CSS DOM 双图交叉渐变 | Three.js WebGL |
 | 表情切换 | 双 img 交叉渐变 0.6s | VRM blend shape 切换 |
 | 眨眼 | 无 | 原生 autoBlink |
 | 视线跟踪 | 无 | 眼睛跟随鼠标 |
@@ -204,17 +211,17 @@ http://localhost:6186
 
 上传到 `assets/` 后，按文件名**子串匹配**自动关联到对应配置项：
 
-| 配置项 | 推荐文件名（Single） | 推荐文件名（Layered） | 匹配关键字 |
-|--------|-------------------|---------------------|----------|
-| 表情 neutral | `single_neutral.png` | `expr_neutral.png` | `neutral` |
-| 表情 happy | `single_happy.png` | `expr_happy.png` | `happy` |
-| 表情 sad | `single_sad.png` | `expr_sad.png` | `sad` |
-| 表情 angry | `single_angry.png` | `expr_angry.png` | `angry` |
-| 表情 surprised | `single_surprised.png` | `expr_surprised.png` | `surprised` |
-| 表情 blush | `single_blush.png` | `expr_blush.png` | `blush` |
-| 表情 thinking | `single_thinking.png` | `expr_thinking.png` | `thinking` |
-| 背景 background | `bg_background.png` | `bg_background.png` | `background` 或 `bg` |
-| VRM 模型 | — | `model.vrm` | `.vrm` 文件 |
+| 配置项 | 推荐文件名 | 匹配关键字 |
+|--------|-----------|----------|
+| 表情 neutral | `single_neutral.png` | `neutral` |
+| 表情 happy | `single_happy.png` | `happy` |
+| 表情 sad | `single_sad.png` | `sad` |
+| 表情 angry | `single_angry.png` | `angry` |
+| 表情 surprised | `single_surprised.png` | `surprised` |
+| 表情 blush | `single_blush.png` | `blush` |
+| 表情 thinking | `single_thinking.png` | `thinking` |
+| 背景 background | `bg_background.png` | `background` 或 `bg` |
+| VRM 模型 | `model.vrm` | `.vrm` 文件 |
 
 ---
 
@@ -263,14 +270,6 @@ Facial expression: [表情描述].
 Same light-gray background, same 3:4 composition.
 ```
 
-**闭眼变体 prompt：**
-
-```
-Same character. Identical appearance and pose.
-Eyes gently closed, peaceful/blinking expression.
-Same background, same composition.
-```
-
 ---
 
 ## API 响应格式
@@ -296,7 +295,7 @@ Same background, same composition.
   └─ /api/* → 代理至 AstrBot Core (Quart :6185) → fetch 同步请求
 ```
 
-- 前端: 原生 HTML/CSS/JS，Canvas 2D 渲染，无框架依赖
+- 前端: 原生 HTML/CSS/JS；Single 模式 CSS DOM 渲染；VRM 模式 Three.js + three-vrm (CDN, ~800KB)
 - 后端: Python `http.server` + AstrBot Star API
 - 通信: `fetch()` 同步请求/响应，通过本地代理与 AstrBot Core 交互，JWT Bearer 认证
 - 管道: 所有对话经 webchat 管道分发，接入记忆/感知/安全等全插件栈
@@ -308,11 +307,12 @@ Same background, same composition.
 - **VRM 3D 模式** — `sprite_mode` 新增 `vrm` 选项，使用 Three.js + three-vrm 渲染 3D 动漫角色
 - **原生动画** — VRM 自动眨眼、视线跟踪鼠标、表情 blend shape 切换、骨骼呼吸
 - **零成本建模** — 支持 VRoid Studio（免费）导出的 .vrm 模型，VRoid Hub 数十万免费模型
-- 删除 Canvas 分层立绘引擎（hair wave / blink image swap / CSS breathing）
-- 从配置中移除 `expressions_blink` 和旧 `layers` 结构
+- **前端依赖变更** — 新增 Three.js + three-vrm CDN 引入（~800KB，浏览器缓存后 0 开销）
+- **破坏性变更** — 删除整个 Canvas 分层立绘引擎；`sprite_mode` 从 `layered` 变为 `vrm`；`expressions_blink` 和旧 `layers` 配置结构移除
+- **迁移** — v0.4 用户升级后需将 `sprite_mode` 从 `layered` 改为 `vrm`，并准备 `.vrm` 模型文件替代原 PNG 表情
 - 新增 `vrm_model` 配置项 + `_api_config` 返回 VRM 文件路径
 - `_resolved_assets` 新增 .vrm 文件自动检测
-- Single 模式完全不变
+- Single 模式完全不变，无迁移成本
 
 ### v0.4.0
 
