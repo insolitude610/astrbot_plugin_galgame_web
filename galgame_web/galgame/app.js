@@ -44,8 +44,6 @@ function initPixiApp() {
     height: container.offsetHeight || 700,
     backgroundAlpha: 0,
     antialias: true,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
   });
   container.appendChild(pixiApp.view);
 }
