@@ -61,6 +61,12 @@
     "default": 7,
     "hint": "超过该天数的旧会话自动清理。设为 0 则永不清理"
   },
+  "vrm_model": {
+    "description": "VRM 3D模型文件",
+    "type": "string",
+    "default": "",
+    "hint": "assets/ 下的 .vrm 文件名。VRM模式使用。从VRoid Studio导出即可。留空自动匹配。"
+  },
   "sprite_scale": {
     "description": "立绘缩放比例",
     "type": "float",
@@ -82,9 +88,9 @@
   "sprite_mode": {
     "description": "立绘渲染模式",
     "type": "string",
-    "options": ["single", "layered"],
+    "options": ["single", "vrm"],
     "default": "single",
-    "hint": "single=单张立绘+表情差分；layered=多层PNG各自独立动画"
+    "hint": "single=双图交叉渐变表情切换；vrm=加载3D VRM模型"
   },
   "expressions": {
     "description": "表情立绘路径",
@@ -109,9 +115,9 @@
     "hint": "JSON对象格式，用于添加额外情绪。例: {\"dokidoki\": \"\", \"cry\": \"cry.png\"}。key为情绪标签名，value为assets/下的文件名。会与上方expressions合并。"
   },
   "layers": {
-    "description": "Canvas 动态立绘 — layered 模式下使用单张全身立绘逐行正弦形变",
+    "description": "VRM 3D模型配置",
     "type": "object",
-    "hint": "layered 模式已升级为 Canvas 单图渲染：每个表情一张正常图(expr_xxx.png) + 可选一张闭眼图(expr_xxx_blink.png)。此处留空即可，插件根据 expressions 配置自动检测对应文件。",
+    "hint": "VRM模型文件在上方 vrm_model 字段配置。此处保留为空（兼容旧版配置结构）。",
     "items": {}
   }
 }

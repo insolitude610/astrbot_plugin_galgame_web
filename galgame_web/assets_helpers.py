@@ -74,6 +74,14 @@ def resolve_assets(config: dict, files: list[str]) -> dict:
             if blink_val:
                 expressions_blink[key] = blink_val
 
+    vrm_model = config.get("vrm_model", "")
+    if not vrm_model and sprite_mode == "vrm":
+        vrm_model = find_asset_for("model", files) or find_asset_for("vrm", files)
+        for fname in files:
+            if fname.lower().endswith(".vrm"):
+                vrm_model = fname
+                break
+
     layers = {}
     if sprite_mode == "layered":
         layers = {
@@ -92,6 +100,7 @@ def resolve_assets(config: dict, files: list[str]) -> dict:
         "expressions": expressions,
         "expressions_blink": expressions_blink,
         "layers": layers,
+        "vrm_model": vrm_model,
     }
 
 

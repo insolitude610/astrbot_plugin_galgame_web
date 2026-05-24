@@ -2,32 +2,31 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持 Canvas 逐行正弦形变动态立绘、AI 驱动情绪表情切换、TTS 语音朗读、快速点击检测等交互特性。
+一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持 3D VRM 模型渲染、双图交叉渐变表情切换、TTS 语音朗读、快速点击检测等交互特性。
 
 ## 功能亮点
 
-- **Canvas 单图动态立绘** —— 一张全身立绘即可实现头发飘动 + 眨眼 + 呼吸，零穿帮
-- **逐行正弦形变** —— Canvas 2D 对单张图逐像素行施加正弦偏移，模拟微风吹拂发丝
-- **眨眼系统** —— 每情绪可配 `_blink` 闭眼变体图，随机 3~6 秒眨眼一次，真正换图而非压扁
-- **情绪实时切换** —— AI 回复中标记 `{emotion_happy}` 等标签，立绘表情 Canvas fade 过渡
+- **3D VRM 模型支持** —— 上传 `.vrm` 模型（VRoid Studio 免费导出），Three.js 渲染真实 3D 角色
+- **AI 驱动表情切换** —— VRM 内置 blend shapes，支持 neutral/happy/sad/angry/surprised/blush/thinking
+- **自动眨眼 + 视线跟踪** —— VRM 原生 `autoBlink` + `lookAt`，眼睛跟随鼠标
+- **情绪实时切换** —— AI 回复中标记 `{emotion_happy}` 等标签，立绘表情实时切换
 - **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
 - **TTS 语音朗读** —— 接入 AstrBot 内置或第三方 TTS Provider（Edge/OpenAI/Azure/DashScope 等），受限于同步 API 架构暂不可用
 - **打字机效果** —— 回复文字逐字显示
 - **快速点击检测** —— 用户频繁点击鼠标/键盘时 AI 主动关心
-- **双层渲染模式** —— `single` 单张立绘静态切换 或 `layered` Canvas 动态形变
+- **双渲染模式** —— `single` 双图交叉渐变 或 `vrm` 3D 模型渲染
 - **对话历史面板** —— 内建聊天记录查看，气泡式展示，背景色自适应
 - **语音输入** —— 浏览器麦克风录音，经 AstrBot STT 管道自动转文字
 - **AstrBot 指令全兼容** —— `/reset /new` 等所有已注册指令通过管道分发
 - **立绘位置可调** —— `sprite_bottom` / `sprite_left` / `sprite_scale` 配置项
 - **批量删除** —— 立绘管理页多选文件一键删除
-- **纯 CSS / Canvas 动画** —— 呼吸（CSS squash & stretch）+ 头发飘动（Canvas）+ 对话框滑入
-- **同步请求/响应** —— `send` API 返回完整回复（文本 + 情绪），前端本地播打字机动画
 - **会话持久化** —— 对话历史自动存盘，重启后保留；localStorage 记录 session_id
-- **立绘管理页面** —— 浏览器内上传 / 预览 / 删除 PNG，自动匹配情绪文件
+- **立绘管理页面** —— 浏览器内上传 / 预览 / 删除素材，自动匹配文件
+- **同步请求/响应** —— `send` API 返回完整回复（文本 + 情绪），前端本地播打字机动画
 
 ## 快速开始
 
-> **推荐**：日常使用 `single` 模式最简单——每情绪一张全身 PNG 即可。`layered` 模式需要额外提供闭眼变体图（`_blink` 后缀），详见[渲染模式说明](#渲染模式与立绘说明)。
+> **推荐**：`single` 模式最稳定——每情绪一张全身 PNG 即可。`vrm` 模式需要 3D 模型文件（从 VRoid Studio 免费导出，或从 VRoid Hub 下载现成模型）。
 
 ### 安装
 
@@ -45,7 +44,8 @@
 | 角色人格 | 选择已在 AstrBot 配置好的 Persona | AstrBot 预设或自建 |
 | LLM Provider | 驱动对话的 AI 模型 | deepseek / gpt-4o |
 | TTS Provider | 语音合成（暂不可用） | 等待后续修复 |
-| 立绘渲染模式 | `single` 单图 或 `layered` Canvas 动态 | layered 效果更好 |
+| 立绘渲染模式 | `single` 双图交叉渐变 或 `vrm` 3D模型 | single 最稳定 |
+| VRM 模型文件 | `.vrm` 格式 3D 模型文件路径 | 留空自动匹配 assets/ 目录下 .vrm 文件 |
 | 立绘缩放比例 | 整体缩放倍数 | 默认 1.0，建议 0.5 ~ 2.0 |
 | 立绘底部位置 | vh 距离底部，越小越靠下 | 默认 28，建议 5 ~ 45 |
 | 立绘水平位置 | 水平锚点 % 位置 | 默认 50（居中） |
@@ -97,62 +97,63 @@ http://localhost:6186
 
 ---
 
-### Layered 模式（`sprite_mode: layered`）
+### VRM 模式（`sprite_mode: vrm`）
 
-**原理**：Canvas 2D 对**一张完整全身立绘**逐像素行施加正弦横向偏移，实现头发飘动 + CSS 挤压拉伸呼吸 + 闭眼图换图眨眼。不再使用多层 PNG 叠加。
+**原理**：上传一个 `.vrm` 3D 模型文件（从 VRoid Studio 免费导出），Three.js + three-vrm 在浏览器中实时渲染 3D 动漫角色。VRM 原生支持表情 blend shapes、自动眨眼、眼动追踪、骨骼呼吸等。
 
 **核心特性**：
 
 | 动画效果 | 实现方式 |
 |---------|---------|
-| 呼吸起伏 | CSS `@keyframes breathe-layered`（`scaleY(1.018)` + `scaleX(0.995)` + `translateY(-4px)`），`transform-origin: bottom center` |
-| 头发飘动 | Canvas 逐行正弦偏移：`offset = sin(y × 0.04 + time) × 4 × (h-y)/h`，发梢振幅最大、根部不动 |
-| 眨眼 | 定时换图：随机 3~6 秒闭眼 130ms，切到 `_blink` 变体后立即切回 |
-| 表情切换 | Canvas opacity fade out 300ms → 换源图 → fade in |
+| 自动眨眼 | VRM 原生 `autoBlink`，随机 2-5 秒眨眼一次 |
+| 视线跟踪 | `VRM.lookAt.target` 绑定鼠标位置，眼睛跟随光标 |
+| 表情切换 | VRM blend shapes：`expressionManager.setValue("happy", 1.0)` |
+| 呼吸起伏 | Three.js 骨骼默认微动 + DirectionalLight 立体光影 |
+| 3D 旋转 | 可拖拽改变视角，或固定正面朝向 |
 
-**需要上传的图片**：
+**需要上传的素材**：
 
-| 配置项 | 应上传的文件 | 说明 |
-|--------|------------|------|
-| `neutral` | 完整半身立绘（普通表情） | **必须** |
-| `neutral_blink` | 完整半身立绘（普通表情闭眼） | 可选，尺寸必须与 `neutral` 一致 |
-| `happy` | 完整半身立绘（开心表情） | |
-| `happy_blink` | 完整半身立绘（开心表情闭眼） | 可选 |
-| `sad` | 完整半身立绘（悲伤表情） | |
-| `sad_blink` | 完整半身立绘（悲伤表情闭眼） | 可选 |
-| `angry` | 完整半身立绘（生气表情） | |
-| `angry_blink` | 完整半身立绘（生气表情闭眼） | 可选 |
-| `surprised` | 完整半身立绘（惊讶表情） | |
-| `surprised_blink` | 完整半身立绘（惊讶表情闭眼） | 可选 |
-| `blush` | 完整半身立绘（害羞表情） | |
-| `blush_blink` | 完整半身立绘（害羞表情闭眼） | 可选 |
-| `thinking` | 完整半身立绘（思考表情） | |
-| `thinking_blink` | 完整半身立绘（思考表情闭眼） | 可选 |
+| 素材 | 格式 | 来源 | 说明 |
+|------|-----|------|------|
+| VRM 模型 | `.vrm` | VRoid Studio（免费） | 一个文件包含模型、骨骼、表情、纹理全部 |
+| 可选背景 | PNG/JPG | 任意 | 与 single 模式共用 |
 
-> **重要**：`_blink` 变体图必须与对应睁眼图**像素尺寸完全一致**、人物位置完全对齐。如果 `_blink` 图缺失或尺寸不匹配，该情绪将跳过眨眼功能，其余动画正常。
+**表情映射**：
 
-**素材量对比（v0.4 vs v0.3）**：
+| AI 标签 | VRM Blend Shape |
+|---------|----------------|
+| `neutral` | neutral |
+| `happy` | happy |
+| `sad` | sad |
+| `angry` | angry |
+| `surprised` | surprised |
+| `blush` | relaxed |
+| `thinking` | neutral |
 
-| | v0.3 Layered | v0.4 Layered |
-|---|---|---|
-| 按情绪分 | body/head/mouth/hair × 8 张 + 表情 × 7 张 = 15 张 | 表情 × 7 张 + blink × (0~7) 张 = 7~14 张 |
-| 复杂度 | 需 PS 拆图层、对齐像素 | 一整张图即可，零拆图 |
-| 穿帮风险 | 各层独立动画，缝隙必露 | **零穿帮**，单图统一形变 |
+**获取 VRM 模型**：
+
+1. 下载 [VRoid Studio](https://vroid.com/en/studio)（免费）
+2. 捏脸 10 分钟
+3. 导出 `.vrm` 文件
+4. 上传到插件 assets/ 目录（立绘管理页面 → VRM 区）
+5. 设置 `sprite_mode` 为 `vrm`
+
+或从 [VRoid Hub](https://hub.vroid.com/) 直接下载数十万个免费模型。
 
 ---
 
 ### 两种模式对照速查
 
-| | Single 模式 | Layered 模式 |
+| | Single 模式 | VRM 模式 |
 |----|-----------|------------|
-| 表情图内容 | 完整半身立绘 | 完整半身立绘 |
-| 需要额外图层 | 不需要 | 不需要（单图渲染） |
-| 表情切换范围 | 全身替换 | Canvas 源图替换 |
-| 头发飘动 | 无 | 有（Canvas 逐行正弦形变） |
-| 眨眼 | 无 | 有（需上传 `_blink` 变体） |
-| 呼吸动画 | CSS translateY | CSS squash & stretch |
-| 实现难度 | 低（一张图一个表情） | 低（一张图 + 可选闭眼图） |
-| 穿帮风险 | 无 | **无**（单图统一形变） |
+| 素材 | 每情绪 1 张 PNG | 1 个 .vrm 文件 |
+| 渲染 | CSS + Canvas 2D | Three.js WebGL |
+| 表情切换 | 双 img 交叉渐变 0.6s | VRM blend shape 切换 |
+| 眨眼 | 无 | 原生 autoBlink |
+| 视线跟踪 | 无 | 眼睛跟随鼠标 |
+| 呼吸 | CSS translateY | 骨骼微动 |
+| 制作成本 | AI 生图 | VRoid Studio 免费捏脸 |
+| 素材来源 | Stable Diffusion 等 | VRoid Hub（数十万免费模型） |
 
 ---
 
@@ -212,14 +213,8 @@ http://localhost:6186
 | 表情 surprised | `single_surprised.png` | `expr_surprised.png` | `surprised` |
 | 表情 blush | `single_blush.png` | `expr_blush.png` | `blush` |
 | 表情 thinking | `single_thinking.png` | `expr_thinking.png` | `thinking` |
-| 闭眼变体 neutral | — | `expr_neutral_blink.png` | `neutral_blink` |
-| 闭眼变体 happy | — | `expr_happy_blink.png` | `happy_blink` |
-| 闭眼变体 sad | — | `expr_sad_blink.png` | `sad_blink` |
-| 闭眼变体 angry | — | `expr_angry_blink.png` | `angry_blink` |
-| 闭眼变体 surprised | — | `expr_surprised_blink.png` | `surprised_blink` |
-| 闭眼变体 blush | — | `expr_blush_blink.png` | `blush_blink` |
-| 闭眼变体 thinking | — | `expr_thinking_blink.png` | `thinking_blink` |
 | 背景 background | `bg_background.png` | `bg_background.png` | `background` 或 `bg` |
+| VRM 模型 | — | `model.vrm` | `.vrm` 文件 |
 
 ---
 
@@ -307,6 +302,17 @@ Same background, same composition.
 - 管道: 所有对话经 webchat 管道分发，接入记忆/感知/安全等全插件栈
 
 ## 变更记录
+
+### v0.5.0
+
+- **VRM 3D 模式** — `sprite_mode` 新增 `vrm` 选项，使用 Three.js + three-vrm 渲染 3D 动漫角色
+- **原生动画** — VRM 自动眨眼、视线跟踪鼠标、表情 blend shape 切换、骨骼呼吸
+- **零成本建模** — 支持 VRoid Studio（免费）导出的 .vrm 模型，VRoid Hub 数十万免费模型
+- 删除 Canvas 分层立绘引擎（hair wave / blink image swap / CSS breathing）
+- 从配置中移除 `expressions_blink` 和旧 `layers` 结构
+- 新增 `vrm_model` 配置项 + `_api_config` 返回 VRM 文件路径
+- `_resolved_assets` 新增 .vrm 文件自动检测
+- Single 模式完全不变
 
 ### v0.4.0
 

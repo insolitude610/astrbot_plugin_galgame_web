@@ -13,8 +13,7 @@
 
     <div id="sprite-area">
       <div id="sprite-container">
-        <canvas id="sprite-canvas-a" class="sprite-canvas-face"></canvas>
-        <canvas id="sprite-canvas-b" class="sprite-canvas-face hidden"></canvas>
+        <div id="vrm-container"></div>
       </div>
       <div id="sprite-single">
         <img id="sprite-face-a" class="sprite-face" src="" />
@@ -77,6 +76,15 @@
 
   <audio id="tts-audio" preload="auto"></audio>
 
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.0.8/lib/three-vrm.module.js"
+    }
+  }
+  </script>
   <script src="./app.js"></script>
 </body>
 </html>

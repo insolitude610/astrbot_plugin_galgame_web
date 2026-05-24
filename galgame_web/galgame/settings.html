@@ -213,12 +213,13 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   <div class="slot-grid" id="slots-single"></div>
 </div>
 
-<!-- Layered mode section -->
+<!-- VRM mode section -->
 <div class="section" id="section-layered">
-  <h2>Layered 模式素材 — Canvas 单图动态立绘</h2>
-  <div class="hint">Layered 模式已升级为 <strong>Canvas 逐行正弦形变</strong>渲染。每种情绪只需 <strong>一张全身立绘</strong>（expr_xxx.png）+ <strong>可选闭眼变体</strong>（expr_xxx_blink.png，尺寸必须与睁眼图完全一致）。无图层拼接，永不穿帮。</div>
-  <div class="sub-section-title">表情立绘 + 闭眼变体</div>
-  <div class="slot-grid" id="slots-layered-expr"></div>
+  <h2>VRM 模式素材 — 3D 角色模型</h2>
+  <div class="hint">上传一个从 <strong>VRoid Studio</strong> 免费导出的 <strong>.vrm 模型文件</strong>即可。VRM模型原生支持 3D 旋转、自动眨眼、眼睛跟随鼠标、表情切换、呼吸动画等。不需要PNG图层。</div>
+  <div class="sub-section-title">VRM 模型文件</div>
+  <div class="slot-grid" id="slots-vrm"></div>
+</div>
 </div>
 
 <!-- Background section -->
@@ -384,15 +385,16 @@ function getMatchedFile(key, prefix) {
 function renderAll() {
   renderModeIndicator();
   renderSingleSlots();
-  renderLayeredExprSlots();
+  renderVRMSlot();
   renderBgSlot();
   renderFileGrid();
 }
 
 function renderModeIndicator() {
   var mode = config.sprite_mode || "single";
+  var labels = { single: "Single 单图", vrm: "VRM 3D" };
   var el = document.getElementById("mode-indicator");
-  el.innerHTML = '当前渲染模式：<span class="mode-badge ' + mode + '">' + (mode === "layered" ? "Layered 多层" : "Single 单图") + '</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>';
+  el.innerHTML = '当前渲染模式：<span class="mode-badge ' + mode + '">' + (labels[mode] || "Single 单图") + '</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>';
 }
 
 function renderSingleSlots() {
@@ -407,17 +409,13 @@ function renderSingleSlots() {
   }
 }
 
-function renderLayeredExprSlots() {
+function renderVRMSlot() {
   var section = document.getElementById("section-layered");
-  var grid = document.getElementById("slots-layered-expr");
+  var grid = document.getElementById("slots-vrm");
   var mode = config.sprite_mode || "single";
-  section.className = "section " + (mode === "layered" ? "active" : "inactive");
+  section.className = "section " + (mode === "vrm" ? "active" : "inactive");
   grid.innerHTML = "";
-  var keys = getEmotionKeys();
-  for (var i = 0; i < keys.length; i++) {
-    grid.appendChild(slotCard(keys[i], getMatchedFile(keys[i], "expr"), keys[i] + " (表情)", "expr"));
-    grid.appendChild(slotCard(keys[i] + "_blink", getMatchedFile(keys[i] + "_blink", "expr"), keys[i] + " (闭眼)", "expr"));
-  }
+  grid.appendChild(slotCard("vrm_model", getMatchedFile("model", "vrm") || getMatchedFile("vrm", "vrm"), "VRM 3D模型 (.vrm)", "vrm"));
 }
 
 function renderBgSlot() {

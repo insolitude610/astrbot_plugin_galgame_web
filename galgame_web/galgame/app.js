@@ -15,149 +15,29 @@ var backgroundFile = "";
 var typewriterTimer = null;
 var isAudioPlaying = false;
 
-/* ---- dual-canvas layered renderer ---- */
-var canvasA = null, canvasB = null;
-var ctxA = null, ctxB = null;
-var openImg = { a: null, b: null };
-var blinkImg = { a: null, b: null };
-var blinking = { a: false, b: false };
-var canvasTime = 0;
-var waveRafId = null;
-var activeCanvas = "a";
-var canvasW = 0, canvasH = 0;
-var waveStep = 2;
-var currentExpr = "neutral";
+/* ---- VRM 3D renderer ---- */
+var vrmModule = null;
+var vrmStarted = false;
+var vrmModelPath = "";
 var expressionsBlink = {};
-var blinkSchedulerId = null;
-var activeFace = "a";
+var currentExpr = "neutral";
 
-function renderFrame() {
-  if (spriteMode !== "layered") return;
-  var side = activeCanvas;
-  var ctx = side === "a" ? ctxA : ctxB;
-  var open = openImg[side];
-  var blink = blinkImg[side];
-  if (!ctx || !open) { waveRafId = requestAnimationFrame(renderFrame); return; }
-  var img = blinking[side] && blink ? blink : open;
-  var w = canvasW, h = canvasH;
-  ctx.clearRect(0, 0, w, h);
-  var hairLine = Math.floor(h * 0.3);
-  ctx.drawImage(img, 0, hairLine, w, h - hairLine, 0, hairLine, w, h - hairLine);
-  for (var y = 0; y < hairLine; y += waveStep) {
-    var fade = (hairLine - y) / hairLine;
-    var off = Math.sin(y * 0.03 + canvasTime) * 15 * fade;
-    ctx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
-  }
-  canvasTime += 0.04;
-  waveRafId = requestAnimationFrame(renderFrame);
+function startVRMRender() {
+  var container = document.getElementById("vrm-container");
+  if (!container || !vrmModule) return;
+  vrmStarted = true;
+  vrmModule.startVRM(container, vrmModelPath).then(function() {
+    if (currentEmotion !== "neutral") vrmModule.setVRMExpression(currentEmotion);
+  });
 }
 
-function scheduleBlink() {
-  if (spriteMode !== "layered") return;
-  var side = activeCanvas;
-  if (!blinkImg[side]) { blinkSchedulerId = null; return; }
-  var delay = 3000 + Math.random() * 3000;
-  blinkSchedulerId = setTimeout(function() {
-    if (spriteMode !== "layered") return;
-    blinking[activeCanvas] = true;
-    setTimeout(function() {
-      blinking[activeCanvas] = false;
-      scheduleBlink();
-    }, 130);
-  }, delay);
+function stopVRMRender() {
+  vrmStarted = false;
+  if (vrmModule) vrmModule.stopVRM();
 }
 
-function stopCanvasRender() {
-  if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
-  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-  blinking.a = false;
-  blinking.b = false;
-}
-
-function startCanvasRender(exprVal, blinkVal) {
-  if (!canvasA) return;
-  activeCanvas = "a";
-  blinking.a = false; blinking.b = false;
-  openImg.a = null; openImg.b = null;
-  blinkImg.a = null; blinkImg.b = null;
-  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-
-  ctxA = canvasA.getContext("2d");
-  ctxB = canvasB.getContext("2d");
-  canvasA.classList.remove("hidden");
-  canvasB.classList.add("hidden");
-
-  var img = new Image();
-  img.onload = function() {
-    canvasW = img.naturalWidth;
-    canvasH = img.naturalHeight;
-    if (canvasW > 2000) waveStep = 3;
-    canvasA.width = canvasW; canvasA.height = canvasH;
-    canvasB.width = canvasW; canvasB.height = canvasH;
-    openImg.a = img;
-    loadBlinkVariant(blinkVal);
-    waveRafId = requestAnimationFrame(renderFrame);
-  };
-  img.src = assetUrl(exprVal);
-}
-
-function loadBlinkVariant(blinkVal) {
-  var side = activeCanvas;
-  blinkImg[side] = null;
-  if (!blinkVal) return;
-  var img = new Image();
-  img.onload = function() {
-    if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
-      blinkImg[side] = img;
-      if (!blinkSchedulerId) scheduleBlink();
-    } else {
-      console.warn("Blink image size mismatch for", blinkVal);
-      blinkImg[side] = null;
-    }
-  };
-  img.onerror = function() { blinkImg[side] = null; };
-  img.src = assetUrl(blinkVal);
-}
-
-function canvasSwitchExpression(emotion) {
-  if (!canvasA || !ctxA) return;
-  var oldSide = activeCanvas;
-  var newSide = activeCanvas === "a" ? "b" : "a";
-  var exprVal = expressions[emotion] || expressions["neutral"];
-  var blinkVal = expressionsBlink[emotion] || expressionsBlink["neutral"] || "";
-
-  var img = new Image();
-  img.onload = function() {
-    var iw = img.naturalWidth, ih = img.naturalHeight;
-    if (iw > 2000) waveStep = 3; else waveStep = 2;
-    if (iw !== canvasW || ih !== canvasH) {
-      canvasW = iw; canvasH = ih;
-      canvasA.width = iw; canvasA.height = ih;
-      canvasB.width = iw; canvasB.height = ih;
-    }
-    var newCtx = newSide === "a" ? ctxA : ctxB;
-    var hairLine = Math.floor(ih * 0.3);
-    newCtx.clearRect(0, 0, iw, ih);
-    newCtx.drawImage(img, 0, hairLine, iw, ih - hairLine, 0, hairLine, iw, ih - hairLine);
-    for (var y = 0; y < hairLine; y += waveStep) {
-      var fade = (hairLine - y) / hairLine;
-      var off = Math.sin(y * 0.03) * 15 * fade;
-      newCtx.drawImage(img, 0, y, iw, waveStep, off, y, iw, waveStep);
-    }
-    openImg[newSide] = img;
-
-    // crossfade
-    var oldEl = oldSide === "a" ? canvasA : canvasB;
-    var newEl = newSide === "a" ? canvasA : canvasB;
-    oldEl.classList.add("hidden");
-    newEl.classList.remove("hidden");
-    activeCanvas = newSide;
-
-    if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-    blinking[oldSide] = false;
-    loadBlinkVariant(blinkVal);
-  };
-  img.src = assetUrl(exprVal);
+function vrmSwitchExpression(emotion) {
+  if (vrmModule && vrmStarted) vrmModule.setVRMExpression(emotion);
 }
 
 /* ---- voice recording ---- */
@@ -245,8 +125,7 @@ async function toggleRecording() {
 var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
-  canvasA: document.getElementById("sprite-canvas-a"),
-  canvasB: document.getElementById("sprite-canvas-b"),
+  vrmContainer: document.getElementById("vrm-container"),
   spriteSingle: document.getElementById("sprite-single"),
   spriteFaceA: document.getElementById("sprite-face-a"),
   spriteFaceB: document.getElementById("sprite-face-b"),
@@ -345,6 +224,9 @@ async function init() {
   setupInput();
   setupRapidDetection();
   applySprites();
+  if (spriteMode === "vrm") {
+    import("./vrm.js").then(function(m) { vrmModule = m; startVRMRender(); });
+  }
   if (isResuming) {
     restoreLastMessage();
   }
@@ -358,6 +240,8 @@ function applyConfig(cfg) {
   expressions = cfg.expressions || {};
   expressionsBlink = cfg.expressions_blink || {};
   layers = cfg.layers || {};
+  vrmModelPath = cfg.vrm_model || "";
+  if (!vrmModelPath) vrmModelPath = "./assets/model.vrm";
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
   el.characterName.textContent = characterName;
@@ -478,18 +362,12 @@ function safeImg(el, src) {
 }
 
 function applySprites() {
-  if (spriteMode === "layered") {
+  if (spriteMode === "vrm") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    canvasA = el.canvasA;
-    canvasB = el.canvasB;
-    var exprVal = expressions[currentEmotion] || expressions["neutral"];
-    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
-    currentExpr = currentEmotion;
-    startCanvasRender(exprVal, blinkVal);
+    if (!vrmStarted) startVRMRender();
   } else {
-    stopCanvasRender();
-    canvasA = null; canvasB = null;
+    stopVRMRender();
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     activeFace = "a";
@@ -519,8 +397,8 @@ function loadExpressionToSingle(emotion) {
 function switchExpression(emotion) {
   if (!emotion || emotion === currentEmotion) return;
   currentEmotion = emotion;
-  if (spriteMode === "layered") {
-    canvasSwitchExpression(emotion);
+  if (spriteMode === "vrm") {
+    vrmSwitchExpression(emotion);
   } else {
     loadExpressionToSingle(emotion);
   }
@@ -757,15 +635,13 @@ async function notifyRapidAction(count) {
 init();
 
 window.addEventListener("beforeunload", function () {
-  stopCanvasRender();
+  stopVRMRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
 });
 
 document.addEventListener("visibilitychange", function () {
-  if (document.hidden) stopCanvasRender();
-  else if (spriteMode === "layered" && !waveRafId) {
-    var exprVal = expressions[currentEmotion] || expressions["neutral"];
-    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
-    startCanvasRender(exprVal, blinkVal);
+  if (document.hidden) stopVRMRender();
+  else if (spriteMode === "vrm" && !vrmStarted) {
+    startVRMRender();
   }
 });

@@ -262,6 +262,7 @@ class GalgamePlugin(Star):
             "expressions_blink": resolved.get("expressions_blink", {}),
             "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
+            "vrm_model": self.config.get("vrm_model", "") or resolved.get("vrm_model", ""),
             "character_name": self.config.get("character_name", ""),
             "background": resolved["background"],
             "sprite_scale": self.config.get("sprite_scale", 1.0),

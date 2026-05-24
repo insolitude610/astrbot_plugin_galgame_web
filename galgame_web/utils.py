@@ -28,6 +28,16 @@ DEFAULT_GALGAME_PROMPT = (
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
 
+VRM_EMOTION_MAP = {
+    "neutral": "neutral",
+    "happy": "happy",
+    "sad": "sad",
+    "angry": "angry",
+    "surprised": "surprised",
+    "blush": "relaxed",
+    "thinking": "neutral",
+}
+
 
 def get_emotion_tags(config: dict) -> list[str]:
     expressions = config.get("expressions", {})
