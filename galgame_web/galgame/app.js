@@ -51,6 +51,11 @@ function initPixiApp() {
 }
 
 function positionPlane(plane) {
+  var fitScale = Math.min(
+    pixiApp.screen.width / plane.texture.width,
+    pixiApp.screen.height / plane.texture.height
+  );
+  plane.scale.set(fitScale);
   plane.x = pixiApp.screen.width / 2;
   plane.y = pixiApp.screen.height;
   plane.pivot.set(plane.texture.width / 2, plane.texture.height);
