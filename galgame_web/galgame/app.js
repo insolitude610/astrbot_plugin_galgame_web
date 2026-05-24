@@ -23,7 +23,7 @@ var basePosA = null, basePosB = null;
 var activeMesh = "a";
 var crossfading = false;
 var meshW = 0, meshH = 0;
-var cols = 8, rows = 12;
+var cols = 10, rows = 16;
 var animTime = 0;
 var blinkPhase = 0;
 var blinkSide = "a";
@@ -44,6 +44,8 @@ function initPixiApp() {
     height: container.offsetHeight || 700,
     backgroundAlpha: 0,
     antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
   });
   container.appendChild(pixiApp.view);
 }
@@ -106,21 +108,21 @@ function animateMeshVertices(plane, base, time, blinkClosed) {
       var by = base[idx + 1];
 
       // breathing: chest expansion (Y=up, X=slight ribcage)
-      var chest = Math.sin(time * 1.4) * (1 - Math.abs(yNorm - 0.35) * 1.5);
+      var chest = Math.sin(time * 1.0) * (1 - Math.abs(yNorm - 0.35) * 1.5);
       chest = Math.max(0, chest);
-      var breathY = chest * halfH * 0.02 * yFromFeet;
-      var breathX = chest * halfW * 0.008 * yFromFeet;
+      var breathY = chest * halfH * 0.04 * yFromFeet;
+      var breathX = chest * halfW * 0.02 * yFromFeet;
 
       // hair sway: top 30% rows, quadratic fade
       var hairOff = 0;
       if (r < hairRows) {
         var hairFade = (hairRows - r) / hairRows;
         hairFade = hairFade * hairFade;
-        hairOff = Math.sin(time * 2.5 + c * 0.6) * halfW * 0.025 * hairFade;
+        hairOff = Math.sin(time * 2.5 + c * 0.6) * halfW * 0.05 * hairFade;
       }
 
       // head tilt: slight rotation-like X offset
-      var tilt = Math.sin(time * 0.8 + 1.5) * halfW * 0.012 * headFactor;
+      var tilt = Math.sin(time * 0.8 + 1.5) * halfW * 0.025 * headFactor;
 
       // blink: compress eye region Y
       var blinkCompress = 1;
