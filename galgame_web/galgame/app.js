@@ -40,24 +40,14 @@ function initPixiApp() {
   container.innerHTML = "";
   if (pixiApp) { pixiApp.destroy(true); pixiApp = null; }
   pixiApp = new PIXI.Application({
+    width: container.offsetWidth || 500,
+    height: container.offsetHeight || 700,
     backgroundAlpha: 0,
-    resizeTo: container,
     antialias: true,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
   });
   container.appendChild(pixiApp.view);
-}
-
-function createPlane(texture, side) {
-  var plane = new PIXI.SimplePlane(texture, cols, rows);
-  plane.alpha = 0;
-  pixiApp.stage.addChild(plane);
-  var buffer = plane.geometry.getBuffer("aVertexPosition");
-  var base = new Float32Array(buffer.data);
-  if (side === "a") { meshA = plane; basePosA = base; }
-  else { meshB = plane; basePosB = base; }
-  return plane;
 }
 
 function positionPlane(plane) {
@@ -178,16 +168,23 @@ function startMeshRender(exprVal) {
   crossfading = false;
 
   var texture = PIXI.Texture.from(assetUrl(exprVal));
-  meshA = new PIXI.SimplePlane(texture, cols, rows);
-  meshA.alpha = 1;
-  pixiApp.stage.addChild(meshA);
-  positionPlane(meshA);
-  var buffer = meshA.geometry.getBuffer("aVertexPosition");
-  basePosA = new Float32Array(buffer.data);
-  meshW = texture.width; meshH = texture.height;
+  if (texture.baseTexture.valid) {
+    _buildMesh(texture);
+  } else {
+    texture.baseTexture.once("loaded", function() { _buildMesh(texture); });
+  }
 
-  pixiApp.ticker.add(animateMeshes);
-  if (!blinkSchedulerId) scheduleBlink();
+  function _buildMesh(tex) {
+    meshW = tex.width; meshH = tex.height;
+    meshA = new PIXI.SimplePlane(tex, cols, rows);
+    meshA.alpha = 1;
+    pixiApp.stage.addChild(meshA);
+    positionPlane(meshA);
+    var buffer = meshA.geometry.getBuffer("aVertexPosition");
+    basePosA = new Float32Array(buffer.data);
+    pixiApp.ticker.add(animateMeshes);
+    if (!blinkSchedulerId) scheduleBlink();
+  }
 }
 
 function switchMeshExpression(emotion) {
@@ -199,19 +196,29 @@ function switchMeshExpression(emotion) {
   }
 
   var texture = PIXI.Texture.from(assetUrl(exprVal));
-  meshB = new PIXI.SimplePlane(texture, cols, rows);
-  meshB.alpha = 0;
-  pixiApp.stage.addChild(meshB);
-  positionPlane(meshB);
-  var buffer = meshB.geometry.getBuffer("aVertexPosition");
-  basePosB = new Float32Array(buffer.data);
+  if (texture.baseTexture.valid) {
+    _buildSwitchMesh(texture);
+  } else {
+    texture.baseTexture.once("loaded", function() { _buildSwitchMesh(texture); });
+  }
 
-  crossfading = true;
-  activeMesh = "b";
-  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-  blinkPhase = 0;
-  if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
-  scheduleBlink();
+  function _buildSwitchMesh(tex) {
+    if (meshW !== tex.width || meshH !== tex.height) {
+      meshW = tex.width; meshH = tex.height;
+    }
+    meshB = new PIXI.SimplePlane(tex, cols, rows);
+    meshB.alpha = 0;
+    pixiApp.stage.addChild(meshB);
+    positionPlane(meshB);
+    var buffer = meshB.geometry.getBuffer("aVertexPosition");
+    basePosB = new Float32Array(buffer.data);
+    crossfading = true;
+    activeMesh = "b";
+    if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+    blinkPhase = 0;
+    if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
+    scheduleBlink();
+  }
 }
 
 /* ---- voice recording ---- */

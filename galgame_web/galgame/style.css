@@ -90,7 +90,6 @@ html, body {
   width: min(40vw, 500px);
   height: min(55vh, 700px);
   scale: var(--sprite-scale, 1);
-  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.15));
 }
 
 #sprite-container.active {
