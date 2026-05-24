@@ -15,151 +15,203 @@ var backgroundFile = "";
 var typewriterTimer = null;
 var isAudioPlaying = false;
 
-/* ---- dual-canvas layered renderer ---- */
-var canvasA = null, canvasB = null;
-var ctxA = null, ctxB = null;
-var openImg = { a: null, b: null };
-var blinkImg = { a: null, b: null };
-var blinking = { a: false, b: false };
-var canvasTime = 0;
-var waveRafId = null;
-var activeCanvas = "a";
-var canvasW = 0, canvasH = 0;
-var waveStep = 2;
+/* ---- pixi mesh layered renderer ---- */
+var pixiApp = null;
+var pixiContainer = null;
+var meshA = null, meshB = null;
+var basePosA = null, basePosB = null;
+var activeMesh = "a";
+var crossfading = false;
+var meshW = 0, meshH = 0;
+var cols = 8, rows = 12;
+var animTime = 0;
+var blinkPhase = 0;
+var blinkSide = "a";
+var blinkTimer = null;
+var blinkSchedulerId = null;
 var currentExpr = "neutral";
 var expressionsBlink = {};
-var blinkSchedulerId = null;
 var activeFace = "a";
 
-function renderFrame() {
+function initPixiApp() {
+  var container = document.getElementById("pixi-container");
+  if (!container) return;
+  pixiContainer = container;
+  container.innerHTML = "";
+  if (pixiApp) { pixiApp.destroy(true); pixiApp = null; }
+  pixiApp = new PIXI.Application({
+    backgroundAlpha: 0,
+    resizeTo: container,
+    antialias: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+  });
+  container.appendChild(pixiApp.view);
+}
+
+function createPlane(texture, side) {
+  var plane = new PIXI.SimplePlane(texture, cols, rows);
+  plane.alpha = 0;
+  pixiApp.stage.addChild(plane);
+  var buffer = plane.geometry.getBuffer("aVertexPosition");
+  var base = new Float32Array(buffer.data);
+  if (side === "a") { meshA = plane; basePosA = base; }
+  else { meshB = plane; basePosB = base; }
+  return plane;
+}
+
+function positionPlane(plane) {
+  plane.x = pixiApp.screen.width / 2;
+  plane.y = pixiApp.screen.height;
+  plane.pivot.set(plane.texture.width / 2, plane.texture.height);
+}
+
+function animateMeshes() {
   if (spriteMode !== "layered") return;
-  var side = activeCanvas;
-  var ctx = side === "a" ? ctxA : ctxB;
-  var open = openImg[side];
-  var blink = blinkImg[side];
-  if (!ctx || !open) { waveRafId = requestAnimationFrame(renderFrame); return; }
-  var img = blinking[side] && blink ? blink : open;
-  var w = canvasW, h = canvasH;
-  ctx.clearRect(0, 0, w, h);
-  var hairLine = Math.floor(h * 0.3);
-  ctx.drawImage(img, 0, hairLine, w, h - hairLine, 0, hairLine, w, h - hairLine);
-  for (var y = 0; y < hairLine; y += waveStep) {
-    var fade = (hairLine - y) / hairLine;
-    fade = fade * fade;
-    var off = Math.sin(y * 0.04 + canvasTime) * 3 * fade;
-    ctx.drawImage(img, 0, y, w, waveStep, off, y, w, waveStep);
+  var t = animTime;
+
+  if (crossfading) {
+    if (meshA) meshA.alpha = Math.max(0, meshA.alpha - 0.035);
+    if (meshB) meshB.alpha = Math.min(1, meshB.alpha + 0.035);
+    if (meshB && meshB.alpha >= 1) {
+      crossfading = false;
+      if (meshA) { pixiApp.stage.removeChild(meshA); meshA.destroy(); meshA = null; basePosA = null; }
+      meshA = meshB; meshB = null;
+      basePosA = basePosB; basePosB = null;
+      meshA.alpha = 1;
+      activeMesh = "a";
+    }
   }
-  canvasTime += 0.05;
-  waveRafId = requestAnimationFrame(renderFrame);
+
+  if (meshA && basePosA) {
+    animateMeshVertices(meshA, basePosA, t, activeMesh === "a" && blinkPhase > 1);
+  }
+  if (meshB && basePosB && crossfading) {
+    animateMeshVertices(meshB, basePosB, t, false);
+  }
+
+  animTime += 0.016;
+}
+
+function animateMeshVertices(plane, base, time, blinkClosed) {
+  var buffer = plane.geometry.getBuffer("aVertexPosition");
+  var v = buffer.data;
+  var vertsPerRow = cols + 1;
+  var w = plane.texture.width, h = plane.texture.height;
+  var halfW = w / 2, halfH = h / 2;
+  var neckRow = Math.floor(rows * 0.35);
+  var hairRows = Math.floor(rows * 0.3);
+
+  for (var r = 0; r <= rows; r++) {
+    var yNorm = r / rows;
+    var yFromFeet = 1 - yNorm;
+    var headFactor = r < neckRow ? 1 - r / neckRow : 0;
+
+    for (var c = 0; c <= cols; c++) {
+      var idx = (r * vertsPerRow + c) * 2;
+      var bx = base[idx];
+      var by = base[idx + 1];
+
+      // breathing: chest expansion (Y=up, X=slight ribcage)
+      var chest = Math.sin(time * 1.4) * (1 - Math.abs(yNorm - 0.35) * 1.5);
+      chest = Math.max(0, chest);
+      var breathY = chest * halfH * 0.02 * yFromFeet;
+      var breathX = chest * halfW * 0.008 * yFromFeet;
+
+      // hair sway: top 30% rows, quadratic fade
+      var hairOff = 0;
+      if (r < hairRows) {
+        var hairFade = (hairRows - r) / hairRows;
+        hairFade = hairFade * hairFade;
+        hairOff = Math.sin(time * 2.5 + c * 0.6) * halfW * 0.025 * hairFade;
+      }
+
+      // head tilt: slight rotation-like X offset
+      var tilt = Math.sin(time * 0.8 + 1.5) * halfW * 0.012 * headFactor;
+
+      // blink: compress eye region Y
+      var blinkCompress = 1;
+      if (blinkClosed && r >= Math.floor(rows * 0.25) && r <= Math.floor(rows * 0.38)) {
+        blinkCompress = 0.08;
+      }
+
+      v[idx] = bx + hairOff + breathX + tilt;
+      v[idx + 1] = by * blinkCompress + breathY * blinkCompress;
+    }
+  }
+  buffer.update();
 }
 
 function scheduleBlink() {
   if (spriteMode !== "layered") return;
-  var side = activeCanvas;
-  if (!blinkImg[side]) { blinkSchedulerId = null; return; }
   var delay = 3000 + Math.random() * 3000;
   blinkSchedulerId = setTimeout(function() {
     if (spriteMode !== "layered") return;
-    blinking[activeCanvas] = true;
-    setTimeout(function() {
-      blinking[activeCanvas] = false;
-      scheduleBlink();
-    }, 130);
+    blinkPhase = 1;
+    blinkSide = activeMesh;
+    blinkTimer = setTimeout(function() {
+      blinkPhase = 2;
+      blinkTimer = setTimeout(function() {
+        blinkPhase = 0;
+        scheduleBlink();
+      }, 130);
+    }, 50);
   }, delay);
 }
 
-function stopCanvasRender() {
-  if (waveRafId) { cancelAnimationFrame(waveRafId); waveRafId = null; }
+function stopMeshRender() {
+  crossfading = false;
   if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-  blinking.a = false;
-  blinking.b = false;
+  if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
+  blinkPhase = 0;
+  if (pixiApp && pixiApp.ticker) pixiApp.ticker.remove(animateMeshes);
+  if (pixiApp) { pixiApp.destroy(true); pixiApp = null; }
+  if (pixiContainer) pixiContainer.innerHTML = "";
+  meshA = null; meshB = null;
+  basePosA = null; basePosB = null;
 }
 
-function startCanvasRender(exprVal, blinkVal) {
-  if (!canvasA) return;
-  activeCanvas = "a";
-  blinking.a = false; blinking.b = false;
-  openImg.a = null; openImg.b = null;
-  blinkImg.a = null; blinkImg.b = null;
-  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+function startMeshRender(exprVal) {
+  initPixiApp();
+  if (!pixiApp) return;
+  activeMesh = "a";
+  crossfading = false;
 
-  ctxA = canvasA.getContext("2d");
-  ctxB = canvasB.getContext("2d");
-  canvasA.classList.remove("hidden");
-  canvasB.classList.add("hidden");
+  var texture = PIXI.Texture.from(assetUrl(exprVal));
+  meshA = new PIXI.SimplePlane(texture, cols, rows);
+  meshA.alpha = 1;
+  pixiApp.stage.addChild(meshA);
+  positionPlane(meshA);
+  var buffer = meshA.geometry.getBuffer("aVertexPosition");
+  basePosA = new Float32Array(buffer.data);
+  meshW = texture.width; meshH = texture.height;
 
-  var img = new Image();
-  img.onload = function() {
-    canvasW = img.naturalWidth;
-    canvasH = img.naturalHeight;
-    if (canvasW > 2000) waveStep = 3; else waveStep = 2;
-    canvasA.width = canvasW; canvasA.height = canvasH;
-    canvasB.width = canvasW; canvasB.height = canvasH;
-    openImg.a = img;
-    loadBlinkVariant(blinkVal);
-    waveRafId = requestAnimationFrame(renderFrame);
-  };
-  img.src = assetUrl(exprVal);
+  pixiApp.ticker.add(animateMeshes);
+  if (!blinkSchedulerId) scheduleBlink();
 }
 
-function loadBlinkVariant(blinkVal) {
-  var side = activeCanvas;
-  blinkImg[side] = null;
-  if (!blinkVal) return;
-  var img = new Image();
-  img.onload = function() {
-    if (img.naturalWidth === canvasW && img.naturalHeight === canvasH) {
-      blinkImg[side] = img;
-      if (!blinkSchedulerId) scheduleBlink();
-    } else {
-      console.warn("Blink image size mismatch for", blinkVal);
-      blinkImg[side] = null;
-    }
-  };
-  img.onerror = function() { blinkImg[side] = null; };
-  img.src = assetUrl(blinkVal);
-}
-
-function canvasSwitchExpression(emotion) {
-  if (!canvasA || !ctxA) return;
-  var oldSide = activeCanvas;
-  var newSide = activeCanvas === "a" ? "b" : "a";
+function switchMeshExpression(emotion) {
+  if (!pixiApp || !meshA) return;
   var exprVal = expressions[emotion] || expressions["neutral"];
-  var blinkVal = expressionsBlink[emotion] || expressionsBlink["neutral"] || "";
+  if (crossfading) {
+    crossfading = false;
+    if (meshB) { pixiApp.stage.removeChild(meshB); meshB.destroy(); meshB = null; basePosB = null; }
+  }
 
-  var img = new Image();
-  img.onload = function() {
-    var iw = img.naturalWidth, ih = img.naturalHeight;
-    if (iw > 2000) waveStep = 3; else waveStep = 2;
-    if (iw !== canvasW || ih !== canvasH) {
-      canvasW = iw; canvasH = ih;
-      canvasA.width = iw; canvasA.height = ih;
-      canvasB.width = iw; canvasB.height = ih;
-    }
-    var newCtx = newSide === "a" ? ctxA : ctxB;
-    var hairLine = Math.floor(ih * 0.3);
-    newCtx.clearRect(0, 0, iw, ih);
-    newCtx.drawImage(img, 0, hairLine, iw, ih - hairLine, 0, hairLine, iw, ih - hairLine);
-    for (var y = 0; y < hairLine; y += waveStep) {
-      var fade = (hairLine - y) / hairLine;
-      fade = fade * fade;
-      var off = Math.sin(y * 0.04) * 3 * fade;
-      newCtx.drawImage(img, 0, y, iw, waveStep, off, y, iw, waveStep);
-    }
-    openImg[newSide] = img;
+  var texture = PIXI.Texture.from(assetUrl(exprVal));
+  meshB = new PIXI.SimplePlane(texture, cols, rows);
+  meshB.alpha = 0;
+  pixiApp.stage.addChild(meshB);
+  positionPlane(meshB);
+  var buffer = meshB.geometry.getBuffer("aVertexPosition");
+  basePosB = new Float32Array(buffer.data);
 
-    // crossfade
-    var oldEl = oldSide === "a" ? canvasA : canvasB;
-    var newEl = newSide === "a" ? canvasA : canvasB;
-    oldEl.classList.add("hidden");
-    newEl.classList.remove("hidden");
-    activeCanvas = newSide;
-
-    if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
-    blinking[oldSide] = false;
-    loadBlinkVariant(blinkVal);
-  };
-  img.src = assetUrl(exprVal);
+  crossfading = true;
+  activeMesh = "b";
+  if (blinkSchedulerId) { clearTimeout(blinkSchedulerId); blinkSchedulerId = null; }
+  blinkPhase = 0;
+  if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
+  scheduleBlink();
 }
 
 /* ---- voice recording ---- */
@@ -247,8 +299,6 @@ async function toggleRecording() {
 var el = {
   bg: document.getElementById("background"),
   spriteContainer: document.getElementById("sprite-container"),
-  canvasA: document.getElementById("sprite-canvas-a"),
-  canvasB: document.getElementById("sprite-canvas-b"),
   spriteSingle: document.getElementById("sprite-single"),
   spriteFaceA: document.getElementById("sprite-face-a"),
   spriteFaceB: document.getElementById("sprite-face-b"),
@@ -483,15 +533,11 @@ function applySprites() {
   if (spriteMode === "layered") {
     el.spriteContainer.classList.add("active");
     el.spriteSingle.classList.remove("active");
-    canvasA = el.canvasA;
-    canvasB = el.canvasB;
     var exprVal = expressions[currentEmotion] || expressions["neutral"];
-    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
     currentExpr = currentEmotion;
-    startCanvasRender(exprVal, blinkVal);
+    startMeshRender(exprVal);
   } else {
-    stopCanvasRender();
-    canvasA = null; canvasB = null;
+    stopMeshRender();
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     activeFace = "a";
@@ -522,7 +568,7 @@ function switchExpression(emotion) {
   if (!emotion || emotion === currentEmotion) return;
   currentEmotion = emotion;
   if (spriteMode === "layered") {
-    canvasSwitchExpression(emotion);
+    switchMeshExpression(emotion);
   } else {
     loadExpressionToSingle(emotion);
   }
@@ -759,15 +805,14 @@ async function notifyRapidAction(count) {
 init();
 
 window.addEventListener("beforeunload", function () {
-  stopCanvasRender();
+  stopMeshRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
 });
 
 document.addEventListener("visibilitychange", function () {
-  if (document.hidden) stopCanvasRender();
-  else if (spriteMode === "layered" && !waveRafId) {
+  if (document.hidden) stopMeshRender();
+  else if (spriteMode === "layered") {
     var exprVal = expressions[currentEmotion] || expressions["neutral"];
-    var blinkVal = expressionsBlink[currentEmotion] || expressionsBlink["neutral"] || "";
-    startCanvasRender(exprVal, blinkVal);
+    startMeshRender(exprVal);
   }
 });
