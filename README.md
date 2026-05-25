@@ -58,8 +58,8 @@ http://localhost:6186
 | 配置项 | 说明 | 推荐值 |
 |--------|------|--------|
 | `character_name` | 对话框上方显示的角色名 | 你的角色名 |
-| `persona` | AstrBot 内置人格 | AstrBot 预设或自建 |
-| `llm_provider` | 驱动对话的 AI 模型 | deepseek / gpt-4o |
+| `persona` | AstrBot 内置人格 | AstrBot 预设 |
+| `llm_provider` | 驱动对话的 AI 模型 | deepseek / gpt |
 | `tts_provider` | 语音合成（暂不可用） | 等待后续修复 |
 | `web_port` | 独立 WebUI 端口 | 默认 `6186`，`0` = 关闭 |
 | `sprite_mode` | 立绘渲染模式 | **`single`**（推荐，VRM 尚不可用） |
@@ -87,7 +87,6 @@ http://localhost:6186
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
 - **对话历史面板** —— 顶部时钟图标进入，气泡式展示历史消息，背景色自动适配角色立绘
 - **AstrBot 指令兼容** —— 在输入框直接使用 `/reset`、`/new` 等指令，经管道分发执行
-- **唤醒前缀命令** —— 输入 `/reset` 可清空当前会话重新开始
 
 ### 平台集成
 
@@ -234,28 +233,6 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 
 > 将会话保留天数设为 `0` 则永不清理。同时注意 AstrBot Dashboard 对话管理中也可查看/导出 Galgame 对话记录。
 
----
-
-## 立绘生成指南
-
-使用 AI 图片生成工具（gpt-image-2、Stable Diffusion 等）快速创建立绘。
-
-**主体立绘 prompt：**
-```
-2D anime-style character illustration, half-body portrait,
-front-facing, standing pose with relaxed posture.
-[你的角色描述]
-Clean lineart, soft anime cel-shading,
-Solid light-gray background. Aspect ratio 3:4.
-No dialog box, no text, no UI elements.
-```
-
-**表情差分 prompt：**
-```
-Same character. Identical appearance: [外观要点].
-Facial expression: [表情描述].
-Same light-gray background, same 3:4 composition.
-```
 
 ---
 
