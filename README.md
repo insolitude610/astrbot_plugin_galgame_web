@@ -2,7 +2,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、语音输入、对话历史等交互特性。
+一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、TTS 语音朗读、语音输入、会话恢复、对话历史等交互特性。
 
 > **注意**：和 webchat 平台一致，但本插件的 Web 对话 bot 暂不支持发送文件和图片（待开发）。~谁家galgame角色能给你发图片和文件啊（）~
 
@@ -88,6 +88,7 @@ http://localhost:6186
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
 - **对话历史面板** —— 顶部时钟图标进入，气泡式展示历史消息，背景色自动适配角色立绘
 - **AstrBot 指令兼容** —— 在输入框直接使用 `/reset`、`/new` 等指令，经管道分发执行
+- **重播按钮** —— 对话框右上角重播按钮，可重放上次 AI 回复的完整打字机 + 表情切换动画
 
 ### 平台集成
 

@@ -1,5 +1,14 @@
 # 变更记录
 
+## v0.5.1
+
+- **TTS 语音朗读** — `_push_through_pipeline` 新增 `record` 类型监听，自动从管道 back_queue 捕获音频并 base64 编码返回前端。配合任意 AstrBot TTS 插件（如 `astrbot_plugin_tts_emotion_router`）即可实现语音朗读，不安装 TTS 插件时静默降级
+- **对话框重播按钮** — 对话框新增重播按钮（旋转箭头图标），点击可重播上次 AI 回复的完整打字机动画 + 表情切换
+- **会话恢复功能** — 新增 `GET /session/list` API 与前端会话选择器弹窗。清除浏览器缓存或换设备后，可浏览磁盘上的历史会话列表并选择恢复，同时支持 `?sid=xxx` URL 参数直达
+- **JSON 过滤优化** — 修复 `startswith("{")` 暴力过滤误伤 `{emotion_xxx}` 表情标签导致整个回复为空的 bug，改用 `json.loads` 精确校验纯 JSON 片段
+- **元数据更新** — 修正 `metadata.yaml` 描述，移除已废弃的分层立绘动画说明，补充 TTS 和会话恢复
+- **README 重写** — 标注 VRM 开发中状态，调整文档结构突出快速开始，补充遗漏特性（JWT 认证、会话双向同步、资产迁移等）
+
 ## v0.5.0
 
 - **VRM 3D 模式** — `sprite_mode` 新增 `vrm` 选项，使用 Three.js + three-vrm 渲染 3D 动漫角色
