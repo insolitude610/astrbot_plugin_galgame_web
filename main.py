@@ -62,6 +62,17 @@ def _mime_for_suffix(suffix: str) -> str:
     return _AUDIO_MIME_MAP.get(suffix.lower(), "audio/wav")
 
 
+def _is_pure_json(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return False
+    try:
+        json.loads(stripped)
+        return True
+    except (json.JSONDecodeError, ValueError):
+        return False
+
+
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -496,7 +507,7 @@ class GalgamePlugin(Star):
                             audio_mime = _mime_for_suffix(record_path.suffix)
                             logger.info(f"[pipeline] captured audio: {record_file} ({record_path.stat().st_size} bytes)")
                 elif mtype in ("plain", "complete"):
-                    if dtext and not dtext.lstrip().startswith("{"):
+                    if dtext and not _is_pure_json(dtext):
                         collected.append(dtext)
         except asyncio.TimeoutError:
             logger.warning(f"[pipeline] TIMEOUT after 120s")
