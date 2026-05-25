@@ -97,6 +97,7 @@ class GalgamePlugin(Star):
         ctx.register_web_api(f"/{pn}/assets/copy", self._api_assets_copy, ["POST"], "Copy an asset")
         ctx.register_web_api(f"/{pn}/rapid_action", self._api_rapid_action, ["POST"], "Notify rapid click activity")
         ctx.register_web_api(f"/{pn}/assets/batch-delete", self._api_assets_batch_delete, ["POST"], "Batch delete assets")
+        ctx.register_web_api(f"/{pn}/session/list", self._api_session_list, ["GET"], "List available sessions for recovery")
 
     # ---- standalone web server ----
 
@@ -246,6 +247,30 @@ class GalgamePlugin(Star):
         if not sid or sid not in self._sessions:
             return {"error": "invalid session_id"}, 400
         return {"messages": self._sessions[sid]["history"]}
+
+    async def _api_session_list(self):
+        sessions_list = []
+        for path in SESSIONS_DIR.glob("*.json"):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            sid = path.stem
+            history = data.get("history", [])
+            last_msg = ""
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and msg.get("content"):
+                    last_msg = msg["content"]
+                    break
+            sessions_list.append({
+                "session_id": sid,
+                "created_at": data.get("created_at", 0),
+                "message_count": len(history),
+                "last_message": last_msg[:80],
+            })
+        sessions_list.sort(key=lambda s: s["created_at"], reverse=True)
+        return {"sessions": sessions_list}
 
     # ---- config API ----
 

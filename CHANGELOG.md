@@ -1,5 +1,50 @@
 # 变更记录
 
+## v0.5.0
+
+- **VRM 3D 模式** — `sprite_mode` 新增 `vrm` 选项，使用 Three.js + three-vrm 渲染 3D 动漫角色
+- **原生动画** — VRM 自动眨眼、视线跟踪鼠标、表情 blend shape 切换、骨骼呼吸
+- **零成本建模** — 支持 VRoid Studio（免费）导出的 .vrm 模型，VRoid Hub 数十万免费模型
+- **前端依赖变更** — 新增 Three.js + three-vrm CDN 引入（~800KB，浏览器缓存后 0 开销）
+- **破坏性变更** — 删除整个 Canvas 分层立绘引擎；`sprite_mode` 从 `layered` 变为 `vrm`；`expressions_blink` 和旧 `layers` 配置结构移除
+- **迁移** — v0.4 用户升级后需将 `sprite_mode` 从 `layered` 改为 `vrm`，并准备 `.vrm` 模型文件替代原 PNG 表情
+- 新增 `vrm_model` 配置项 + `_api_config` 返回 VRM 文件路径
+- `_resolved_assets` 新增 .vrm 文件自动检测
+- Single 模式完全不变，无迁移成本
+
+## v0.4.0
+
+- **Layered 模式重写** —— 废弃多层 PNG 叠加，改为 Canvas 单图逐行正弦形变渲染
+- **眨眼系统** —— 每情绪可选 `_blink` 闭眼变体图，真正换图眨眼（替换旧的 scaleY 压扁方案）
+- **呼吸动画升级** —— 从 JS 多频正弦波改为纯 CSS `scaleY` + `scaleX` 挤压拉伸（`transform-origin: bottom center`）
+- **表情切换渐变** —— Canvas opacity fade out → 换源 → fade in（300ms 过渡）
+- **素材简化** —— 不再需要拆分 body/head/hair/mouth 等图层，一张全身立绘即可
+- 删除 `LAYER_KEYS`、口型同步、多层动画引擎（净减 81 行代码）
+- 后端新增 `expressions_blink` 自动检测与 API 返回
+- Single 模式完全不变
+
+## v0.3.0
+
+- **独立 WebUI 端口** — 插件内置 HTTP 服务器，在独立端口提供完整 WebUI
+- **管道全集成** — 所有消息经 webchat 管道分发，指令和语音走管道、记忆/感知/安全全栈生效
+- **AstrBot 指令全兼容** — `/help /reset /new` 等所有已注册指令正常运行
+- **语音输入** — 浏览器麦克风录音为 WAV，经管道 STT 插件转文字后发送
+- **立绘位置可调** — 新增 `sprite_bottom`、`sprite_left` 配置项，自由调整角色站位
+- **立绘缩放** — 新增 `sprite_scale` 配置项，CSS `scale` 变换
+- **批量删除** — 立绘管理页多选文件一键删除
+- **资产迁移** — assets 目录移至 `data/plugin_data/`，插件更新不丢用户图片；`.migrated` 标记防重复搬迁
+- **对话历史面板** — 内建聊天记录查看，气泡式展示，背景色自适应
+- **JWT 代理认证** — 所有 API 请求通过代理自动附带 JWT Bearer 令牌
+- 移除 Dashboard 内嵌 / Bridge SDK / SSE 依赖
+- `user-select: auto`，`localStorage` 正常工作
+
+## v0.2.4
+
+- **立绘管理页按模式分区** —— Single / Layered 分区独立展示所需文件清单，当前模式高亮
+- **槽位上传自动重命名** —— 从表情/图层槽位上传的文件自动存为标准名（如 `happy.png`），无需手动改名
+- **支持自定义情绪** —— 新增 `custom_emotions` 配置字段（JSON），可自由添加额外情绪标签
+- 全面重写 README：详述两种模式差异、文件需求、表情系统、命名约定
+
 ## v0.2.3
 
 - **立绘管理页面** —— 浏览器内拖拽上传 / 预览 / 删除 PNG，自动匹配情绪和图层映射，主页右上角齿轮入口

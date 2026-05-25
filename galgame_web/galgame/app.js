@@ -188,6 +188,105 @@ function restoreLastMessage() {
   });
 }
 
+function getUrlSessionId() {
+  var m = location.search.match(/[?&]sid=([a-f0-9]+)/i);
+  return m ? m[1] : "";
+}
+
+async function showSessionPicker() {
+  var listEl = document.getElementById("session-picker-list");
+  listEl.innerHTML = '<div class="session-picker-loading">正在查找历史对话...</div>';
+  document.getElementById("session-picker").classList.add("active");
+
+  var sessions;
+  try {
+    var data = await apiGet("session/list");
+    sessions = data.sessions || [];
+  } catch (err) {
+    console.warn("Failed to list sessions:", err);
+    sessions = [];
+  }
+
+  listEl.innerHTML = "";
+  if (!sessions.length) {
+    closeSessionPicker();
+    return;
+  }
+
+  for (var i = 0; i < sessions.length; i++) {
+    var s = sessions[i];
+    var d = new Date(s.created_at * 1000);
+    var dateStr = d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0") + " " +
+      String(d.getHours()).padStart(2, "0") + ":" +
+      String(d.getMinutes()).padStart(2, "0");
+    var preview = s.last_message || "(暂无对话)";
+    var item = document.createElement("div");
+    item.className = "session-picker-item";
+    item.onclick = (function(sid) {
+      return function() { resumeSession(sid); };
+    })(s.session_id);
+    item.innerHTML =
+      '<div class="session-picker-time">' + dateStr + '</div>' +
+      '<div class="session-picker-preview">' + preview + '</div>' +
+      '<span class="session-picker-count">' + s.message_count + ' 条消息</span>';
+    listEl.appendChild(item);
+  }
+}
+
+function closeSessionPicker() {
+  document.getElementById("session-picker").classList.remove("active");
+}
+
+function resumeSession(sid) {
+  closeSessionPicker();
+  initSession(sid).then(function(resp) {
+    if (!resp) return;
+    sessionId = resp.session_id;
+    localStorage.setItem("galgame_session_id", sessionId);
+    if (resp.current_emotion) {
+      currentEmotion = resp.current_emotion;
+    }
+    finishInit(true);
+  });
+}
+
+function startNewSession() {
+  closeSessionPicker();
+  finishInit(false);
+}
+
+async function initSession(resumeId) {
+  var resp;
+  try {
+    resp = await apiPost("session/init", { resume_id: resumeId || "" });
+  } catch (err) {
+    console.error("Failed to init session:", err);
+    el.dialogText.textContent = "初始化失败(" + (err.message || err) + ")，请刷新页面。";
+    return null;
+  }
+  if (!resp || !resp.session_id) {
+    console.error("session/init returned:", resp);
+    el.dialogText.textContent = "会话初始化失败，请刷新页面。";
+    return null;
+  }
+  return resp;
+}
+
+function finishInit(isResuming) {
+  if (!sessionId) return;
+  setupInput();
+  setupRapidDetection();
+  applySprites();
+  if (spriteMode === "vrm") {
+    import("./vrm.js").then(function(m) { vrmModule = m; startVRMRender(); });
+  }
+  if (isResuming) {
+    restoreLastMessage();
+  }
+}
+
 async function init() {
   try {
     var config = await apiGet("config");
@@ -199,36 +298,33 @@ async function init() {
 
   applyBackground();
 
-  var savedId = localStorage.getItem("galgame_session_id") || "";
-  var isResuming = false;
-  try {
-    var resp = await apiPost("session/init", { resume_id: savedId });
-    if (!resp || !resp.session_id) {
-      console.error("session/init returned:", resp);
-      el.dialogText.textContent = "会话初始化失败(无session_id)，请刷新页面。";
-    } else {
-      sessionId = resp.session_id;
-      localStorage.setItem("galgame_session_id", sessionId);
-      if (resp.current_emotion) {
-        currentEmotion = resp.current_emotion;
-      }
-      if (savedId === resp.session_id) {
-        isResuming = true;
-      }
-    }
-  } catch (err) {
-    console.error("Failed to init session:", err);
-    el.dialogText.textContent = "初始化失败(" + (err.message || err) + ")，请刷新页面。";
+  var urlSid = getUrlSessionId();
+  var savedId = urlSid || localStorage.getItem("galgame_session_id") || "";
+
+  var resp = await initSession(savedId);
+  if (!resp) return;
+
+  sessionId = resp.session_id;
+  localStorage.setItem("galgame_session_id", sessionId);
+  if (resp.current_emotion) {
+    currentEmotion = resp.current_emotion;
   }
 
-  setupInput();
-  setupRapidDetection();
-  applySprites();
-  if (spriteMode === "vrm") {
-    import("./vrm.js").then(function(m) { vrmModule = m; startVRMRender(); });
+  if (savedId === resp.session_id) {
+    finishInit(true);
+    return;
   }
-  if (isResuming) {
-    restoreLastMessage();
+
+  var hasSessions = false;
+  try {
+    var data = await apiGet("session/list");
+    hasSessions = (data.sessions || []).length > 0;
+  } catch (e) {}
+
+  if (hasSessions) {
+    showSessionPicker();
+  } else {
+    finishInit(false);
   }
 }
 

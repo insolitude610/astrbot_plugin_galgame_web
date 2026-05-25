@@ -228,7 +228,6 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 | 手动删除 `sessions/` | **是** | 物理删除 |
 | 更换浏览器 | **是** | localStorage 不共享 |
 | 无痕/隐私模式 | **是** | localStorage 不持久化 |
-| 清除浏览器缓存 | **是** | localStorage 被清 |
 | 换电脑/设备 | **是** | 无跨设备同步 |
 
 > 将会话保留天数设为 `0` 则永不清理。同时注意 AstrBot Dashboard 对话管理中也可查看/导出 Galgame 对话记录。
