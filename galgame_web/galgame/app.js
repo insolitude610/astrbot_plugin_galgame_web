@@ -14,6 +14,7 @@ var backgroundFile = "";
 
 var typewriterTimer = null;
 var isAudioPlaying = false;
+var lastReplyData = null;
 
 /* ---- VRM 3D renderer ---- */
 var vrmModule = null;
@@ -538,6 +539,15 @@ function typewriterAppend(text, emotionMap) {
   tick();
 }
 
+/* ---- replay ---- */
+
+function replayLastResponse() {
+  if (!lastReplyData) return;
+  if (typewriterTimer) clearTimeout(typewriterTimer);
+  switchExpression(currentEmotion);
+  typewriterAppend(lastReplyData.text, lastReplyData.emotionMap);
+}
+
 /* ---- TTS audio ---- */
 
 function playTTSAudio(base64data, mime) {
@@ -619,6 +629,8 @@ async function sendMessage(audioData) {
       var emotionMap = {};
       var emotionList = resp.emotions || [];
       emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
+      lastReplyData = { text: resp.reply, emotionMap: emotionMap };
+      document.getElementById("replay-btn").classList.add("active");
       typewriterAppend(resp.reply, emotionMap);
       finishResponse();
       if (resp.audio) {

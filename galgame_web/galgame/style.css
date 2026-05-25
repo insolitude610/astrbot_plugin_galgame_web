@@ -176,6 +176,41 @@ html, body {
   color: rgba(255,255,255,0.3);
 }
 
+/* ---- Replay Button ---- */
+
+#replay-btn {
+  position: absolute;
+  top: -16px;
+  right: 18px;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(15, 15, 35, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.40);
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s, background .2s, transform .15s;
+}
+
+#replay-btn.active {
+  display: flex;
+}
+
+#replay-btn:hover {
+  color: rgba(200, 170, 255, 0.95);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+#replay-btn:active {
+  transform: scale(0.88);
+}
+
 /* ---- Dialog Text ---- */
 
 #dialog-text {
