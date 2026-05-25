@@ -540,11 +540,12 @@ function typewriterAppend(text, emotionMap) {
 
 /* ---- TTS audio ---- */
 
-function playTTSAudio(base64data) {
+function playTTSAudio(base64data, mime) {
   if (!base64data) return;
 
   var audio = el.ttsAudio;
-  audio.src = "data:audio/wav;base64," + base64data;
+  var mimeType = mime || "audio/wav";
+  audio.src = "data:" + mimeType + ";base64," + base64data;
 
   audio.onplay = function () {
     isAudioPlaying = true;
@@ -620,6 +621,10 @@ async function sendMessage(audioData) {
       emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
       typewriterAppend(resp.reply, emotionMap);
       finishResponse();
+      if (resp.audio) {
+        var audioMime = resp.audio_mime || "audio/wav";
+        playTTSAudio(resp.audio, audioMime);
+      }
     } else if (resp.error) {
       showError(resp.error);
     } else {

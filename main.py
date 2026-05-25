@@ -18,6 +18,7 @@ from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.provider import LLMResponse, ProviderRequest
 from astrbot.api.star import Context, Star
 from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from .galgame_web.utils import (
     DEFAULT_EMOTION_TAGS,
@@ -53,6 +54,12 @@ from .galgame_web.session_helpers import (
 from .galgame_web.web_handler import GalgameWebHandler
 
 ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
+
+_AUDIO_MIME_MAP = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
+
+
+def _mime_for_suffix(suffix: str) -> str:
+    return _AUDIO_MIME_MAP.get(suffix.lower(), "audio/wav")
 
 
 class GalgamePlugin(Star):
@@ -450,7 +457,7 @@ class GalgamePlugin(Star):
 
     # ---- pipeline ----
 
-    async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> str:
+    async def _push_through_pipeline(self, text: str, session_id: str, audio_path: str = "") -> dict:
         t0 = time.time()
         msg_id = str(uuid.uuid4())
         wc_sid = f"webchat!{self._webchat_username}!{session_id}"
@@ -467,6 +474,8 @@ class GalgamePlugin(Star):
         await chat_queue.put((self._webchat_username, session_id, payload))
         logger.info(f"[pipeline] pushed to chat_queue (setup={t1 - t0:.3f}s)")
         collected = []
+        audio_b64 = ""
+        audio_mime = ""
         first = True
         try:
             while True:
@@ -478,6 +487,14 @@ class GalgamePlugin(Star):
                 dtext = result.get("data", "")
                 if mtype == "end":
                     break
+                elif mtype == "record":
+                    record_file = dtext.replace("[RECORD]", "").strip()
+                    if record_file:
+                        record_path = pathlib.Path(get_astrbot_data_path()) / "attachments" / record_file
+                        if record_path.exists():
+                            audio_b64 = base64.b64encode(record_path.read_bytes()).decode()
+                            audio_mime = _mime_for_suffix(record_path.suffix)
+                            logger.info(f"[pipeline] captured audio: {record_file} ({record_path.stat().st_size} bytes)")
                 elif mtype in ("plain", "complete"):
                     if dtext and not dtext.lstrip().startswith("{"):
                         collected.append(dtext)
@@ -486,8 +503,8 @@ class GalgamePlugin(Star):
         finally:
             webchat_queue_mgr.remove_back_queue(msg_id)
         result_text = "".join(collected).strip()
-        logger.info(f"[pipeline] returning text_len={len(result_text)}")
-        return result_text
+        logger.info(f"[pipeline] returning text_len={len(result_text)} audio={'yes' if audio_b64 else 'no'}")
+        return {"text": result_text, "audio": audio_b64, "audio_mime": audio_mime}
 
     async def _api_send(self):
         data = await request.get_json() or {}
@@ -533,7 +550,9 @@ class GalgamePlugin(Star):
         pipeline_text = text + rapid_hint
         try:
             t_pipe = time.time()
-            raw_reply = await self._push_through_pipeline(pipeline_text, sid, audio_path)
+            pipeline_result = await self._push_through_pipeline(pipeline_text, sid, audio_path)
+            raw_reply = pipeline_result["text"]
+            audio_b64 = pipeline_result.get("audio", "")
             logger.info(f"[perf] pipeline roundtrip: {time.time() - t_pipe:.2f}s")
         except Exception as e:
             logger.exception(f"[pipeline] push failed: {e}")
@@ -577,7 +596,7 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to sync conversation to DB: {e}")
 
-        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions]}
+        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions], "audio": audio_b64, "audio_mime": pipeline_result.get("audio_mime", "")}
 
     async def _api_rapid_action(self):
         data = await request.get_json()
