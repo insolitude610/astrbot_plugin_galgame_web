@@ -597,6 +597,7 @@ class GalgamePlugin(Star):
             rapid_hint = f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，可能心情烦躁或着急，请关心一下ta怎么了）"
 
         pipeline_text = text + rapid_hint
+        before_send = time.time()
         try:
             t_pipe = time.time()
             pipeline_result = await self._push_through_pipeline(pipeline_text, sid, audio_path)
@@ -617,23 +618,30 @@ class GalgamePlugin(Star):
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         if not audio_b64:
-            await asyncio.sleep(4)
+            await asyncio.sleep(3)
             att_dir = pathlib.Path(get_astrbot_data_path()) / "attachments"
             audio_exts = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".webm"}
-            newest = None
-            newest_time = 0
-            if att_dir.is_dir():
-                for f in att_dir.iterdir():
-                    if f.is_file() and f.suffix.lower() in audio_exts:
-                        mtime = f.stat().st_mtime
-                        if mtime > newest_time:
-                            newest_time = mtime
-                            newest = f
-            if newest and newest.exists():
-                raw = newest.read_bytes()
-                audio_b64 = base64.b64encode(raw).decode()
-                pipeline_result["audio_mime"] = _detect_audio_mime(raw)
-                logger.info(f"[pipeline] picked up audio from filesystem: {newest.name}")
+            empty_polls = 0
+            for _ in range(20):
+                newest = None
+                newest_time = 0
+                if att_dir.is_dir():
+                    for f in att_dir.iterdir():
+                        if f.is_file() and f.suffix.lower() in audio_exts:
+                            mtime = f.stat().st_mtime
+                            if mtime > before_send and mtime > newest_time:
+                                newest_time = mtime
+                                newest = f
+                if newest:
+                    raw = newest.read_bytes()
+                    audio_b64 = base64.b64encode(raw).decode()
+                    pipeline_result["audio_mime"] = _detect_audio_mime(raw)
+                    logger.info(f"[pipeline] TTS audio captured: {newest.name}")
+                    break
+                empty_polls += 1
+                if empty_polls >= 3:
+                    break
+                await asyncio.sleep(1)
 
         raw_reply = raw_reply.replace("\\n", "\n")
         emotion_tags = get_emotion_tags(self.config)
