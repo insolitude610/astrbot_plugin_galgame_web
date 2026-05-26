@@ -230,6 +230,7 @@ class GalgamePlugin(Star):
             return
         text = resp.completion_text or ""
         if text.strip():
+            text = re.sub(r"\[EMO:\w+\]", "", text).strip()
             session["_last_resp_text"] = text
         ev = session.get("_resp_event")
         if ev and not ev.is_set():
@@ -619,19 +620,23 @@ class GalgamePlugin(Star):
 
         if not audio_b64:
             await asyncio.sleep(3)
-            att_dir = pathlib.Path(get_astrbot_data_path()) / "attachments"
+            att_dirs = [
+                pathlib.Path(get_astrbot_data_path()) / "attachments",
+                pathlib.Path(get_astrbot_data_path()) / "temp",
+            ]
             audio_exts = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".webm"}
             empty_polls = 0
             for _ in range(20):
                 newest = None
                 newest_time = 0
-                if att_dir.is_dir():
-                    for f in att_dir.iterdir():
-                        if f.is_file() and f.suffix.lower() in audio_exts:
-                            mtime = f.stat().st_mtime
-                            if mtime > before_send and mtime > newest_time:
-                                newest_time = mtime
-                                newest = f
+                for att_dir in att_dirs:
+                    if att_dir.is_dir():
+                        for f in att_dir.iterdir():
+                            if f.is_file() and f.suffix.lower() in audio_exts:
+                                mtime = f.stat().st_mtime
+                                if mtime > before_send and mtime > newest_time:
+                                    newest_time = mtime
+                                    newest = f
                 if newest:
                     raw = newest.read_bytes()
                     audio_b64 = base64.b64encode(raw).decode()
@@ -640,6 +645,7 @@ class GalgamePlugin(Star):
                     break
                 empty_polls += 1
                 if empty_polls >= 3:
+                    logger.info(f"[pipeline] TTS audio poll: no new files after {empty_polls} rounds, giving up")
                     break
                 await asyncio.sleep(1)
 
@@ -650,7 +656,10 @@ class GalgamePlugin(Star):
         if pending_emotions:
             clean_text = raw_reply
             emotions = pending_emotions
-            clean_text = re.sub(EMOTION_PATTERN, "", clean_text).strip()
+            clean_text = re.sub(EMOTION_PATTERN, "", clean_text)
+            clean_text = re.sub(r"\[EMO:\w+\]", "", clean_text)
+            clean_text = re.sub(r"\([a-z-]+\)", "", clean_text)
+            clean_text = re.sub(r"<#\d+\.?\d*#>", "", clean_text).strip()
         else:
             clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
         final_emotion = emotions[-1][0] if emotions else "neutral"
