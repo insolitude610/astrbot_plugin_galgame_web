@@ -548,6 +548,9 @@ function replayLastResponse() {
   if (typewriterTimer) clearTimeout(typewriterTimer);
   switchExpression(currentEmotion);
   typewriterAppend(lastReplyData.text, lastReplyData.emotionMap);
+  if (lastReplyData.audio) {
+    playTTSAudio(lastReplyData.audio, lastReplyData.audioMime);
+  }
 }
 
 /* ---- TTS audio ---- */
@@ -631,7 +634,7 @@ async function sendMessage(audioData) {
       var emotionMap = {};
       var emotionList = resp.emotions || [];
       emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
-      lastReplyData = { text: resp.reply, emotionMap: emotionMap };
+      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav" };
       document.getElementById("replay-btn").classList.add("active");
       typewriterAppend(resp.reply, emotionMap);
       finishResponse();
