@@ -55,11 +55,24 @@ from .galgame_web.web_handler import GalgameWebHandler
 
 ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
 
-_AUDIO_MIME_MAP = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
 
-
-def _mime_for_suffix(suffix: str) -> str:
-    return _AUDIO_MIME_MAP.get(suffix.lower(), "audio/wav")
+def _detect_audio_mime(raw: bytes) -> str:
+    if len(raw) < 4:
+        return "audio/wav"
+    head = raw[:4]
+    if head == b"RIFF":
+        return "audio/wav"
+    if head == b"OggS":
+        return "audio/ogg"
+    if head == b"fLaC":
+        return "audio/flac"
+    if head[:2] == b"\xff\xfb" or head[:2] == b"\xff\xf3" or head[:2] == b"\xff\xf2":
+        return "audio/mpeg"
+    if head == b"ID3\x03" or head == b"ID3\x02" or head == b"ID3\x04":
+        return "audio/mpeg"
+    if len(raw) >= 12 and raw[4:8] == b"ftyp":
+        return "audio/mp4"
+    return "audio/wav"
 
 
 def _is_pure_json(text: str) -> bool:
@@ -503,9 +516,10 @@ class GalgamePlugin(Star):
                     if record_file:
                         record_path = pathlib.Path(get_astrbot_data_path()) / "attachments" / record_file
                         if record_path.exists():
-                            audio_b64 = base64.b64encode(record_path.read_bytes()).decode()
-                            audio_mime = _mime_for_suffix(record_path.suffix)
-                            logger.info(f"[pipeline] captured audio: {record_file} ({record_path.stat().st_size} bytes)")
+                            raw = record_path.read_bytes()
+                            audio_b64 = base64.b64encode(raw).decode()
+                            audio_mime = _detect_audio_mime(raw)
+                            logger.info(f"[pipeline] captured audio: {record_file} ({len(raw)} bytes, {audio_mime})")
                 elif mtype in ("plain", "complete"):
                     if dtext and not _is_pure_json(dtext):
                         collected.append(dtext)
