@@ -103,7 +103,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             req.add_header("Authorization", f"Bearer {GalgameWebHandler.jwt_token}")
 
         try:
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=300)
             status = resp.status
             logger.debug(f"[proxy] upstream responded {status}")
 

@@ -1,5 +1,11 @@
 # AI Galgame 虚拟伙伴
 
+> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
+> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
+> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
+>
+> 如已安装 `astrbot_plugin_combine_messages` 等消息合并/防抖类插件，请在 AstrBot WebUI 的会话管理中，为 Galgame 的 webchat 会话禁用该类插件。
+
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
 一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、TTS 语音朗读、语音输入、会话恢复、对话历史等交互特性。
