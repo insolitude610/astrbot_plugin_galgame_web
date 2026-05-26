@@ -116,7 +116,7 @@
   },
   "typewriter_speed": {
     "description": "打字机速度",
-    "type": "integer",
+    "type": "int",
     "default": 60,
     "hint": "打字机逐字显示间隔，单位毫秒。数值越小速度越快。建议范围 10 ~ 200。"
   },
