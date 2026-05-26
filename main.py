@@ -619,14 +619,13 @@ class GalgamePlugin(Star):
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         if not audio_b64:
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
             att_dirs = [
                 pathlib.Path(get_astrbot_data_path()) / "attachments",
                 pathlib.Path(get_astrbot_data_path()) / "temp",
             ]
             audio_exts = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".webm"}
-            empty_polls = 0
-            for _ in range(20):
+            for _ in range(15):
                 newest = None
                 newest_time = 0
                 for att_dir in att_dirs:
@@ -642,10 +641,6 @@ class GalgamePlugin(Star):
                     audio_b64 = base64.b64encode(raw).decode()
                     pipeline_result["audio_mime"] = _detect_audio_mime(raw)
                     logger.info(f"[pipeline] TTS audio captured: {newest.name}")
-                    break
-                empty_polls += 1
-                if empty_polls >= 3:
-                    logger.info(f"[pipeline] TTS audio poll: no new files after {empty_polls} rounds, giving up")
                     break
                 await asyncio.sleep(1)
 
