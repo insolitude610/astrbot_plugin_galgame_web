@@ -13,6 +13,7 @@ var characterName = "小星";
 var backgroundFile = "";
 
 var typewriterTimer = null;
+var typewriterSpeed = 60;
 var isAudioPlaying = false;
 var lastReplyData = null;
 
@@ -345,6 +346,7 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
   document.documentElement.style.setProperty("--sprite-bottom", cfg.sprite_bottom != null ? cfg.sprite_bottom : 28);
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
+  typewriterSpeed = cfg.typewriter_speed || 60;
 }
 
 function applyBackground() {
@@ -524,7 +526,7 @@ function typewriterAppend(text, emotionMap) {
         var pos = emotionPositions.shift();
         switchExpression(emotionMap[pos]);
       }
-      typewriterTimer = setTimeout(tick, 60);
+      typewriterTimer = setTimeout(tick, typewriterSpeed);
     } else {
       typewriterTimer = null;
       // Apply any remaining emotions

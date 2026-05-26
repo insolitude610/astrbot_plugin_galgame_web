@@ -346,6 +346,7 @@ class GalgamePlugin(Star):
             "sprite_scale": self.config.get("sprite_scale", 1.0),
             "sprite_bottom": self.config.get("sprite_bottom", 28.0),
             "sprite_left": self.config.get("sprite_left", 50.0),
+            "typewriter_speed": self.config.get("typewriter_speed", 60),
         }
 
     # ---- asset APIs ----
