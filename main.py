@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 import pathlib
+import re
 import shutil
 import threading
 import time
@@ -233,6 +234,27 @@ class GalgamePlugin(Star):
         ev = session.get("_resp_event")
         if ev and not ev.is_set():
             ev.set()
+
+    @filter.on_decorating_result(priority=1)
+    async def _strip_emotion_tags_for_tts(self, event: AstrMessageEvent) -> None:
+        umo = event.unified_msg_origin
+        if not umo:
+            return
+        parts = umo.partition(":FriendMessage:")
+        sid = parts[2].rsplit("!", 1)[-1] if parts[2] else ""
+        session = self._sessions.get(sid)
+        if not session:
+            return
+        result = event.get_result()
+        if not result or not result.chain:
+            return
+        emotion_tags = get_emotion_tags(self.config)
+        for comp in result.chain:
+            if hasattr(comp, "text") and isinstance(comp.text, str):
+                clean, emotions = extract_emotions(comp.text, emotion_tags)
+                if emotions:
+                    session["_pending_emotions"] = emotions
+                comp.text = clean
 
     # ---- session API ----
 
@@ -594,7 +616,14 @@ class GalgamePlugin(Star):
 
         raw_reply = raw_reply.replace("\\n", "\n")
         emotion_tags = get_emotion_tags(self.config)
-        clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
+        async with session["_lock"]:
+            pending_emotions = session.pop("_pending_emotions", None)
+        if pending_emotions:
+            clean_text = raw_reply
+            emotions = pending_emotions
+            clean_text = re.sub(EMOTION_PATTERN, "", clean_text).strip()
+        else:
+            clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
         async with session["_lock"]:
