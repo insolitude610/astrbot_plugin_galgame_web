@@ -1,5 +1,13 @@
 # 变更记录
 
+## v0.5.2
+
+- **TTS 情绪标签剥离** — 新增 `on_decorating_result(priority=1)` 钩子，在 TTS 插件合成语音前从消息链中剥离 `{emotion_xxx}` 标签，避免标签被当作文字读出。情绪数据缓存到 session 供 `_api_send` 使用
+- **音频格式自动检测** — 用文件 magic bytes（RIFF/ID3/OggS/fLaC/ftyp）替代后缀名判断 MIME 类型。webchat 适配器总是存为 `.wav` 后缀，但实际格式可能是 mp3，此前会导致浏览器播放失败
+- **打字机速度可配置** — 新增 `typewriter_speed` 配置项（`_conf_schema.json`），默认 60ms/字，支持 10~200 范围
+- **重播按钮升级** — `replayLastResponse` 现在同时重放 TTS 语音，`lastReplyData` 新增 audio 字段，每次新回复覆盖旧数据不堆积
+- **修复插件载入错误** — `_conf_schema.json` 类型名 `integer` → `int`，兼容 AstrBot schema 校验
+
 ## v0.5.1
 
 - **TTS 语音朗读** — `_push_through_pipeline` 新增 `record` 类型监听，自动从管道 back_queue 捕获音频并 base64 编码返回前端。配合任意 AstrBot TTS 插件（如 `astrbot_plugin_tts_emotion_router`）即可实现语音朗读，不安装 TTS 插件时静默降级
