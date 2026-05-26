@@ -1,5 +1,18 @@
 # 变更记录
 
+## v0.5.3
+
+- **VRM 3D 模式正式上线** — `sprite_mode: vrm` 使用 Three.js + three-vrm 渲染 3D 动漫角色。VRoid Studio（免费）导出 `.vrm` 一键上传，原生支持自动眨眼、视线跟踪鼠标、表情 blend shape 切换。旧 `layered` 模式已删除
+- **Single 模式双图交叉渐变** — 两个 `<img>` 叠放，旧图淡出和新图淡入同时 0.6s 重叠过渡，零空白帧。取代旧版单图 fade 切换
+- **combine_messages 兼容性** — 明确声明不建议与消息合并/防抖插件一同使用。AstrBot 内置 `session_plugin_config` 可对 webchat 会话禁用指定插件。README 添加醒目警告
+- **TTS 多管道兼容** — 适配 `combine_messages` 两阶段管道场景的 TTS 音频捕获。`on_decorating_result(priority=1)` 剥离 `{emotion_xxx}` 标签避免被读出，`_capture_llm_response` 剥离 `[EMO:xxx]` 和 TTS 控制符 `(inhale)` `<#0.6#>` 保证前端显示干净
+- **立绘素材匹配修复** — `_resolve_assets` 过滤 `_blink` 文件防止闭眼图被误当主表情图，眨眼中断 CDN 后自动恢复
+- **情绪标签格式强化** — 提示词用具体正反例替代模板写法 `{emotion_xxx}`，防止 LLM 输出 `{happy}` 缩写格式
+- **会话状态恢复** — 从立绘管理页返回后自动恢复当前表情和最后一句 AI 回复文字。`_api_session_init` 新增 `current_emotion` 字段
+- **视觉效果优化** — drop-shadow 光晕从 40px/0.5 收紧到 8px/0.15；单/VRM 两模式容器尺寸统一；呼吸动画定位修复
+- **代码重构** — `main.py` 从 1152 行拆分为 5 个模块：`utils.py`（情绪/提示词）、`assets_helpers.py`（素材匹配）、`session_helpers.py`（会话持久化）、`web_handler.py`（HTTP 服务器）、`vrm.js`（3D 渲染引擎）
+- **HTTP 代理超时** 120s → 300s，消除慢 LLM 请求断连
+
 ## v0.5.2
 
 - **TTS 情绪标签剥离** — 新增 `on_decorating_result(priority=1)` 钩子，在 TTS 插件合成语音前从消息链中剥离 `{emotion_xxx}` 标签，避免标签被当作文字读出。情绪数据缓存到 session 供 `_api_send` 使用
