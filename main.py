@@ -256,33 +256,6 @@ class GalgamePlugin(Star):
                     session["_pending_emotions"] = emotions
                 comp.text = clean
 
-    @filter.on_decorating_result(priority=-2000)
-    async def _capture_tts_audio(self, event: AstrMessageEvent) -> None:
-        umo = event.unified_msg_origin
-        if not umo:
-            return
-        parts = umo.partition(":FriendMessage:")
-        sid = parts[2].rsplit("!", 1)[-1] if parts[2] else ""
-        session = self._sessions.get(sid)
-        if not session:
-            return
-        result = event.get_result()
-        if not result or not result.chain:
-            return
-        for comp in result.chain:
-            file_val = getattr(comp, "file", None)
-            if file_val:
-                from astrbot.core.utils.astrbot_path import get_astrbot_data_path as _gadp
-                record_path = pathlib.Path(_gadp()) / "attachments" / str(file_val)
-                if record_path.exists():
-                    raw = record_path.read_bytes()
-                    session["_pending_audio"] = base64.b64encode(raw).decode()
-                    session["_pending_audio_mime"] = _detect_audio_mime(raw)
-                break
-        ev = session.get("_audio_event")
-        if ev and not ev.is_set():
-            ev.set()
-
     # ---- session API ----
 
     async def _api_session_init(self):
@@ -644,14 +617,23 @@ class GalgamePlugin(Star):
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         if not audio_b64:
-            audio_ev = session.get("_audio_event", asyncio.Event())
-            audio_ev.clear()
-            try:
-                await asyncio.wait_for(audio_ev.wait(), timeout=10)
-            except asyncio.TimeoutError:
-                pass
-            audio_b64 = session.pop("_pending_audio", None) or ""
-            pipeline_result["audio_mime"] = session.pop("_pending_audio_mime", None) or ""
+            await asyncio.sleep(4)
+            att_dir = pathlib.Path(get_astrbot_data_path()) / "attachments"
+            audio_exts = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".webm"}
+            newest = None
+            newest_time = 0
+            if att_dir.is_dir():
+                for f in att_dir.iterdir():
+                    if f.is_file() and f.suffix.lower() in audio_exts:
+                        mtime = f.stat().st_mtime
+                        if mtime > newest_time:
+                            newest_time = mtime
+                            newest = f
+            if newest and newest.exists():
+                raw = newest.read_bytes()
+                audio_b64 = base64.b64encode(raw).decode()
+                pipeline_result["audio_mime"] = _detect_audio_mime(raw)
+                logger.info(f"[pipeline] picked up audio from filesystem: {newest.name}")
 
         raw_reply = raw_reply.replace("\\n", "\n")
         emotion_tags = get_emotion_tags(self.config)
