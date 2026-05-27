@@ -6,7 +6,7 @@
 >
 > ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
 >
-> 如已安装 `astrbot_plugin_combine_messages` 等消息合并/防抖类插件，请在 AstrBot WebUI 的会话管理中，为 Galgame 的 webchat 会话禁用该类插件。
+> 如已安装 `astrbot_plugin_combine_messages` 等消息合并/防抖类插件，请在 AstrBot WebUI 的自定义规则中，为 Galgame 的 webchat 会话禁用该类插件。
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
@@ -95,6 +95,8 @@ http://localhost:6186
 - **TTS 语音朗读** —— 配合任意 AstrBot TTS 插件（如 `astrbot_plugin_tts_emotion_router` 等），安装后自动捕获管道音频并播放。不安装 TTS 插件时静默降级，不影响正常使用
 - **语音输入** —— 浏览器麦克风录音 → WAV → AstrBot STT 管道自动转文字
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
+- **点击快进** — 打字机播放中点击对话框，文字快速弹入显示并切到最终表情，还原 galgame 手感
+- **轻戳互动** — 空闲时点击角色区域可触发 AI 主动对话
 - **对话历史面板** —— 顶部时钟图标进入，气泡式展示历史消息，背景色自动适配角色立绘
 - **AstrBot 指令兼容** —— 在输入框直接使用 `/reset`、`/new` 等指令，经管道分发执行
 - **重播按钮** —— 对话框右上角重播按钮，可重放上次 AI 回复的完整打字机 + 表情切换动画 + TTS 语音
