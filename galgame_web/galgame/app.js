@@ -548,8 +548,9 @@ function typewriterAppend(text, emotionMap) {
 
 /* ---- skip typewriter (click to fast-forward) ---- */
 
-function skipTypewriter() {
+function skipTypewriter(e) {
   if (!typewriterTimer) return;
+  if (e && e.target.tagName === "BUTTON") return;
   clearTimeout(typewriterTimer);
   typewriterTimer = null;
   el.dialogText.textContent = typewriterFullText;
