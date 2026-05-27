@@ -231,6 +231,15 @@ html, body {
   border-radius: 2px;
 }
 
+#dialog-text.text-reveal {
+  animation: text-pop 0.2s ease-out;
+}
+
+@keyframes text-pop {
+  0% { transform: scale(1.03); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 #dialog-text .cursor {
   display: inline-block;
   width: 2px;

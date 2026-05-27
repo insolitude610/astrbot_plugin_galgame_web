@@ -14,6 +14,8 @@ var backgroundFile = "";
 
 var typewriterTimer = null;
 var typewriterSpeed = 60;
+var typewriterFullText = "";
+var typewriterLastEmotion = "";
 var isAudioPlaying = false;
 var lastReplyData = null;
 
@@ -281,6 +283,7 @@ function finishInit(isResuming) {
   setupInput();
   setupRapidDetection();
   applySprites();
+  document.getElementById("dialog-box").addEventListener("click", skipTypewriter);
   if (spriteMode === "vrm") {
     import("./vrm.js").then(function(m) { vrmModule = m; startVRMRender(); });
   }
@@ -507,6 +510,7 @@ function switchExpression(emotion) {
 
 function typewriterAppend(text, emotionMap) {
   var elText = el.dialogText;
+  elText.classList.remove("text-reveal");
   if (typewriterTimer) {
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
@@ -515,7 +519,8 @@ function typewriterAppend(text, emotionMap) {
   emotionMap = emotionMap || {};
   var emotionPositions = Object.keys(emotionMap).map(Number).sort(function(a,b){return a-b;});
 
-  elText.textContent = "";
+  typewriterFullText = text;
+  typewriterLastEmotion = emotionPositions.length ? emotionMap[emotionPositions[emotionPositions.length - 1]] : currentEmotion;
   var i = 0;
   function tick() {
     if (i < text.length) {
@@ -539,6 +544,21 @@ function typewriterAppend(text, emotionMap) {
     }
   }
   tick();
+}
+
+/* ---- skip typewriter (click to fast-forward) ---- */
+
+function skipTypewriter() {
+  if (!typewriterTimer) return;
+  clearTimeout(typewriterTimer);
+  typewriterTimer = null;
+  el.dialogText.textContent = typewriterFullText;
+  el.dialogText.classList.add("text-reveal");
+  setTimeout(function() { el.dialogText.classList.remove("text-reveal"); }, 200);
+  switchExpression(typewriterLastEmotion || currentEmotion);
+  var cursor = document.createElement("span");
+  cursor.className = "cursor";
+  el.dialogText.appendChild(cursor);
 }
 
 /* ---- replay ---- */
