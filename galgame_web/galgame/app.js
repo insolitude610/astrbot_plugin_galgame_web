@@ -735,6 +735,7 @@ function setupRapidDetection() {
 
   document.addEventListener("click", function (e) {
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
+    if (document.getElementById("dialog-box").contains(e.target)) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
     keyTimestamps = [];
   });
