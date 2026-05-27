@@ -565,10 +565,18 @@ class GalgamePlugin(Star):
         audio_data = data.get("audio_data", "")
         if not sid or sid not in self._sessions:
             return {"error": "invalid session_id"}, 400
-        if not text and not audio_data:
-            return {"error": "empty text"}, 400
 
         session = self._sessions[sid]
+
+        async with session["_lock"]:
+            rapid_count = session.pop("pending_rapid_clicks", 0)
+            conv_id = session.get("conv_id", "")
+
+        if rapid_count > 0 and not text and not audio_data:
+            text = "(戳了戳)"
+        elif not text and not audio_data:
+            return {"error": "empty text"}, 400
+
         audio_path = ""
         if audio_data:
             try:
@@ -589,15 +597,7 @@ class GalgamePlugin(Star):
                     session["current_emotion"] = "neutral"
                 save_session(self._sessions, sid)
 
-        async with session["_lock"]:
-            rapid_count = session.pop("pending_rapid_clicks", 0)
-            conv_id = session.get("conv_id", "")
-
-        rapid_hint = ""
-        if rapid_count > 0:
-            rapid_hint = f"\n\n（用户刚才在短时间内快速点击了{rapid_count}次鼠标或按键，可能心情烦躁或着急，请关心一下ta怎么了）"
-
-        pipeline_text = text + rapid_hint
+        pipeline_text = text
         try:
             t_pipe = time.time()
             pipeline_result = await self._push_through_pipeline(pipeline_text, sid, audio_path)

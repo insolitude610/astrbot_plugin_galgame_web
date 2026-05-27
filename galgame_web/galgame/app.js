@@ -764,8 +764,21 @@ async function notifyRapidAction(count) {
       session_id: sessionId,
       count: count,
     });
+    if (!typewriterTimer) {
+      disableInput();
+      var resp = await apiPost("send", { session_id: sessionId, text: "" });
+      if (resp.reply) {
+        var emotionMap = {};
+        (resp.emotions || []).forEach(function(e) { emotionMap[e[1]] = e[0]; });
+        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav" };
+        document.getElementById("replay-btn").classList.add("active");
+        typewriterAppend(resp.reply, emotionMap);
+        finishResponse();
+        if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+      }
+    }
   } catch (err) {
-    console.warn("Rapid action notify failed:", err);
+    console.warn("Rapid action failed:", err);
   }
 }
 
