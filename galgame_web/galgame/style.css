@@ -25,7 +25,7 @@ html, body {
 #background {
   position: absolute;
   inset: 0;
-  background-color: #4a3a50;
+  background-color: #1a1410;
   background-size: cover;
   background-position: center;
   z-index: 0;
@@ -35,7 +35,7 @@ html, body {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(255,200,160,0.06) 0%, rgba(30,20,40,0.20) 100%);
+  background: radial-gradient(ellipse at center, rgba(255,200,160,0.08) 0%, rgba(20,15,10,0.85) 100%);
   pointer-events: none;
 }
 
