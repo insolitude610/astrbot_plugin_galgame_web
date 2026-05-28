@@ -16,15 +16,23 @@ html, body {
 body {
   background: #000;
   position: relative;
+  overflow: hidden;
 }
 
-/* overlay background (warm glass, matches history panel) */
-body::before {
-  content: "";
+/* background layer (matches history panel overlay) */
+#fav-bg {
   position: fixed;
   inset: 0;
-  background: linear-gradient(rgba(50, 40, 30, 0.68), rgba(35, 28, 20, 0.65));
   z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-color: #000;
+}
+#fav-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(50, 40, 30, 0.68), rgba(35, 28, 20, 0.65));
 }
 
 /* content container (matches history-content card) */
@@ -148,6 +156,7 @@ body::before {
 </head>
 <body>
 
+<div id="fav-bg"></div>
 <div id="fav-container">
   <div id="fav-header">
     <div>
@@ -259,6 +268,16 @@ async function loadFavorites() {
   loading.style.display = "none";
 }
 
+async function loadBackground() {
+  try {
+    var cfg = await apiGet("config");
+    if (cfg.background) {
+      document.getElementById("fav-bg").style.backgroundImage = "url(./assets/" + encodeURIComponent(cfg.background) + ")";
+    }
+  } catch(e) {}
+}
+
+loadBackground();
 loadFavorites();
 </script>
 </body>
