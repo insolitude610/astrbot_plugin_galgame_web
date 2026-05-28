@@ -475,9 +475,10 @@ function applySprites() {
     el.spriteContainer.classList.remove("active");
     el.spriteSingle.classList.add("active");
     activeFace = "a";
-    el.spriteFaceA.classList.remove("hidden");
     el.spriteFaceB.classList.add("hidden");
-    loadExpressionToSingle(currentEmotion);
+    var initSrc = assetUrl(expressions[currentEmotion] || expressions["neutral"]);
+    if (initSrc) el.spriteFaceA.src = initSrc;
+    el.spriteFaceA.classList.remove("hidden");
   }
 }
 
