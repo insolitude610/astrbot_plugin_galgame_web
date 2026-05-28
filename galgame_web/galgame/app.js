@@ -576,6 +576,24 @@ function replayLastResponse() {
   }
 }
 
+/* ---- favorites ---- */
+
+async function favoriteCurrent() {
+  if (!lastReplyData || !lastReplyData.audio_file) return;
+  try {
+    await apiPost("favorites/add", {
+      text: lastReplyData.text,
+      audio_file: lastReplyData.audio_file,
+      audio_mime: lastReplyData.audioMime,
+    });
+    var btn = document.getElementById("favorite-btn");
+    btn.classList.add("favorited");
+    setTimeout(function() { btn.classList.remove("favorited"); }, 600);
+  } catch(e) {
+    console.warn("Favorite add failed:", e);
+  }
+}
+
 /* ---- TTS audio ---- */
 
 function playTTSAudio(base64data, mime) {
@@ -657,8 +675,13 @@ async function sendMessage(audioData) {
       var emotionMap = {};
       var emotionList = resp.emotions || [];
       emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
-      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav" };
+      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
       document.getElementById("replay-btn").classList.add("active");
+      if (resp.audio_file) {
+        document.getElementById("favorite-btn").classList.add("active");
+      } else {
+        document.getElementById("favorite-btn").classList.remove("active");
+      }
       typewriterAppend(resp.reply, emotionMap);
       finishResponse();
       if (resp.audio) {
@@ -740,6 +763,24 @@ async function toggleHistory() {
           };
         })(msg.audio_file);
         msgRow.appendChild(playBtn);
+
+        var favBtn = document.createElement("button");
+        favBtn.className = "msg-fav-btn";
+        favBtn.title = "收藏语音";
+        favBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+        favBtn.onclick = (function(m) {
+          return async function() {
+            try {
+              await apiPost("favorites/add", {
+                text: m.content,
+                audio_file: m.audio_file,
+                audio_mime: m.audio_mime || "audio/wav",
+              });
+              favBtn.style.color = "#ef4444";
+            } catch(e) { console.warn("Favorite add failed:", e); }
+          };
+        })(msg);
+        msgRow.appendChild(favBtn);
       }
 
       row.appendChild(msgRow);
@@ -798,8 +839,13 @@ async function notifyRapidAction(count) {
       if (resp.reply) {
         var emotionMap = {};
         (resp.emotions || []).forEach(function(e) { emotionMap[e[1]] = e[0]; });
-        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav" };
+        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
         document.getElementById("replay-btn").classList.add("active");
+      if (resp.audio_file) {
+        document.getElementById("favorite-btn").classList.add("active");
+      } else {
+        document.getElementById("favorite-btn").classList.remove("active");
+      }
         typewriterAppend(resp.reply, emotionMap);
         finishResponse();
         if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");

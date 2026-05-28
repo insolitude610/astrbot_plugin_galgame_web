@@ -211,6 +211,70 @@ html, body {
   transform: scale(0.88);
 }
 
+/* ---- Favorite Button ---- */
+
+#favorite-btn {
+  position: absolute;
+  top: -16px;
+  right: 56px;
+  z-index: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(15, 15, 35, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s, background .2s, transform .15s;
+}
+
+#favorite-btn.active {
+  display: flex;
+}
+
+#favorite-btn:hover {
+  color: rgba(255, 130, 150, 0.95);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+#favorite-btn.favorited {
+  color: #ef4444;
+  fill: #ef4444;
+}
+
+#favorite-btn.favorited svg {
+  fill: #ef4444;
+  stroke: #ef4444;
+}
+
+/* ---- Favorites Link (top nav) ---- */
+
+#favorites-link {
+  position: fixed;
+  top: 12px;
+  right: 100px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  transition: color .2s, background .2s;
+}
+#favorites-link:hover {
+  background: rgba(255,255,255,.15);
+  color: rgba(255,130,150,.85);
+}
+
 /* ---- Dialog Text ---- */
 
 #dialog-text {
@@ -542,6 +606,27 @@ html, body {
 .msg-play-btn:hover {
   color: rgba(220, 180, 140, 0.9);
   background: rgba(200, 160, 120, 0.18);
+}
+
+.msg-fav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 130, 150, 0.15);
+  background: rgba(255, 130, 150, 0.05);
+  color: rgba(255, 130, 150, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s, background .2s;
+}
+.msg-fav-btn:hover {
+  color: rgba(255, 130, 150, 0.9);
+  background: rgba(255, 130, 150, 0.15);
 }
 
 .msg-bubble {
