@@ -294,6 +294,11 @@ function finishInit(isResuming) {
 }
 
 async function init() {
+  var cachedBg = localStorage.getItem("galgame_bg") || "";
+  if (cachedBg) {
+    el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
+  }
+
   try {
     var config = await apiGet("config");
     applyConfig(config);
@@ -346,6 +351,7 @@ function applyConfig(cfg) {
   if (!vrmModelPath) vrmModelPath = "./assets/model.vrm";
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
+  if (backgroundFile) localStorage.setItem("galgame_bg", backgroundFile);
   historyAvatar = cfg.history_avatar || "";
   el.characterName.textContent = characterName;
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
