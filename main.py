@@ -55,6 +55,13 @@ from .galgame_web.session_helpers import (
 from .galgame_web.web_handler import GalgameWebHandler
 
 ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
+AUDIO_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "audio"
+
+_MIME_EXT = {"audio/wav": ".wav", "audio/mpeg": ".mp3", "audio/ogg": ".ogg", "audio/flac": ".flac", "audio/mp4": ".m4a"}
+
+
+def _ext_for_mime(mime: str) -> str:
+    return _MIME_EXT.get(mime, ".wav")
 
 
 def _detect_audio_mime(raw: bytes) -> str:
@@ -526,6 +533,7 @@ class GalgamePlugin(Star):
         collected = []
         audio_b64 = ""
         audio_mime = ""
+        audio_file = ""
         first = True
         try:
             while True:
@@ -545,6 +553,9 @@ class GalgamePlugin(Star):
                             raw = record_path.read_bytes()
                             audio_b64 = base64.b64encode(raw).decode()
                             audio_mime = _detect_audio_mime(raw)
+                            AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+                            audio_file = f"{uuid.uuid4().hex}{_ext_for_mime(audio_mime)}"
+                            (AUDIO_DIR / audio_file).write_bytes(raw)
                             logger.info(f"[pipeline] captured audio: {record_file} ({len(raw)} bytes, {audio_mime})")
                 elif mtype in ("plain", "complete"):
                     if dtext and not _is_pure_json(dtext):
@@ -555,7 +566,7 @@ class GalgamePlugin(Star):
             webchat_queue_mgr.remove_back_queue(msg_id)
         result_text = "".join(collected).strip()
         logger.info(f"[pipeline] returning text_len={len(result_text)} audio={'yes' if audio_b64 else 'no'}")
-        return {"text": result_text, "audio": audio_b64, "audio_mime": audio_mime}
+        return {"text": result_text, "audio": audio_b64, "audio_mime": audio_mime, "audio_file": audio_file}
 
     async def _api_send(self):
         data = await request.get_json() or {}
@@ -635,7 +646,7 @@ class GalgamePlugin(Star):
 
         async with session["_lock"]:
             session["history"].append({"role": "user", "content": text})
-            session["history"].append({"role": "assistant", "content": clean_text})
+            session["history"].append({"role": "assistant", "content": clean_text, "audio_file": pipeline_result.get("audio_file", ""), "audio_mime": pipeline_result.get("audio_mime", "")})
             session["current_emotion"] = final_emotion
             if len(session["history"]) > 40:
                 session["history"] = session["history"][-40:]

@@ -22,6 +22,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:6185"
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame"
     assets_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "assets"
+    audio_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
     jwt_token: str = ""
 
     MIME = {
@@ -61,6 +62,10 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             safe_assets = _safe_path(filename, self.assets_dir)
             if safe_assets and safe_assets.is_file():
                 safe = safe_assets
+        elif filename.startswith("audio/"):
+            safe_audio = _safe_path(filename, self.audio_dir)
+            if safe_audio and safe_audio.is_file():
+                safe = safe_audio
         if not safe or not safe.is_file():
             self.send_error(404)
             return

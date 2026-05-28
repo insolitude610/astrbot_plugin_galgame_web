@@ -523,6 +523,27 @@ html, body {
   border: 2px solid rgba(200, 160, 120, 0.25);
 }
 
+.msg-play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 160, 120, 0.2);
+  background: rgba(200, 160, 120, 0.08);
+  color: rgba(200, 160, 120, 0.5);
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s, background .2s;
+}
+.msg-play-btn:hover {
+  color: rgba(220, 180, 140, 0.9);
+  background: rgba(200, 160, 120, 0.18);
+}
+
 .msg-bubble {
   display: inline-block;
   max-width: 72%;
