@@ -129,6 +129,8 @@ def register_asset(plugin_config: dict, key: str, filename: str, assets_dir: pat
                 plugin_config["expressions"][base] = filename
         elif prefix == "bg" and "background" in plugin_config:
             plugin_config["background"] = filename
+        elif prefix == "avatar" and "history_avatar" in plugin_config:
+            plugin_config["history_avatar"] = filename
     except Exception:
         logger.exception(f"_register_asset failed for key={key}")
     for ext in IMAGE_EXTS:

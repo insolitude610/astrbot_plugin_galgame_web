@@ -120,6 +120,12 @@
     "default": 60,
     "hint": "打字机逐字显示间隔，单位毫秒。数值越小速度越快。建议范围 10 ~ 200。"
   },
+  "history_avatar": {
+    "description": "历史记录头像",
+    "type": "string",
+    "default": "",
+    "hint": "对话历史面板中 AI 消息左侧显示的头像图。留空则不显示头像。建议正方形大头照 128×128。可通过立绘管理页上传。"
+  },
   "layers": {
     "description": "VRM 3D模型配置",
     "type": "object",

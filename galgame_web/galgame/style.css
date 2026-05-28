@@ -505,6 +505,24 @@ html, body {
   padding-right: 4px;
 }
 
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.history-msg.user .msg-row {
+  justify-content: flex-end;
+}
+
+.history-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(200, 160, 120, 0.25);
+}
+
 .msg-bubble {
   display: inline-block;
   max-width: 72%;
@@ -529,7 +547,6 @@ html, body {
   border: 2px solid var(--history-user-bubble-border, rgba(180,140,100,.30));
   border-top-right-radius: 4px;
   color: var(--history-user-bubble-text, #e0d4c0);
-  float: right;
   box-shadow: 0 1px 4px rgba(0,0,0,.15);
 }
 

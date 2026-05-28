@@ -229,6 +229,13 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   <div class="slot-grid" id="slots-bg"></div>
 </div>
 
+<!-- Avatar section -->
+<div class="section" id="section-avatar">
+  <h2>对话历史头像</h2>
+  <div class="hint">对话历史面板中 AI 消息左侧显示的头像。建议<strong>正方形大头照（128×128）</strong>，留空则不显示。</div>
+  <div class="slot-grid" id="slots-avatar"></div>
+</div>
+
 <!-- All files grid -->
 <h3 style="margin-top: 28px;">所有已上传文件</h3>
 <div id="batch-bar" style="display:none; margin-bottom:8px; align-items:center; gap:12px;">
@@ -387,6 +394,7 @@ function renderAll() {
   renderSingleSlots();
   renderVRMSlot();
   renderBgSlot();
+  renderAvatarSlot();
   renderFileGrid();
 }
 
@@ -422,6 +430,12 @@ function renderBgSlot() {
   var grid = document.getElementById("slots-bg");
   grid.innerHTML = "";
   grid.appendChild(slotCard("background", getMatchedFile("background", "bg"), "背景图", "bg"));
+}
+
+function renderAvatarSlot() {
+  var grid = document.getElementById("slots-avatar");
+  grid.innerHTML = "";
+  grid.appendChild(slotCard("history_avatar", getMatchedFile("history_avatar", "avatar"), "头像", "avatar"));
 }
 
 function slotCard(key, matchedFile, label, idPrefix) {

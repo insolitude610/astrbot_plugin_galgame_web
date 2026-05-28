@@ -11,6 +11,7 @@ var expressions = {};
 var layers = {};
 var characterName = "小星";
 var backgroundFile = "";
+var historyAvatar = "";
 
 var typewriterTimer = null;
 var typewriterSpeed = 60;
@@ -345,6 +346,7 @@ function applyConfig(cfg) {
   if (!vrmModelPath) vrmModelPath = "./assets/model.vrm";
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
+  historyAvatar = cfg.history_avatar || "";
   el.characterName.textContent = characterName;
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
   document.documentElement.style.setProperty("--sprite-bottom", cfg.sprite_bottom != null ? cfg.sprite_bottom : 28);
@@ -715,7 +717,17 @@ async function toggleHistory() {
       var bubble = document.createElement("div");
       bubble.className = "msg-bubble";
       bubble.textContent = msg.content;
-      row.appendChild(bubble);
+
+      var msgRow = document.createElement("div");
+      msgRow.className = "msg-row";
+      if (!isUser && historyAvatar) {
+        var avatar = document.createElement("img");
+        avatar.className = "history-avatar";
+        avatar.src = assetUrl(historyAvatar);
+        msgRow.appendChild(avatar);
+      }
+      msgRow.appendChild(bubble);
+      row.appendChild(msgRow);
 
       list.appendChild(row);
     }
