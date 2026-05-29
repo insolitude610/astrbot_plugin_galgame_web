@@ -95,13 +95,6 @@ def _is_pure_json(text: str) -> bool:
         return False
 
 
-_GALGAME_TO_TTS_EMOTION = {
-    "happy": "happy", "sad": "sad", "angry": "angry",
-    "surprised": "happy", "blush": "happy", "thinking": "neutral",
-    "neutral": "neutral",
-}
-
-
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -273,9 +266,6 @@ class GalgamePlugin(Star):
                 clean, emotions = extract_emotions(comp.text, emotion_tags)
                 if emotions:
                     session["_pending_emotions"] = emotions
-                    dominant = emotions[-1][0]
-                    tts_emo = _GALGAME_TO_TTS_EMOTION.get(dominant, "neutral")
-                    clean = f"[EMO:{tts_emo}] {clean}"
                 comp.text = clean
 
     # ---- session API ----
