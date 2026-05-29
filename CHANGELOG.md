@@ -1,5 +1,10 @@
 # 变更记录
 
+## v0.5.5
+
+- **分段情感 TTS** — 新增 MiniMax 直调引擎，galgame 按 LLM 输出的 `{emotion_xxx}` 标签位置自动切分文本，每段独立调用 MiniMax API 合成不同情绪的语音。前端打字机播放时逐段触发对应情感的语音。不配 `minimax_tts.api_key` 则整个模块不启动，零影响 Single/VRM 模式
+- **LLM 情绪标记提示** — `DEFAULT_GALGAME_PROMPT` 新增规则教会 LLM 同时输出 `[EMO:xxx]`（供 TTS 插件消费）和 `{emotion_xxx}`（供 galgame 立绘切换），双轨并行互不干扰
+
 ## v0.5.4
 
 - **历史面板角色头像** — AI 消息左侧显示圆形头像。立绘管理页新增头像槽位，上传 PNG 后自动注册到 `history_avatar` 配置。不上传则不显示

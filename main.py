@@ -11,6 +11,7 @@ import time
 import uuid
 from http.server import ThreadingHTTPServer
 
+import aiohttp
 import jwt
 from quart import Response, request
 
@@ -93,6 +94,69 @@ def _is_pure_json(text: str) -> bool:
         return True
     except (json.JSONDecodeError, ValueError):
         return False
+
+
+async def _minimax_tts(text: str, emotion: str, tts_cfg: dict) -> tuple[bytes, str] | tuple[None, None]:
+    if not text.strip():
+        return None, None
+    voice_map = {}
+    speed_map = {}
+    try:
+        voice_map = json.loads(tts_cfg.get("emotion_voice_map", "{}") or "{}")
+    except json.JSONDecodeError:
+        pass
+    try:
+        speed_map = json.loads(tts_cfg.get("emotion_speed_map", "{}") or "{}")
+    except json.JSONDecodeError:
+        pass
+    voice_id = voice_map.get(emotion) or tts_cfg.get("voice_id", "female-shaonv")
+    speed = speed_map.get(emotion) or float(tts_cfg.get("speed", 1.0))
+    group_id = tts_cfg.get("group_id", "")
+    payload = {
+        "model": tts_cfg.get("model", "speech-2.8-hd"),
+        "text": text,
+        "stream": False,
+        "voice_setting": {
+            "voice_id": voice_id,
+            "speed": speed,
+            "emotion": emotion,
+        },
+        "audio_setting": {
+            "channel": 1,
+            "sample_rate": 32000,
+            "bitrate": 128000,
+            "format": "mp3",
+        },
+    }
+    url = f"https://api.minimaxi.com/v1/t2a_v2?GroupId={group_id}" if group_id else "https://api.minimaxi.com/v1/t2a_v2"
+    headers = {
+        "Authorization": f"Bearer {tts_cfg['api_key']}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    logger.warning(f"[minimax] TTS API error {resp.status}")
+                    return None, None
+                data = await resp.json()
+                audio_hex = None
+                if "data" in data and "audio" in data["data"]:
+                    audio_hex = data["data"]["audio"]
+                elif "extra_info" in data and "audio_hex" in data["extra_info"]:
+                    audio_hex = data["extra_info"]["audio_hex"]
+                elif "base_resp" in data and data["base_resp"].get("status_code") == 0:
+                    audio_hex = data.get("data", {}).get("audio") or ""
+                if not audio_hex:
+                    logger.warning(f"[minimax] TTS returned no audio: {data}")
+                    return None, None
+                raw = bytes.fromhex(audio_hex)
+                return raw, "audio/mpeg"
+    except asyncio.TimeoutError:
+        logger.warning(f"[minimax] TTS timeout for text: {text[:30]}")
+    except Exception as e:
+        logger.warning(f"[minimax] TTS error: {e}")
+    return None, None
 
 
 class GalgamePlugin(Star):
@@ -248,7 +312,7 @@ class GalgamePlugin(Star):
             ev.set()
 
     @filter.on_decorating_result(priority=1)
-    async def _strip_emotion_tags_for_tts(self, event: AstrMessageEvent) -> None:
+    async def _segmented_emotion_tts(self, event: AstrMessageEvent) -> None:
         umo = event.unified_msg_origin
         if not umo:
             return
@@ -260,13 +324,37 @@ class GalgamePlugin(Star):
         result = event.get_result()
         if not result or not result.chain:
             return
+
+        tts_cfg = self.config.get("minimax_tts", {}) or {}
+        tts_enabled = bool(tts_cfg.get("api_key", "").strip())
+
         emotion_tags = get_emotion_tags(self.config)
         for comp in result.chain:
             if hasattr(comp, "text") and isinstance(comp.text, str):
                 clean, emotions = extract_emotions(comp.text, emotion_tags)
                 if emotions:
                     session["_pending_emotions"] = emotions
+                    if tts_enabled and len(emotions) >= 1:
+                        segments = self._build_emotion_segments(clean, emotions, tts_cfg)
+                        session["_audio_segments"] = segments
                 comp.text = clean
+
+    def _build_emotion_segments(self, text: str, emotions: list, tts_cfg: dict) -> list[dict]:
+        segments = []
+        cursor = 0
+        sorted_emos = sorted(emotions, key=lambda e: e[1])
+        for emo_label, char_pos in sorted_emos:
+            if char_pos < cursor:
+                continue
+            seg_text = text[cursor:char_pos].strip()
+            if seg_text:
+                segments.append({"text": seg_text, "emotion": emo_label, "char_pos": cursor})
+            cursor = char_pos
+        tail = text[cursor:].strip()
+        if tail or not segments:
+            emo = emotions[-1][0] if emotions else "neutral"
+            segments.append({"text": tail or text.strip(), "emotion": emo, "char_pos": cursor})
+        return segments
 
     # ---- session API ----
 
@@ -648,6 +736,25 @@ class GalgamePlugin(Star):
             clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
+        tts_cfg = self.config.get("minimax_tts", {}) or {}
+        tts_enabled = bool(tts_cfg.get("api_key", "").strip())
+
+        audio_segments = []
+        async with session["_lock"]:
+            raw_segments = session.pop("_audio_segments", None)
+        if tts_enabled and raw_segments:
+            logger.info(f"[segmented_tts] synthesizing {len(raw_segments)} segments")
+            t0_tts = time.time()
+            for seg in raw_segments:
+                raw, mime = await _minimax_tts(seg["text"], seg["emotion"], tts_cfg)
+                if raw:
+                    audio_segments.append({
+                        "b64": base64.b64encode(raw).decode(),
+                        "mime": mime,
+                        "char_pos": seg["char_pos"],
+                    })
+            logger.info(f"[segmented_tts] {len(audio_segments)}/{len(raw_segments)} segments in {time.time() - t0_tts:.1f}s")
+
         async with session["_lock"]:
             session["history"].append({"role": "user", "content": text})
             session["history"].append({"role": "assistant", "content": clean_text, "audio_file": pipeline_result.get("audio_file", ""), "audio_mime": pipeline_result.get("audio_mime", "")})
@@ -672,7 +779,7 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to sync conversation to DB: {e}")
 
-        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions], "audio": audio_b64, "audio_mime": pipeline_result.get("audio_mime", ""), "audio_file": pipeline_result.get("audio_file", "")}
+        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions], "audio": audio_b64, "audio_mime": pipeline_result.get("audio_mime", ""), "audio_file": pipeline_result.get("audio_file", ""), "audio_segments": audio_segments}
 
     def _load_favorites(self) -> list[dict]:
         if not FAVORITES_PATH.exists():
