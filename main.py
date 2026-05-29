@@ -116,10 +116,10 @@ async def _minimax_tts(text: str, emotion: str, tts_cfg: dict) -> tuple[bytes, s
         "model": tts_cfg.get("model", "speech-2.8-hd"),
         "text": text,
         "stream": False,
+        "emotion": emotion,
         "voice_setting": {
             "voice_id": voice_id,
             "speed": speed,
-            "emotion": emotion,
         },
         "audio_setting": {
             "channel": 1,
@@ -337,6 +337,7 @@ class GalgamePlugin(Star):
                     if tts_enabled and len(emotions) >= 1:
                         segments = self._build_emotion_segments(clean, emotions, tts_cfg)
                         session["_audio_segments"] = segments
+                clean = re.sub(r"\[EMO:\w+\]\s*", "", clean)
                 comp.text = clean
 
     def _build_emotion_segments(self, text: str, emotions: list, tts_cfg: dict) -> list[dict]:
