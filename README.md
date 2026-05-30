@@ -76,6 +76,7 @@ http://localhost:6186
 | `sprite_left` | 立绘水平锚点 (%) | 默认 `50`（居中） |
 | `typewriter_speed` | 打字机速度 (ms/字) | 默认 `60`，越小越快，建议 10~200 |
 | `history_avatar` | 历史记录头像 | 立绘管理页直接上传设置，留空则不显示 |
+| `tts_emotion_map` | 立绘情绪→TTS情绪映射 (JSON) | 例：`{"blush":"shy","thinking":"contemplative"}`，留空直接用标签本名 |
 | `background` | 场景背景图 | 留空自动匹配 |
 | `expressions` | 各情绪对应立绘文件名 | 留空自动匹配 |
 | `custom_emotions` | 自定义额外情绪标签 (JSON) | 例：`{"dokidoki": ""}` |
@@ -93,7 +94,7 @@ http://localhost:6186
 
 - **AI 驱动表情切换** —— LLM 回复中插入 `{emotion_happy}` 等标签，前端实时切换角色表情
 - **打字机效果** —— 回复文字逐字显示（60ms/字），表情随文字进度同步切换
-- **TTS 语音朗读** —— 支持两种模式：管道捕获（配合 TTS 插件使用）和内置 MiniMax 分段情感引擎（`minimax_tts` 配置），每段语音按表情切换独立合成不同情绪
+- **TTS 分段情感语音** —— 按 LLM 输出的 `{emotion_xxx}` 标签边界自动分段，每段文本前拼接 Fish Audio 方括号标签 `[xxx]`，逐段调用 AstrBot TTS provider 独立合成不同情绪语音，前端打字机播放时语音与立绘同步切换
 - **语音输入** —— 浏览器麦克风录音 → WAV → AstrBot STT 管道自动转文字
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
 - **点击快进** — 打字机播放中点击对话框，文字快速弹入显示并切到最终表情，还原 galgame 手感
@@ -257,11 +258,17 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 ```json
 {
   "reply": "AI 回复文本（已去除情绪标签）",
-  "emotion": "happy"
+  "emotion": "happy",
+  "emotions": [["neutral", 0], ["happy", 8], ["blush", 18]],
+  "audio": "（pipeline 管道 TTS 音频 base64，有分段时置空）",
+  "audio_segments": [
+    {"b64": "...", "mime": "audio/wav", "char_pos": 0},
+    {"b64": "...", "mime": "audio/wav", "char_pos": 8}
+  ]
 }
 ```
 
-前端收到后执行打字机动画显示 `reply`，根据 `emotion` 切换立绘表情。
+前端收到后执行打字机动画显示 `reply`，根据 `emotions` 序列在指定位置切换立绘，`audio_segments` 逐段播放 Fish Audio 情感语音。
 
 ---
 
@@ -284,7 +291,7 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 
 ## 已知限制
 
-- **TTS 情绪精度**：当前 galgame 插件与 TTS 插件各自独立注入情绪标签指令（如 `{emotion_xxx}` vs `[EMO:xxx]`），LLM 自主决定输出格式。TTS 插件在无法解析显式情绪标记时，会使用启发式关键词分类器兜底，但复杂情绪场景下音色匹配可能不够精准。未来计划开发通用的情绪标记适配层，提升跨插件 TTS 兼容性。
+- **TTS 情绪标签**：WebUI 聊天的 TTS 绕过了 AstrBot pipeline 直接调用 provider，因此其他插件的文本处理钩子（如 meme_manager 的方括号过滤）不会影响 Fish Audio 情感标签。`{emotion_xxx}` 标签在 pipeline 处理阶段由 `_handle_emotion_strip` 剥离，不影响消息显示。
 - **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。
 - **VRM 3D 模式**：尚未完善，暂不可用。
 
