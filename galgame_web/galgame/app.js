@@ -920,6 +920,7 @@ async function notifyRapidAction(count) {
           finishResponse();
           if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
         }
+      }
     }
   } catch (err) {
     console.warn("Rapid action failed:", err);
