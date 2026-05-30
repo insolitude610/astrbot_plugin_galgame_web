@@ -2,11 +2,49 @@
 
 ## v0.6.0
 
-- **Fish Audio 分段情感 TTS** — 移除 MiniMax 直调引擎，改用 AstrBot 已配置的 TTS provider（Fish Audio）。LLM 回复按 `{emotion_xxx}` 标签边界自动分段，每段文本前拼接 Fish Audio 方括号情绪标签 `[xxx]`，逐段调用 provider 合成独立语音。前端打字机播放时每段语音跟随立绘切换同步触发
-- **移除 `[EMO:xxx]` 双标签系统** — 不再需要双轨情绪标记。`{emotion_xxx}` 作为统一标签：立绘切换定位 + Fish Audio TTS 情绪输入。LLM prompt 简化，不再要求 `[EMO:xxx]` 开头
-- **新增 `tts_emotion_map` 配置** — 支持将 galgame 立绘情绪映射到 Fish Audio 情绪（如 `{"blush":"shy","thinking":"contemplative"}`），留空则直接用标签本名
-- **删除 `minimax_tts` 配置段** — 移除 `_conf_schema.json` 中 MiniMax 相关全部配置项（api_key、voice_id、model、emotion_voice_map、emotion_speed_map）
-- **绕过 pipeline TTS** — WebUI 聊天 TTS 直接调用 provider，绕过 AstrBot pipeline 各阶段（避免 meme_manager 等插件误吞 `[xxx]` 标签）。pipeline TTS 音频在有分段时自动置空，防止双重播放
+**TTS 重构：MiniMax → Fish Audio 单次行内标签合成**
+
+- 移除 MiniMax 直调引擎（`_minimax_tts`/`import aiohttp`）和 `minimax_tts` 配置段
+- WebUI 聊天 TTS 直接调用 AstrBot provider（`self.context.provider_manager.inst_map.get`），绕过 pipeline 各阶段，避免 meme_manager 等插件误吞 `[xxx]` 方括号标签
+- 插件配置新增 `tts_provider` 选择器，可直接选择 AstrBot 已注册的 TTS provider，未选择时回退全局默认
+- LLM 回复按 `{emotion_xxx}` 标签边界分段，每段文本前拼接 Fish Audio 方括号情绪标签 `[xxx]`，**单次 API 调用**发送整段带标签文本，Fish Audio S2-Pro 按句子边界自动切换情绪
+- 前端播放改为单个音频文件，消除旧分段 TTS 多文件重叠播放的 bug；立绘切换根据音频 duration 按字符位置比例 `setTimeout` 调度，与语音同步
+- 新增 `tts_emotion_map` 配置：支持将 galgame 立绘情绪映射到 Fish Audio 情绪（如 `{"blush":"shy"}`），留空直接用标签本名
+- 音频格式支持 wav/mp3 可选（`audio_format` 配置），mp3 模式用 ffmpeg 转码（~200KB/条 vs wav ~2MB），未安装 ffmpeg 自动回退
+
+**自由情绪标签系统**
+
+- 新增 `extract_all_emotions()`：匹配**所有** `{emotion_xxx}` 标签，拆分为 `known`（已配置的 7 种，给前端立绘切换）和 `all`（全部，给 TTS 拼 `[xxx]` 标签）
+- LLM prompt 教 AI 除了必须的基础 7 种表情外，还可自由使用 `{emotion_excited}`、`{emotion_傲娇}`、`{emotion_whispering}` 等中英文自定义标签，Fish Audio S2-Pro 15000+ 自由文本描述全量可用
+- 前端立绘只按已知 7 种切换，未知标签不影响显示
+
+**移除 `[EMO:xxx]` 双标签系统**
+
+- 删除 prompt 中的 `[EMO:xxx]` 指令，`{emotion_xxx}` 作为统一标签：立绘切换定位 + TTS 情绪输入
+- `_capture_llm_response` 不再剥离 `[EMO:xxx]`；`_handle_emotion_strip` 精简，只做 `{emotion_xxx}` 剥离
+
+**会话管理增强**
+
+- 修复 Dashboard 重复空白 UMO 对话：`init_astrbot_conv` 创建前先查已有的 `get_curr_conversation_id`；`sync_sessions_to_db` 去掉 `create_if_not_exists`，对话不存在时重新 init
+- 新增会话切换导航按钮（列表图标），替换原一次性模态框，可随时展开侧滑面板浏览和切换历史会话
+- 每条会话卡片右上角新增 × 删除按钮，调用 `POST /session/delete` API 同时清理 AstrBot 对话、JSON 文件、关联音频
+- 插件启动时自动清理无引用的空壳 session（history 为空 + conv 已不存在）
+- `/new`、`/del`、`/reset` 指令完全同步 AstrBot 对话生命周期：`/new` 后从 AstrBot 读回新 conv_id，`/del` 后清空 conv_id 等 pipeline 自动重建，指令文本不记入 history
+- `sync_conv_to_db` 更新前验证对话仍存在，避免向已删除对话写入
+
+**音频文件管理**
+
+- 音频孤儿清理：启动时扫描 `audio/` 目录，只保留被 session history 或收藏（`favorites.json`）引用的文件
+- 会话删除时同步清理关联音频；`gc_sessions` 超期清理也一并清音频
+- 收藏的语音受保护，永远不会被误删
+- TTS 音频存入 `AUDIO_DIR`，支持历史面板回放和语音收藏
+
+**其他修复**
+
+- 过滤 meme_manager 产生的 `[IMAGE]xxx.jpg` 引用文本，防止显示在对话框
+- 修复 `_build_tts_segments` 情绪错位 bug（`{emotion_xxx}` 在开头时后续分段全用错情绪）
+- 修复 `ProviderManager` 无 `get_provider` 方法导致的 AttributeError → 改用 `inst_map.get`
+- 修复 `sendMessage`/`notifyRapidAction` 中多余/缺失 `}` 导致的 SyntaxError 页面全紫
 
 ## v0.5.5
 

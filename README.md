@@ -68,7 +68,8 @@ http://localhost:6186
 | `character_name` | 对话框上方显示的角色名 | 你的角色名 |
 | `persona` | AstrBot 内置人格 | AstrBot 预设 |
 | `llm_provider` | 驱动对话的 AI 模型 | deepseek / gpt |
-| `tts_provider` | 语音合成提供商 | 选择已配置的 TTS Provider，配合 TTS 插件使用 |
+| `tts_provider` | 语音合成提供商 | 选择已配置的 TTS Provider（推荐 Fish Audio S2-Pro） |
+| `audio_format` | TTS 音频格式 | `wav`=无损(≈2MB/条)；`mp3`=需 ffmpeg(≈200KB/条)，未安装自动回退 wav |
 | `web_port` | 独立 WebUI 端口 | 默认 `6186`，`0` = 关闭 |
 | `sprite_mode` | 立绘渲染模式 | **`single`**（推荐，VRM 尚不可用） |
 | `sprite_scale` | 立绘整体缩放倍数 | 默认 `1.0`，建议 0.5 ~ 2.0 |
@@ -94,13 +95,14 @@ http://localhost:6186
 
 - **AI 驱动表情切换** —— LLM 回复中插入 `{emotion_happy}` 等标签，前端实时切换角色表情
 - **打字机效果** —— 回复文字逐字显示（60ms/字），表情随文字进度同步切换
-- **TTS 分段情感语音** —— 按 LLM 输出的 `{emotion_xxx}` 标签边界自动分段，每段文本前拼接 Fish Audio 方括号标签 `[xxx]`，逐段调用 AstrBot TTS provider 独立合成不同情绪语音，前端打字机播放时语音与立绘同步切换
+- **TTS 情感语音** —— 按 LLM 输出的 `{emotion_xxx}` 标签边界，在纯文本前拼接 Fish Audio 方括号标签 `[xxx]`，单次调用 TTS provider 合成整段情感语音。Fish Audio S2-Pro 按句子边界自动切换情绪。立绘切换根据音频时长同步，与语音进度一致
 - **语音输入** —— 浏览器麦克风录音 → WAV → AstrBot STT 管道自动转文字
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
 - **点击快进** — 打字机播放中点击对话框，文字快速弹入显示并切到最终表情，还原 galgame 手感
 - **轻戳互动** — 空闲时点击角色区域可触发 AI 主动对话
 - **对话历史面板** —— 顶部时钟图标进入，气泡式展示历史消息，背景色自动适配角色立绘。支持 AI 消息头像显示、历史语音回放
-- **AstrBot 指令兼容** —— 在输入框直接使用 `/reset`、`/new` 等指令，经管道分发执行
+- **会话切换面板** —— 顶部列表图标进入，浏览和切换所有历史会话，每条会话右上角 × 按钮可直接删除（同步清理 AstrBot 对话 + 关联音频）
+- **AstrBot 指令兼容** —— 在输入框使用 `/reset`、`/new`、`/del` 等指令，会话状态与 AstrBot 对话生命周期完全同步，指令文本不污染对话记录
 - **重播按钮** —— 对话框右上角重播按钮，可重放上次 AI 回复的完整打字机 + 表情切换动画 + TTS 语音
 - **语音收藏** —— 顶部 ❤ 图标进入收藏页面，可收藏喜欢的语音片段，数据持久化不随 /reset 丢失
 
@@ -188,7 +190,7 @@ http://localhost:6186
 
 ### 自定义情绪
 
-在插件配置页的 **「自定义情绪」** 字段中写入 JSON 添加额外情绪：
+在插件配置页的 **「自定义情绪」** 字段中写入 JSON 添加额外情绪（会同时用于立绘切换和 TTS）：
 
 ```json
 {"dokidoki": "dokidoki.png", "cry": "", "smirk": "smirk.png"}
@@ -197,7 +199,18 @@ http://localhost:6186
 - **key**：情绪标签名，AI 会使用 `{emotion_key}` 标记
 - **value**：`assets/` 下的文件名（留空自动匹配 `key.png`）
 
-后端自动合并默认 7 种 + 自定义情绪，system prompt 会列出全部可用标签。注意：新增情绪后需上传对应的表情图。
+### 自由情绪标签（TTS 专用）
+
+除了已配置的立绘表情，AI 还可以在回复中自由使用任意 `{emotion_xxx}` 标签来增强 TTS 表现力，支持英文和中文：
+
+```
+{emotion_excited}哇！{emotion_happy}今天真开心！{emotion_傲娇}哼！{emotion_blush}嘿嘿~
+```
+
+- 已配置的 7 种（如 happy/blush）→ 同时触发立绘切换 + TTS 情绪
+- 自由标签（如 excited/傲娇）→ **仅 TTS 生效**，立绘不切（没有对应的表情图）
+- Fish Audio S2-Pro 支持 15000+ 自由文本描述，`[excited]`/`[傲娇]`/`[whispering]` 等均可用
+- 通过 `tts_emotion_map` 可把 galgame 标签映射到 Fish Audio 标签（如 `{"blush":"shy"}`）
 
 ---
 
@@ -260,15 +273,13 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
   "reply": "AI 回复文本（已去除情绪标签）",
   "emotion": "happy",
   "emotions": [["neutral", 0], ["happy", 8], ["blush", 18]],
-  "audio": "（pipeline 管道 TTS 音频 base64，有分段时置空）",
-  "audio_segments": [
-    {"b64": "...", "mime": "audio/wav", "char_pos": 0},
-    {"b64": "...", "mime": "audio/wav", "char_pos": 8}
-  ]
+  "audio": "（Fish Audio TTS 合成语音 base64）",
+  "audio_mime": "audio/wav",
+  "audio_file": "abc123.wav"
 }
 ```
 
-前端收到后执行打字机动画显示 `reply`，根据 `emotions` 序列在指定位置切换立绘，`audio_segments` 逐段播放 Fish Audio 情感语音。
+前端收到后执行打字机动画显示 `reply`，`emotions` 已知项（已配置立绘的 7 种）用于立绘切换，`audio` 为单文件整段语音，TTS 文本含所有 `[xxx]` 行内情绪标签（包括 AI 自由发挥的自定义标签）。
 
 ---
 
@@ -291,8 +302,9 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 
 ## 已知限制
 
-- **TTS 情绪标签**：WebUI 聊天的 TTS 绕过了 AstrBot pipeline 直接调用 provider，因此其他插件的文本处理钩子（如 meme_manager 的方括号过滤）不会影响 Fish Audio 情感标签。`{emotion_xxx}` 标签在 pipeline 处理阶段由 `_handle_emotion_strip` 剥离，不影响消息显示。
-- **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。
+- **TTS 情绪标签**：WebUI 聊天的 TTS 绕过 AstrBot pipeline 直接调用 provider，因此 meme_manager 等插件的文本处理钩子不会影响 Fish Audio 方括号情感标签。`{emotion_xxx}` 在 pipeline 处理阶段由插件剥离。除已配置的 7 种立绘表情外，AI 可自由使用任意 `{emotion_xxx}` 标签（如 `{emotion_傲娇}`），TTS 全部接收而前端立绘只按已知 7 种切换。
+- **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。meme_manager 产生的 `[IMAGE]` 引用会自动过滤。
+- **Fish Audio 网络依赖**：Fish Audio API 服务器在境外，需稳定代理。代理不稳定时 TTS 会降级静默跳过，文字正常显示。
 - **VRM 3D 模式**：尚未完善，暂不可用。
 
 ## 许可证

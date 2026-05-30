@@ -28,7 +28,7 @@
     "description": "TTS 语音合成 Provider",
     "type": "string",
     "_special": "select_provider_tts",
-    "hint": "选择已配置的 TTS 提供商。推荐 Edge TTS（免费，零配置）或 OpenAI TTS。留空则不启用语音。",
+    "hint": "选择已配置的 TTS 提供商。推荐Fish Audio。留空则不启用语音。",
     "default": ""
   },
   "llm_provider": {
