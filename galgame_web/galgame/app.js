@@ -19,6 +19,24 @@ var typewriterFullText = "";
 var typewriterLastEmotion = "";
 var isAudioPlaying = false;
 var lastReplyData = null;
+var expressionTimers = [];
+
+function clearExpressionTimers() {
+  for (var t = 0; t < expressionTimers.length; t++) clearTimeout(expressionTimers[t]);
+  expressionTimers = [];
+}
+
+function scheduleExpressionTimers(emotionList, totalChars, audioDuration) {
+  clearExpressionTimers();
+  for (var i = 0; i < emotionList.length; i++) {
+    var emo = emotionList[i][0];
+    var pos = emotionList[i][1];
+    var delay = (pos / totalChars) * audioDuration * 1000;
+    expressionTimers.push(setTimeout((function(e) {
+      return function() { switchExpression(e); };
+    })(emo), delay));
+  }
+}
 
 /* ---- VRM 3D renderer ---- */
 var vrmModule = null;
@@ -525,6 +543,7 @@ function switchExpression(emotion) {
 /* ---- typewriter ---- */
 
 function typewriterAppend(text, emotionMap) {
+  clearExpressionTimers();
   var elText = el.dialogText;
   elText.classList.remove("text-reveal");
   if (typewriterTimer) {
@@ -567,6 +586,7 @@ function skipTypewriter(e) {
   if (e && e.target.closest("button")) return;
   clearTimeout(typewriterTimer);
   typewriterTimer = null;
+  clearExpressionTimers();
   el.dialogText.textContent = typewriterFullText;
   el.dialogText.classList.add("text-reveal");
   setTimeout(function() { el.dialogText.classList.remove("text-reveal"); }, 200);
@@ -582,9 +602,25 @@ function replayLastResponse() {
   if (!lastReplyData) return;
   if (typewriterTimer) clearTimeout(typewriterTimer);
   switchExpression(currentEmotion);
-  typewriterAppend(lastReplyData.text, lastReplyData.emotionMap);
-  if (lastReplyData.audio) {
-    playTTSAudio(lastReplyData.audio, lastReplyData.audioMime);
+  var emotionList = [];
+  for (var key in lastReplyData.emotionMap) {
+    emotionList.push([lastReplyData.emotionMap[key], parseInt(key)]);
+  }
+  if (lastReplyData.audio && emotionList.length) {
+    typewriterAppend(lastReplyData.text, {});
+    var audio = playTTSAudio(lastReplyData.audio, lastReplyData.audioMime);
+    if (audio) {
+      audio.onloadedmetadata = function() {
+        scheduleExpressionTimers(emotionList, lastReplyData.text.length, audio.duration);
+      };
+      audio.onended = function() { clearExpressionTimers(); };
+      audio.onerror = function() { clearExpressionTimers(); };
+    }
+  } else {
+    typewriterAppend(lastReplyData.text, lastReplyData.emotionMap);
+    if (lastReplyData.audio) {
+      playTTSAudio(lastReplyData.audio, lastReplyData.audioMime);
+    }
   }
 }
 
@@ -609,7 +645,7 @@ async function favoriteCurrent() {
 /* ---- TTS audio ---- */
 
 function playTTSAudio(base64data, mime) {
-  if (!base64data) return;
+  if (!base64data) return null;
 
   var audio = el.ttsAudio;
   var mimeType = mime || "audio/wav";
@@ -628,6 +664,7 @@ function playTTSAudio(base64data, mime) {
   audio.play().catch(function (e) {
     console.warn("Audio play failed:", e);
   });
+  return audio;
 }
 
 /* ---- response lifecycle ---- */
@@ -694,10 +731,21 @@ async function sendMessage(audioData) {
       } else {
         document.getElementById("favorite-btn").classList.remove("active");
       }
-      typewriterAppend(resp.reply, emotionMap);
-      finishResponse();
-      if (resp.audio) {
-        playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+      if (resp.audio && emotionList.length) {
+        typewriterAppend(resp.reply, {});
+        finishResponse();
+        var audio = playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+        audio.onloadedmetadata = function() {
+          scheduleExpressionTimers(emotionList, resp.reply.length, audio.duration);
+        };
+        audio.onended = function() { clearExpressionTimers(); };
+        audio.onerror = function() { clearExpressionTimers(); };
+      } else {
+        typewriterAppend(resp.reply, emotionMap);
+        finishResponse();
+        if (resp.audio) {
+          playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+        }
       }
     } else if (resp.error) {
       showError(resp.error);
@@ -847,7 +895,8 @@ async function notifyRapidAction(count) {
       var resp = await apiPost("send", { session_id: sessionId, text: "" });
       if (resp.reply) {
         var emotionMap = {};
-        (resp.emotions || []).forEach(function(e) { emotionMap[e[1]] = e[0]; });
+        var emotionList = resp.emotions || [];
+        emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
         lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
         document.getElementById("replay-btn").classList.add("active");
       if (resp.audio_file) {
@@ -855,10 +904,22 @@ async function notifyRapidAction(count) {
       } else {
         document.getElementById("favorite-btn").classList.remove("active");
       }
-        typewriterAppend(resp.reply, emotionMap);
-        finishResponse();
-        if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
-      }
+        if (resp.audio && emotionList.length) {
+          typewriterAppend(resp.reply, {});
+          finishResponse();
+          var audio = playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+          if (audio) {
+            audio.onloadedmetadata = function() {
+              scheduleExpressionTimers(emotionList, resp.reply.length, audio.duration);
+            };
+            audio.onended = function() { clearExpressionTimers(); };
+            audio.onerror = function() { clearExpressionTimers(); };
+          }
+        } else {
+          typewriterAppend(resp.reply, emotionMap);
+          finishResponse();
+          if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+        }
     }
   } catch (err) {
     console.warn("Rapid action failed:", err);
