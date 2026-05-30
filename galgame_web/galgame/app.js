@@ -17,7 +17,6 @@ var typewriterTimer = null;
 var typewriterSpeed = 60;
 var typewriterFullText = "";
 var typewriterLastEmotion = "";
-var typewriterAudioSegments = null;
 var isAudioPlaying = false;
 var lastReplyData = null;
 
@@ -525,17 +524,12 @@ function switchExpression(emotion) {
 
 /* ---- typewriter ---- */
 
-function typewriterAppend(text, emotionMap, audioSegments) {
+function typewriterAppend(text, emotionMap) {
   var elText = el.dialogText;
   elText.classList.remove("text-reveal");
   if (typewriterTimer) {
     clearTimeout(typewriterTimer);
     typewriterTimer = null;
-  }
-  if (audioSegments && audioSegments.length) {
-    typewriterAudioSegments = audioSegments;
-  } else {
-    typewriterAudioSegments = null;
   }
 
   emotionMap = emotionMap || {};
@@ -552,21 +546,11 @@ function typewriterAppend(text, emotionMap, audioSegments) {
         var pos = emotionPositions.shift();
         switchExpression(emotionMap[pos]);
       }
-      if (typewriterAudioSegments && typewriterAudioSegments.length && typewriterAudioSegments[0].char_pos < i) {
-        var seg = typewriterAudioSegments.shift();
-        var audio = new Audio("data:" + (seg.mime || "audio/mpeg") + ";base64," + seg.b64);
-        audio.play().catch(function(e) { console.warn("Segment audio failed:", e); });
-      }
       typewriterTimer = setTimeout(tick, typewriterSpeed);
     } else {
       typewriterTimer = null;
       while (emotionPositions.length) {
         switchExpression(emotionMap[emotionPositions.shift()]);
-      }
-      while (typewriterAudioSegments && typewriterAudioSegments.length) {
-        var remainingSeg = typewriterAudioSegments.shift();
-        var remainingAudio = new Audio("data:" + (remainingSeg.mime || "audio/mpeg") + ";base64," + remainingSeg.b64);
-        remainingAudio.play();
       }
       var cursor = document.createElement("span");
       cursor.className = "cursor";
@@ -598,8 +582,8 @@ function replayLastResponse() {
   if (!lastReplyData) return;
   if (typewriterTimer) clearTimeout(typewriterTimer);
   switchExpression(currentEmotion);
-  typewriterAppend(lastReplyData.text, lastReplyData.emotionMap, lastReplyData.audio_segments || null);
-  if (lastReplyData.audio && !lastReplyData.audio_segments) {
+  typewriterAppend(lastReplyData.text, lastReplyData.emotionMap);
+  if (lastReplyData.audio) {
     playTTSAudio(lastReplyData.audio, lastReplyData.audioMime);
   }
 }
@@ -703,18 +687,18 @@ async function sendMessage(audioData) {
       var emotionMap = {};
       var emotionList = resp.emotions || [];
       emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
-      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "", audio_segments: resp.audio_segments || null };
+      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
       document.getElementById("replay-btn").classList.add("active");
       if (resp.audio_file) {
         document.getElementById("favorite-btn").classList.add("active");
       } else {
         document.getElementById("favorite-btn").classList.remove("active");
       }
-      typewriterAppend(resp.reply, emotionMap, resp.audio_segments || null);
+      typewriterAppend(resp.reply, emotionMap);
       finishResponse();
       if (resp.audio) {
-        var audioMime = resp.audio_mime || "audio/wav";
-        playTTSAudio(resp.audio, audioMime);
+        playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+      }
       }
     } else if (resp.error) {
       showError(resp.error);
@@ -865,14 +849,14 @@ async function notifyRapidAction(count) {
       if (resp.reply) {
         var emotionMap = {};
         (resp.emotions || []).forEach(function(e) { emotionMap[e[1]] = e[0]; });
-        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "", audio_segments: resp.audio_segments || null };
+        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
         document.getElementById("replay-btn").classList.add("active");
       if (resp.audio_file) {
         document.getElementById("favorite-btn").classList.add("active");
       } else {
         document.getElementById("favorite-btn").classList.remove("active");
       }
-        typewriterAppend(resp.reply, emotionMap, resp.audio_segments || null);
+        typewriterAppend(resp.reply, emotionMap);
         finishResponse();
         if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
       }

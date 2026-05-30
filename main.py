@@ -269,10 +269,10 @@ class GalgamePlugin(Star):
                     session["_pending_emotions"] = emotions
                 comp.text = clean
 
-    def _build_tts_segments(self, text: str, emotions: list, emotion_map: dict) -> list[dict]:
-        segments = []
-        cursor = 0
+    def _build_tagged_text(self, text: str, emotions: list, emotion_map: dict) -> str:
         sorted_emos = sorted(emotions, key=lambda e: e[1])
+        result_parts = []
+        cursor = 0
         current_emotion = sorted_emos[0][0] if sorted_emos else "neutral"
         for emo_label, char_pos in sorted_emos:
             if char_pos < cursor:
@@ -281,24 +281,14 @@ class GalgamePlugin(Star):
             seg_text = text[cursor:char_pos].strip()
             if seg_text:
                 fish_emo = emotion_map.get(current_emotion, current_emotion)
-                segments.append({
-                    "text": seg_text,
-                    "emotion": current_emotion,
-                    "tagged_text": f"[{fish_emo}]{seg_text}",
-                    "char_pos": cursor,
-                })
+                result_parts.append(f"[{fish_emo}]{seg_text}")
             cursor = char_pos
             current_emotion = emo_label
         tail = text[cursor:].strip()
-        if tail or not segments:
+        if tail or not result_parts:
             fish_emo = emotion_map.get(current_emotion, current_emotion)
-            segments.append({
-                "text": tail or text.strip(),
-                "emotion": current_emotion,
-                "tagged_text": f"[{fish_emo}]{tail or text.strip()}",
-                "char_pos": cursor,
-            })
-        return segments
+            result_parts.append(f"[{fish_emo}]{tail or text.strip()}")
+        return "".join(result_parts)
 
     # ---- session API ----
 
@@ -719,6 +709,8 @@ class GalgamePlugin(Star):
             pass
 
         audio_segments = []
+        audio_file = ""
+        audio_mime_val = ""
         if emotions and clean_text:
             tts_provider_id = self.config.get("tts_provider", "").strip()
             if tts_provider_id:
@@ -726,32 +718,29 @@ class GalgamePlugin(Star):
             else:
                 tts_provider = self.context.get_using_tts_provider()
             if tts_provider:
-                segments = self._build_tts_segments(clean_text, emotions, tts_emotion_map)
-                t0_tts = time.time()
-                for seg in segments:
-                    try:
-                        audio_path = await tts_provider.get_audio(seg["tagged_text"])
-                        if audio_path:
-                            raw = pathlib.Path(audio_path).read_bytes()
-                            mime = _detect_audio_mime(raw)
-                            audio_segments.append({
-                                "b64": base64.b64encode(raw).decode(),
-                                "mime": mime,
-                                "char_pos": seg["char_pos"],
-                            })
-                            logger.info(f"[fishaudio_tts] segment '{seg['emotion']}' ({len(raw)} bytes, {mime})")
-                        else:
-                            logger.warning(f"[fishaudio_tts] no audio for segment: {seg['tagged_text'][:30]}")
-                    except Exception as e:
-                        logger.warning(f"[fishaudio_tts] segment failed: {e}")
-                if audio_segments:
-                    logger.info(f"[fishaudio_tts] {len(audio_segments)}/{len(segments)} segments in {time.time() - t0_tts:.1f}s")
+                tagged_text = self._build_tagged_text(clean_text, emotions, tts_emotion_map)
+                try:
+                    t0_tts = time.time()
+                    audio_path = await tts_provider.get_audio(tagged_text)
+                    if audio_path:
+                        raw = pathlib.Path(audio_path).read_bytes()
+                        mime = _detect_audio_mime(raw)
+                        audio_b64 = base64.b64encode(raw).decode()
+                        audio_mime_val = mime
+                        AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+                        audio_file = f"{uuid.uuid4().hex}{_ext_for_mime(mime)}"
+                        (AUDIO_DIR / audio_file).write_bytes(raw)
+                        logger.info(f"[fishaudio_tts] synthesized {len(raw)} bytes, {mime} in {time.time() - t0_tts:.1f}s")
+                    else:
+                        logger.warning("[fishaudio_tts] TTS returned no audio")
+                except Exception as e:
+                    logger.warning(f"[fishaudio_tts] TTS failed: {e}")
             else:
-                logger.warning("[fishaudio_tts] No TTS provider configured, skipping segmented TTS")
+                logger.warning("[fishaudio_tts] No TTS provider configured, skipping TTS")
 
         async with session["_lock"]:
             session["history"].append({"role": "user", "content": text})
-            session["history"].append({"role": "assistant", "content": clean_text, "audio_file": pipeline_result.get("audio_file", ""), "audio_mime": pipeline_result.get("audio_mime", "")})
+            session["history"].append({"role": "assistant", "content": clean_text, "audio_file": audio_file, "audio_mime": audio_mime_val})
             session["current_emotion"] = final_emotion
             if len(session["history"]) > 40:
                 session["history"] = session["history"][-40:]
@@ -773,10 +762,7 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.warning(f"Failed to sync conversation to DB: {e}")
 
-        if audio_segments:
-            audio_b64 = ""
-
-        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions], "audio": audio_b64, "audio_mime": pipeline_result.get("audio_mime", ""), "audio_file": pipeline_result.get("audio_file", ""), "audio_segments": audio_segments}
+        return {"reply": clean_text, "emotion": final_emotion, "emotions": [[emo, pos] for emo, pos in emotions], "audio": audio_b64, "audio_mime": audio_mime_val, "audio_file": audio_file, "audio_segments": []}
 
     def _load_favorites(self) -> list[dict]:
         if not FAVORITES_PATH.exists():
