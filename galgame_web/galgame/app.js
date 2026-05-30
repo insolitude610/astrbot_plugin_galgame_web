@@ -699,7 +699,6 @@ async function sendMessage(audioData) {
       if (resp.audio) {
         playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
       }
-      }
     } else if (resp.error) {
       showError(resp.error);
     } else {
