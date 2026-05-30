@@ -634,9 +634,10 @@ class GalgamePlugin(Star):
         cfg = self.context.get_config()
         wake_prefixes = cfg.get("wake_prefix", ["/"])
         matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
+        cmd = ""
         if matched_prefix:
             cmd = text[len(matched_prefix):].strip().split()[0].lower() if text[len(matched_prefix):].strip() else ""
-            if cmd in ("reset", "new"):
+            if cmd in ("reset", "new", "del"):
                 async with session["_lock"]:
                     session["history"] = []
                     session["current_emotion"] = "neutral"
@@ -652,6 +653,21 @@ class GalgamePlugin(Star):
         except Exception as e:
             logger.exception(f"[pipeline] push failed: {e}")
             return {"error": "回复生成失败"}, 500
+
+        is_command = bool(matched_prefix and cmd in ("new", "del", "reset"))
+        if is_command:
+            async with session["_lock"]:
+                if cmd == "new":
+                    new_cid = await self.context.conversation_manager.get_curr_conversation_id(session["umo"])
+                    if new_cid:
+                        session["conv_id"] = new_cid
+                elif cmd == "del":
+                    await init_astrbot_conv(self.context, self._webchat_username, self.config, sid, session)
+            save_session(self._sessions, sid)
+            raw_reply = raw_reply.replace("\\n", "\n") if raw_reply else ""
+            return {"reply": raw_reply or "", "emotion": "neutral", "emotions": [],
+                    "audio": audio_b64, "audio_mime": pipeline_result.get("audio_mime", ""),
+                    "audio_file": pipeline_result.get("audio_file", ""), "audio_segments": []}
 
         if not raw_reply and text.strip() and not matched_prefix:
             ev = session.get("_resp_event", asyncio.Event())

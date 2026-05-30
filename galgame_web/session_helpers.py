@@ -138,6 +138,9 @@ async def sync_conv_to_db(context, session: dict):
     if not umo or not conv_id:
         return
     try:
+        conv = await context.conversation_manager.get_conversation(umo, conv_id)
+        if not conv:
+            return
         await context.conversation_manager.update_conversation(
             unified_msg_origin=umo,
             conversation_id=conv_id,
