@@ -684,7 +684,11 @@ class GalgamePlugin(Star):
 
         audio_segments = []
         if emotions and clean_text:
-            tts_provider = self.context.get_using_tts_provider()
+            tts_provider_id = self.config.get("tts_provider", "").strip()
+            if tts_provider_id:
+                tts_provider = self.context.provider_manager.get_provider(tts_provider_id)
+            else:
+                tts_provider = self.context.get_using_tts_provider()
             if tts_provider:
                 segments = self._build_tts_segments(clean_text, emotions, tts_emotion_map)
                 t0_tts = time.time()
