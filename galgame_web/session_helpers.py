@@ -166,20 +166,28 @@ async def sync_sessions_to_db(
     save_fn,
 ):
     for sid, session in list(sessions.items()):
-        if not session.get("conv_id"):
+        history = session.get("history", [])
+        conv_id = session.get("conv_id", "")
+        umo = session.get("umo", "")
+
+        conv_exists = False
+        if conv_id and umo:
+            try:
+                conv = await context.conversation_manager.get_conversation(umo, conv_id)
+                conv_exists = conv is not None
+            except Exception:
+                pass
+
+        if not history and not conv_exists:
+            path = session_path(sid)
+            if path.exists():
+                path.unlink()
+            del sessions[sid]
+            logger.info(f"Cleaned up dead session: {sid[:8]}")
+            continue
+
+        if not conv_id or not conv_exists:
             await init_astrbot_conv(context, webchat_username, config, sid, session)
             save_fn(sid)
-        else:
-            history = session.get("history", [])
-            if not history:
-                continue
-            try:
-                conv = await context.conversation_manager.get_conversation(
-                    unified_msg_origin=session["umo"],
-                    conversation_id=session["conv_id"],
-                )
-                if not conv:
-                    await init_astrbot_conv(context, webchat_username, config, sid, session)
-                    save_fn(sid)
-            except Exception as e:
-                logger.warning(f"Failed to ensure conversation exists for {sid}: {e}")
+        elif not history:
+            continue
