@@ -134,6 +134,13 @@
     "editor_language": "json",
     "hint": "映射 galgame 情绪标签到 Fish Audio 情绪标签。例: {\"blush\":\"shy\",\"thinking\":\"contemplative\"}。留空则直接使用 galgame 标签。"
   },
+  "audio_format": {
+    "description": "TTS 音频格式",
+    "type": "string",
+    "options": ["wav", "mp3"],
+    "default": "wav",
+    "hint": "wav=无损(≈2MB/条)；mp3=需安装 ffmpeg(≈200KB/条)。未安装 ffmpeg 时自动回退 wav。"
+  },
   "layers": {
     "description": "VRM 3D模型配置",
     "type": "object",

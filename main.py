@@ -6,6 +6,7 @@ import os
 import pathlib
 import re
 import shutil
+import subprocess
 import threading
 import time
 import uuid
@@ -51,6 +52,8 @@ from .galgame_web.session_helpers import (
     sync_conv_to_db,
     delete_astrbot_conv,
     sync_sessions_to_db,
+    cleanup_session_audio,
+    gc_audio_files,
 )
 from .galgame_web.web_handler import GalgameWebHandler
 
@@ -95,6 +98,22 @@ def _is_pure_json(text: str) -> bool:
         return False
 
 
+def _convert_audio(wav_path: pathlib.Path) -> pathlib.Path | None:
+    mp3_path = wav_path.with_suffix(".mp3")
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(wav_path), "-b:a", "128k", str(mp3_path)],
+            capture_output=True, timeout=10
+        )
+        if result.returncode == 0 and mp3_path.exists():
+            wav_path.unlink()
+            return mp3_path
+    except Exception:
+        pass
+    logger.warning("[audio] ffmpeg conversion failed, keeping wav")
+    return None
+
+
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -113,6 +132,7 @@ class GalgamePlugin(Star):
             sync_sessions_to_db(self.context, self._webchat_username, self.config, self._sessions, lambda sid: save_session(self._sessions, sid))
         )
         t.add_done_callback(lambda _t: logger.warning(f"sync_sessions_to_db failed: {_t.exception()}") if _t.exception() else None)
+        gc_audio_files(self._sessions)
 
         web_port = int(self.config.get("web_port", 0) or 0)
         if web_port > 0:
@@ -366,6 +386,7 @@ class GalgamePlugin(Star):
         if not sid:
             return {"error": "session_id required"}, 400
         if sid in self._sessions:
+            cleanup_session_audio(self._sessions[sid]["history"])
             await delete_astrbot_conv(self.context, self._webchat_username, sid)
             del self._sessions[sid]
         path = session_path(sid)
@@ -730,6 +751,14 @@ class GalgamePlugin(Star):
                         AUDIO_DIR.mkdir(parents=True, exist_ok=True)
                         audio_file = f"{uuid.uuid4().hex}{_ext_for_mime(mime)}"
                         (AUDIO_DIR / audio_file).write_bytes(raw)
+                        if self.config.get("audio_format", "wav") == "mp3":
+                            converted = _convert_audio(AUDIO_DIR / audio_file)
+                            if converted:
+                                audio_file = converted.name
+                                raw = converted.read_bytes()
+                                mime = "audio/mpeg"
+                                audio_b64 = base64.b64encode(raw).decode()
+                                audio_mime_val = mime
                         logger.info(f"[fishaudio_tts] synthesized {len(raw)} bytes, {mime} in {time.time() - t0_tts:.1f}s")
                     else:
                         logger.warning("[fishaudio_tts] TTS returned no audio")

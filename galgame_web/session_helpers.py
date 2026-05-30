@@ -9,6 +9,9 @@ SESSIONS_DIR = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" /
 
 PLATFORM_ID = "webchat"
 
+AUDIO_DIR = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
+FAVORITES_PATH = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "favorites.json"
+
 
 def build_umo(webchat_username: str, session_id: str) -> str:
     return f"{PLATFORM_ID}:FriendMessage:webchat!{webchat_username}!{session_id}"
@@ -93,6 +96,7 @@ def gc_sessions(
                 path.unlink()
                 removed += 1
                 sid = path.stem
+                cleanup_session_audio(data.get("history", []))
                 asyncio.ensure_future(delete_conv_callback(sid))
         except (OSError, json.JSONDecodeError):
             pass
@@ -191,3 +195,43 @@ async def sync_sessions_to_db(
             save_fn(sid)
         elif not history:
             continue
+
+
+def _collect_referenced_audio(sessions: dict[str, dict], favorites: list[dict]) -> set[str]:
+    refs: set[str] = set()
+    for s in sessions.values():
+        for msg in s.get("history", []):
+            f = msg.get("audio_file", "")
+            if f:
+                refs.add(f)
+    for fav in favorites:
+        f = fav.get("audio_file", "")
+        if f:
+            refs.add(f)
+    return refs
+
+
+def gc_audio_files(sessions: dict[str, dict]):
+    favs: list[dict] = []
+    if FAVORITES_PATH.exists():
+        try:
+            favs = json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
+        except (OSError, json.JSONDecodeError):
+            pass
+    refs = _collect_referenced_audio(sessions, favs)
+    count = 0
+    for path in AUDIO_DIR.glob("*"):
+        if path.is_file() and path.name not in refs:
+            path.unlink()
+            count += 1
+    if count:
+        logger.info(f"GC cleaned up {count} orphan audio files")
+
+
+def cleanup_session_audio(history: list[dict]):
+    for msg in history:
+        f = msg.get("audio_file", "")
+        if f:
+            p = AUDIO_DIR / f
+            if p.exists():
+                p.unlink()
