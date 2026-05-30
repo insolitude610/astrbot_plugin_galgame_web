@@ -662,7 +662,7 @@ class GalgamePlugin(Star):
                     if new_cid:
                         session["conv_id"] = new_cid
                 elif cmd == "del":
-                    await init_astrbot_conv(self.context, self._webchat_username, self.config, sid, session)
+                    session["conv_id"] = ""
             save_session(self._sessions, sid)
             raw_reply = raw_reply.replace("\\n", "\n") if raw_reply else ""
             return {"reply": raw_reply or "", "emotion": "neutral", "emotions": [],
@@ -681,6 +681,10 @@ class GalgamePlugin(Star):
         raw_reply = raw_reply.replace("\\n", "\n")
         emotion_tags = get_emotion_tags(self.config)
         async with session["_lock"]:
+            if not session.get("conv_id"):
+                new_cid = await self.context.conversation_manager.get_curr_conversation_id(session["umo"])
+                if new_cid:
+                    session["conv_id"] = new_cid
             pending_emotions = session.pop("_pending_emotions", None)
         if pending_emotions:
             clean_text = raw_reply
