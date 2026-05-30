@@ -761,6 +761,7 @@ html, body {
 }
 
 .session-item {
+  position: relative;
   padding: 14px 12px;
   margin: 6px 0;
   border: 1px solid rgba(200, 170, 255, 0.08);
@@ -792,6 +793,27 @@ html, body {
 .session-item-count {
   font-size: 11px;
   color: rgba(180, 160, 210, 0.40);
+}
+
+.session-item-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s, background .15s;
+}
+.session-item-del:hover {
+  background: rgba(220,60,60,.18);
+  color: rgba(255,100,100,.75);
 }
 
 #session-new {

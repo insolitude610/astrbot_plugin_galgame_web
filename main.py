@@ -138,6 +138,7 @@ class GalgamePlugin(Star):
         ctx.register_web_api(f"/{pn}/rapid_action", self._api_rapid_action, ["POST"], "Notify rapid click activity")
         ctx.register_web_api(f"/{pn}/assets/batch-delete", self._api_assets_batch_delete, ["POST"], "Batch delete assets")
         ctx.register_web_api(f"/{pn}/session/list", self._api_session_list, ["GET"], "List available sessions for recovery")
+        ctx.register_web_api(f"/{pn}/session/delete", self._api_session_delete, ["POST"], "Delete a session and its AstrBot conversation")
         ctx.register_web_api(f"/{pn}/favorites/list", self._api_favorites_list, ["GET"], "List saved favorites")
         ctx.register_web_api(f"/{pn}/favorites/add", self._api_favorites_add, ["POST"], "Add a favorite")
         ctx.register_web_api(f"/{pn}/favorites/delete", self._api_favorites_delete, ["POST"], "Delete a favorite")
@@ -366,6 +367,19 @@ class GalgamePlugin(Star):
             })
         sessions_list.sort(key=lambda s: s["created_at"], reverse=True)
         return {"sessions": sessions_list}
+
+    async def _api_session_delete(self):
+        data = await request.get_json() or {}
+        sid = data.get("session_id", "").strip()
+        if not sid:
+            return {"error": "session_id required"}, 400
+        if sid in self._sessions:
+            await delete_astrbot_conv(self.context, self._webchat_username, sid)
+            del self._sessions[sid]
+        path = session_path(sid)
+        if path.exists():
+            path.unlink()
+        return {"status": "ok"}
 
     # ---- config API ----
 

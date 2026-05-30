@@ -257,6 +257,30 @@ async function loadSessionPanel() {
       '<div class="session-item-time">' + dateStr + '</div>' +
       '<div class="session-item-preview">' + preview + '</div>' +
       '<span class="session-item-count">' + s.message_count + ' 条消息</span>';
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "session-item-del";
+    delBtn.title = "删除此对话";
+    delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    delBtn.onclick = (function(sid, el) {
+      return async function(e) {
+        e.stopPropagation();
+        if (!confirm("确认删除此对话？")) return;
+        try {
+          await apiPost("session/delete", { session_id: sid });
+          if (sid === sessionId) {
+            localStorage.removeItem("galgame_session_id");
+            location.href = location.pathname;
+          } else {
+            el.remove();
+          }
+        } catch(e2) {
+          console.warn("Delete session failed:", e2);
+        }
+      };
+    })(s.session_id, item);
+    item.appendChild(delBtn);
+
     listEl.appendChild(item);
   }
 }
