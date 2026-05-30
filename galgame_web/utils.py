@@ -15,12 +15,15 @@ DEFAULT_GALGAME_PROMPT = (
     "回复规则：\n"
     "1. 用口语化、亲切的中文回复，像朋友聊天一样自然\n"
     "2. 回复长度控制在 1-4 句话，不要过长\n"
-    "3. 回复中用 {emotion_xxx} 标签标记表情切换位置。标签格式固定为 {emotion_xxx}，emotion_ 前缀不可省略\n"
-    "   可选表情：{{emotions}}\n"
-    "   可以在一句话中多次切换表情\n"
-    "   ✅ 正确示例：{emotion_happy}今天天气真好！{emotion_blush}谢谢主人~\n"
-    "   ❌ 错误：{happy}今天天气真好！              ← 缺少 emotion_ 前缀\n"
-    "   ❌ 错误：今天天气真好！(开心)                ← 不能用括号写法\n"
+    "3. 回复中用 {emotion_xxx} 标签标记情绪，格式固定为 {emotion_xxx}，emotion_ 前缀不可省略\n"
+    "   必须包含的可选表情（用于立绘切换）：{{emotions}}\n"
+    "   除此之外还可自由使用其他情绪/动作/状态，支持英文和中文：\n"
+    "   如 {emotion_excited}、{emotion_傲娇}、{emotion_whispering}、{emotion_委屈巴巴} 等\n"
+    "   可以在一句话中多次使用标签\n"
+    "   ✅ 基础：{emotion_happy}今天天气真好！{emotion_blush}谢谢主人~\n"
+    "   ✅ 自由：{emotion_excited}哇！{emotion_傲娇}哼，才不是因为喜欢你呢~\n"
+    "   ❌ 错误：{happy}今天天气真好！                ← 缺少 emotion_ 前缀\n"
+    "   ❌ 错误：今天天气真好！(开心)                  ← 不能用括号写法\n"
     "4. 不要在标签前后加任何多余文字\n"
     "5. 你的回复中不应包含括号中的心理活动描写，直接说话即可\n"
     "6. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件"
@@ -83,3 +86,30 @@ def extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
             if emotions:
                 break
     return clean, emotions
+
+
+def extract_all_emotions(text: str, known_tags: list[str]) -> tuple[str, list, list]:
+    """Extract all {emotion_xxx} tags. Returns (clean_text, known_only, all_emotions)."""
+    segments = []
+    all_emotions = []
+    last_end = 0
+    for m in EMOTION_PATTERN.finditer(text):
+        tag = m.group(1).lower()
+        segments.append(text[last_end:m.start()])
+        all_emotions.append((tag, sum(len(s) for s in segments)))
+        last_end = m.end()
+    segments.append(text[last_end:])
+    clean = "".join(segments).strip()
+
+    if not all_emotions:
+        for tag in known_tags:
+            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
+            for m in p.finditer(text):
+                all_emotions.append((tag.lower(), m.start()))
+                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
+                break
+            if all_emotions:
+                break
+
+    known = [(tag, pos) for tag, pos in all_emotions if tag in known_tags]
+    return clean, known, all_emotions

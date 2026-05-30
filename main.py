@@ -30,6 +30,7 @@ from .galgame_web.utils import (
     PLUGIN_NAME,
     get_emotion_tags,
     extract_emotions,
+    extract_all_emotions,
 )
 from .galgame_web.assets_helpers import (
     IMAGE_EXTS,
@@ -284,9 +285,10 @@ class GalgamePlugin(Star):
         emotion_tags = get_emotion_tags(self.config)
         for comp in result.chain:
             if hasattr(comp, "text") and isinstance(comp.text, str):
-                clean, emotions = extract_emotions(comp.text, emotion_tags)
-                if emotions:
-                    session["_pending_emotions"] = emotions
+                clean, known, all_emotions = extract_all_emotions(comp.text, emotion_tags)
+                if known:
+                    session["_pending_emotions"] = known
+                    session["_pending_all_emotions"] = all_emotions if all_emotions else known
                 comp.text = clean
 
     def _build_tagged_text(self, text: str, emotions: list, emotion_map: dict) -> str:
@@ -713,14 +715,16 @@ class GalgamePlugin(Star):
                 if new_cid:
                     session["conv_id"] = new_cid
             pending_emotions = session.pop("_pending_emotions", None)
+            pending_all = session.pop("_pending_all_emotions", None)
         if pending_emotions:
             clean_text = raw_reply
             emotions = pending_emotions
+            emotions_all = pending_all if pending_all else pending_emotions
             clean_text = re.sub(EMOTION_PATTERN, "", clean_text)
             clean_text = re.sub(r"\([a-z-]+\)", "", clean_text)
             clean_text = re.sub(r"<#\d+\.?\d*#>", "", clean_text).strip()
         else:
-            clean_text, emotions = extract_emotions(raw_reply, emotion_tags)
+            clean_text, emotions, emotions_all = extract_all_emotions(raw_reply, emotion_tags)
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
         tts_emotion_map = {}
@@ -739,7 +743,7 @@ class GalgamePlugin(Star):
             else:
                 tts_provider = self.context.get_using_tts_provider()
             if tts_provider:
-                tagged_text = self._build_tagged_text(clean_text, emotions, tts_emotion_map)
+                tagged_text = self._build_tagged_text(clean_text, emotions_all, tts_emotion_map)
                 try:
                     t0_tts = time.time()
                     audio_path = await tts_provider.get_audio(tagged_text)
