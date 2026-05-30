@@ -273,26 +273,28 @@ class GalgamePlugin(Star):
         segments = []
         cursor = 0
         sorted_emos = sorted(emotions, key=lambda e: e[1])
+        current_emotion = sorted_emos[0][0] if sorted_emos else "neutral"
         for emo_label, char_pos in sorted_emos:
             if char_pos < cursor:
+                current_emotion = emo_label
                 continue
             seg_text = text[cursor:char_pos].strip()
             if seg_text:
-                fish_emo = emotion_map.get(emo_label, emo_label)
+                fish_emo = emotion_map.get(current_emotion, current_emotion)
                 segments.append({
                     "text": seg_text,
-                    "emotion": emo_label,
+                    "emotion": current_emotion,
                     "tagged_text": f"[{fish_emo}]{seg_text}",
                     "char_pos": cursor,
                 })
             cursor = char_pos
+            current_emotion = emo_label
         tail = text[cursor:].strip()
         if tail or not segments:
-            emo = emotions[-1][0] if emotions else "neutral"
-            fish_emo = emotion_map.get(emo, emo)
+            fish_emo = emotion_map.get(current_emotion, current_emotion)
             segments.append({
                 "text": tail or text.strip(),
-                "emotion": emo,
+                "emotion": current_emotion,
                 "tagged_text": f"[{fish_emo}]{tail or text.strip()}",
                 "char_pos": cursor,
             })
