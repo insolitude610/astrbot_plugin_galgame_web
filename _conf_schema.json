@@ -126,20 +126,13 @@
     "default": "",
     "hint": "对话历史面板中 AI 消息左侧显示的头像图。留空则不显示头像。建议正方形大头照 128×128。可通过立绘管理页上传。"
   },
-  "minimax_tts": {
-    "description": "MiniMax 分段情感 TTS",
-    "type": "object",
-    "default": {},
-    "hint": "用于分段情感语音合成。不填 api_key 则不启用。",
-    "items": {
-      "api_key": {"description": "API Key", "type": "string", "default": ""},
-      "group_id": {"description": "Group ID", "type": "string", "default": ""},
-      "voice_id": {"description": "默认 Voice ID", "type": "string", "default": "female-shaonv"},
-      "model": {"description": "模型", "type": "string", "default": "speech-2.8-hd"},
-      "speed": {"description": "默认语速", "type": "float", "default": 1.0},
-      "emotion_voice_map": {"description": "情绪→音色映射 (JSON)", "type": "text", "default": "{}", "editor_mode": true, "editor_language": "json", "hint": "例: {\"happy\": \"female-tianmei\", \"sad\": \"female-wenrou\"}。留空则统一用 voice_id。"},
-      "emotion_speed_map": {"description": "情绪→语速映射 (JSON)", "type": "text", "default": "{\"happy\":1.2,\"sad\":0.85,\"angry\":1.1}", "editor_mode": true, "editor_language": "json", "hint": "每种情绪对应的语速倍率。留空则统一用 speed。"}
-    }
+  "tts_emotion_map": {
+    "description": "立绘情绪→TTS情绪映射",
+    "type": "text",
+    "default": "{}",
+    "editor_mode": true,
+    "editor_language": "json",
+    "hint": "映射 galgame 情绪标签到 Fish Audio 情绪标签。例: {\"blush\":\"shy\",\"thinking\":\"contemplative\"}。留空则直接使用 galgame 标签。"
   },
   "layers": {
     "description": "VRM 3D模型配置",

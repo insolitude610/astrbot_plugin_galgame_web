@@ -1,5 +1,13 @@
 # 变更记录
 
+## v0.6.0
+
+- **Fish Audio 分段情感 TTS** — 移除 MiniMax 直调引擎，改用 AstrBot 已配置的 TTS provider（Fish Audio）。LLM 回复按 `{emotion_xxx}` 标签边界自动分段，每段文本前拼接 Fish Audio 方括号情绪标签 `[xxx]`，逐段调用 provider 合成独立语音。前端打字机播放时每段语音跟随立绘切换同步触发
+- **移除 `[EMO:xxx]` 双标签系统** — 不再需要双轨情绪标记。`{emotion_xxx}` 作为统一标签：立绘切换定位 + Fish Audio TTS 情绪输入。LLM prompt 简化，不再要求 `[EMO:xxx]` 开头
+- **新增 `tts_emotion_map` 配置** — 支持将 galgame 立绘情绪映射到 Fish Audio 情绪（如 `{"blush":"shy","thinking":"contemplative"}`），留空则直接用标签本名
+- **删除 `minimax_tts` 配置段** — 移除 `_conf_schema.json` 中 MiniMax 相关全部配置项（api_key、voice_id、model、emotion_voice_map、emotion_speed_map）
+- **绕过 pipeline TTS** — WebUI 聊天 TTS 直接调用 provider，绕过 AstrBot pipeline 各阶段（避免 meme_manager 等插件误吞 `[xxx]` 标签）。pipeline TTS 音频在有分段时自动置空，防止双重播放
+
 ## v0.5.5
 
 - **分段情感 TTS** — 新增 MiniMax 直调引擎，galgame 按 LLM 输出的 `{emotion_xxx}` 标签位置自动切分文本，每段独立调用 MiniMax API 合成不同情绪的语音。前端打字机播放时逐段触发对应情感的语音。不配 `minimax_tts.api_key` 则整个模块不启动，零影响 Single/VRM 模式
