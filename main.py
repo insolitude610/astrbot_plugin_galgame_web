@@ -708,6 +708,7 @@ class GalgamePlugin(Star):
             raw_reply = session.pop("_last_resp_text", "") or raw_reply
 
         raw_reply = raw_reply.replace("\\n", "\n")
+        raw_reply = re.sub(r"\[IMAGE\][^\s]+", "", raw_reply)
         emotion_tags = get_emotion_tags(self.config)
         async with session["_lock"]:
             if not session.get("conv_id"):
