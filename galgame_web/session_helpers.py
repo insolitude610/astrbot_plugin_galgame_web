@@ -109,6 +109,15 @@ async def init_astrbot_conv(
 ):
     umo = build_umo(webchat_username, session_id)
     persona_id = config.get("persona", "") or None
+
+    existing_conv_id = await context.conversation_manager.get_curr_conversation_id(umo)
+    if existing_conv_id:
+        conv = await context.conversation_manager.get_conversation(umo, existing_conv_id)
+        if conv:
+            session["umo"] = umo
+            session["conv_id"] = existing_conv_id
+            return
+
     try:
         conv_id = await context.conversation_manager.new_conversation(
             unified_msg_origin=umo,
@@ -162,10 +171,12 @@ async def sync_sessions_to_db(
             if not history:
                 continue
             try:
-                await context.conversation_manager.get_conversation(
+                conv = await context.conversation_manager.get_conversation(
                     unified_msg_origin=session["umo"],
                     conversation_id=session["conv_id"],
-                    create_if_not_exists=True,
                 )
+                if not conv:
+                    await init_astrbot_conv(context, webchat_username, config, sid, session)
+                    save_fn(sid)
             except Exception as e:
                 logger.warning(f"Failed to ensure conversation exists for {sid}: {e}")

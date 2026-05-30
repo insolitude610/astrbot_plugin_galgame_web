@@ -199,10 +199,30 @@ function getUrlSessionId() {
   return m ? m[1] : "";
 }
 
-async function showSessionPicker() {
-  var listEl = document.getElementById("session-picker-list");
-  listEl.innerHTML = '<div class="session-picker-loading">正在查找历史对话...</div>';
-  document.getElementById("session-picker").classList.add("active");
+function toggleSessionPanel() {
+  var panel = document.getElementById("session-panel");
+  if (panel.classList.contains("active")) {
+    panel.classList.remove("active");
+    return;
+  }
+  loadSessionPanel();
+}
+
+function switchToSession(sid) {
+  localStorage.setItem("galgame_session_id", sid);
+  location.href = "?sid=" + sid;
+}
+
+function startNewSession() {
+  toggleSessionPanel();
+  localStorage.removeItem("galgame_session_id");
+  location.href = location.pathname;
+}
+
+async function loadSessionPanel() {
+  var listEl = document.getElementById("session-list");
+  listEl.innerHTML = '<div class="session-loading">正在查找历史对话...</div>';
+  document.getElementById("session-panel").classList.add("active");
 
   var sessions;
   try {
@@ -215,7 +235,7 @@ async function showSessionPicker() {
 
   listEl.innerHTML = "";
   if (!sessions.length) {
-    closeSessionPicker();
+    listEl.innerHTML = '<div class="session-loading">暂无历史对话</div>';
     return;
   }
 
@@ -229,38 +249,16 @@ async function showSessionPicker() {
       String(d.getMinutes()).padStart(2, "0");
     var preview = s.last_message || "(暂无对话)";
     var item = document.createElement("div");
-    item.className = "session-picker-item";
+    item.className = "session-item";
     item.onclick = (function(sid) {
-      return function() { resumeSession(sid); };
+      return function() { switchToSession(sid); };
     })(s.session_id);
     item.innerHTML =
-      '<div class="session-picker-time">' + dateStr + '</div>' +
-      '<div class="session-picker-preview">' + preview + '</div>' +
-      '<span class="session-picker-count">' + s.message_count + ' 条消息</span>';
+      '<div class="session-item-time">' + dateStr + '</div>' +
+      '<div class="session-item-preview">' + preview + '</div>' +
+      '<span class="session-item-count">' + s.message_count + ' 条消息</span>';
     listEl.appendChild(item);
   }
-}
-
-function closeSessionPicker() {
-  document.getElementById("session-picker").classList.remove("active");
-}
-
-function resumeSession(sid) {
-  closeSessionPicker();
-  initSession(sid).then(function(resp) {
-    if (!resp) return;
-    sessionId = resp.session_id;
-    localStorage.setItem("galgame_session_id", sessionId);
-    if (resp.current_emotion) {
-      currentEmotion = resp.current_emotion;
-    }
-    finishInit(true);
-  });
-}
-
-function startNewSession() {
-  closeSessionPicker();
-  finishInit(false);
 }
 
 async function initSession(resumeId) {
@@ -322,22 +320,7 @@ async function init() {
     currentEmotion = resp.current_emotion;
   }
 
-  if (savedId === resp.session_id) {
-    finishInit(true);
-    return;
-  }
-
-  var hasSessions = false;
-  try {
-    var data = await apiGet("session/list");
-    hasSessions = (data.sessions || []).length > 0;
-  } catch (e) {}
-
-  if (hasSessions) {
-    showSessionPicker();
-  } else {
-    finishInit(false);
-  }
+  finishInit(savedId === resp.session_id);
 }
 
 function applyConfig(cfg) {
