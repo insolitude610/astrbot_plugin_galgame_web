@@ -1,5 +1,19 @@
 # 变更记录
 
+## v0.6.1
+
+**配对表情标签系统强化**
+
+- 提示词升级为配对格式：要求 AI 每次情绪变化输出两个标签 `{emotion_自由}{emotion_立绘}`，自由标签（TTS 语气）+ 必选立绘标签（立绘切换）。同名时只写一个，确保立绘切换和语音语气同步
+- `_build_tagged_text` 重构为按位置分组处理，同位置多标签输出堆叠格式 `[tag1][tag2]text`，自由标签不再被后一个覆盖丢失
+- `_conf_schema.json` 默认提示词与 `DEFAULT_GALGAME_PROMPT` 完全同步，新增 emoji 输出禁止规则
+
+**Bug 修复**
+
+- 修复 TTS 不触发问题：AI 使用自由标签（如 `teasing`、`grin`）但不包含配置立绘标签时，`emotions` 为空导致 TTS guard 条件 `if emotions and clean_text` 判定失败，改为 `if clean_text`
+- 修复系统指令回复触发 TTS：`/reset`、`/new` 等以唤醒前缀开头的输入，LLM 回复不再触发语音朗读
+- `_build_tagged_text` 空情绪列表时返回 `[neutral]text` 作为缺省
+
 ## v0.6.0
 
 **TTS 重构：MiniMax → Fish Audio 单次行内标签合成**
