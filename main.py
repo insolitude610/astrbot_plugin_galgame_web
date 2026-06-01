@@ -748,7 +748,7 @@ class GalgamePlugin(Star):
         audio_segments = []
         audio_file = ""
         audio_mime_val = ""
-        if clean_text:
+        if clean_text and not matched_prefix:
             tts_provider_id = self.config.get("tts_provider", "").strip()
             if tts_provider_id:
                 tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
