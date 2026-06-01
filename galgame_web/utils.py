@@ -29,7 +29,7 @@ DEFAULT_GALGAME_PROMPT = (
     "   ❌ 错误：{happy}今天天气真好！                   ← 缺少 emotion_ 前缀\n"
     "   ❌ 错误：今天天气真好！(开心)                     ← 不能用括号写法\n"
     "4. 不要输出任何标签以外的东西，不要用括号写心理活动，直接说话\n"
-    "5. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件"
+    "5. 你只能输出纯文本对话，禁止调用任何工具/函数，禁止输出图片/文件/附件/emoji"
 )
 
 EXPRESSION_KEYS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
