@@ -292,24 +292,35 @@ class GalgamePlugin(Star):
                 comp.text = clean
 
     def _build_tagged_text(self, text: str, emotions: list, emotion_map: dict) -> str:
-        sorted_emos = sorted(emotions, key=lambda e: e[1])
-        result_parts = []
+        groups: dict[int, list[str]] = {}
+        for emo_label, char_pos in emotions:
+            groups.setdefault(char_pos, []).append(emo_label)
+        sorted_positions = sorted(groups)
+        if not sorted_positions:
+            return f"[neutral]{text.strip()}" if text.strip() else text
+
+        result_parts: list[str] = []
         cursor = 0
-        current_emotion = sorted_emos[0][0] if sorted_emos else "neutral"
-        for emo_label, char_pos in sorted_emos:
-            if char_pos < cursor:
-                current_emotion = emo_label
-                continue
-            seg_text = text[cursor:char_pos].strip()
-            if seg_text:
-                fish_emo = emotion_map.get(current_emotion, current_emotion)
-                result_parts.append(f"[{fish_emo}]{seg_text}")
-            cursor = char_pos
-            current_emotion = emo_label
+        current_emotions = groups[sorted_positions[0]]
+
+        for pos in sorted_positions:
+            tags = groups[pos]
+            seg_text = text[cursor:pos].strip()
+            if seg_text and current_emotions:
+                for emo in current_emotions:
+                    fish_emo = emotion_map.get(emo, emo)
+                    result_parts.append(f"[{fish_emo}]")
+                result_parts.append(seg_text)
+            cursor = pos
+            current_emotions = tags
+
         tail = text[cursor:].strip()
         if tail or not result_parts:
-            fish_emo = emotion_map.get(current_emotion, current_emotion)
-            result_parts.append(f"[{fish_emo}]{tail or text.strip()}")
+            for emo in current_emotions:
+                fish_emo = emotion_map.get(emo, emo)
+                result_parts.append(f"[{fish_emo}]")
+            result_parts.append(tail or text.strip())
+
         return "".join(result_parts)
 
     # ---- session API ----
@@ -737,7 +748,7 @@ class GalgamePlugin(Star):
         audio_segments = []
         audio_file = ""
         audio_mime_val = ""
-        if emotions and clean_text:
+        if clean_text:
             tts_provider_id = self.config.get("tts_provider", "").strip()
             if tts_provider_id:
                 tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
