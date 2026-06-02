@@ -60,7 +60,11 @@ from .galgame_web.web_handler import GalgameWebHandler
 
 ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
 AUDIO_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "audio"
+BGM_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "bgm"
 FAVORITES_PATH = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "favorites.json"
+PREFS_PATH = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "prefs.json"
+
+_AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".opus"}
 
 _MIME_EXT = {"audio/wav": ".wav", "audio/mpeg": ".mp3", "audio/ogg": ".ogg", "audio/flac": ".flac", "audio/mp4": ".m4a"}
 
@@ -115,6 +119,24 @@ def _convert_audio(wav_path: pathlib.Path) -> pathlib.Path | None:
     return None
 
 
+def _load_prefs() -> dict:
+    if not PREFS_PATH.exists():
+        return {}
+    try:
+        return json.loads(PREFS_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_prefs(data: dict):
+    PREFS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREFS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _safe_bgm_path(name: str) -> pathlib.Path | None:
+    return safe_path(name, BGM_DIR)
+
+
 class GalgamePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
@@ -163,6 +185,12 @@ class GalgamePlugin(Star):
         ctx.register_web_api(f"/{pn}/favorites/list", self._api_favorites_list, ["GET"], "List saved favorites")
         ctx.register_web_api(f"/{pn}/favorites/add", self._api_favorites_add, ["POST"], "Add a favorite")
         ctx.register_web_api(f"/{pn}/favorites/delete", self._api_favorites_delete, ["POST"], "Delete a favorite")
+        ctx.register_web_api(f"/{pn}/bgm/list", self._api_bgm_list, ["GET"], "List BGM audio files")
+        ctx.register_web_api(f"/{pn}/bgm/upload", self._api_bgm_upload, ["POST"], "Upload a BGM audio file")
+        ctx.register_web_api(f"/{pn}/bgm/delete", self._api_bgm_delete, ["POST"], "Delete a BGM file")
+        ctx.register_web_api(f"/{pn}/bgm/file", self._api_bgm_file, ["GET"], "Serve a BGM audio file")
+        ctx.register_web_api(f"/{pn}/prefs", self._api_prefs_get, ["GET"], "Get user preferences (BGM, volume)")
+        ctx.register_web_api(f"/{pn}/prefs", self._api_prefs_set, ["POST"], "Save user preferences")
 
     # ---- standalone web server ----
 
@@ -413,6 +441,7 @@ class GalgamePlugin(Star):
         files = list_asset_files(ASSETS_DIR)
         resolved = resolve_assets(self.config, files)
         emotion_keys = get_emotion_tags(self.config)
+        prefs = _load_prefs()
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
@@ -430,6 +459,9 @@ class GalgamePlugin(Star):
             "sprite_left": self.config.get("sprite_left", 50.0),
             "typewriter_speed": self.config.get("typewriter_speed", 60),
             "history_avatar": self.config.get("history_avatar", ""),
+            "bgm_file": prefs.get("bgm_file", ""),
+            "bgm_volume": prefs.get("bgm_volume", 0.5),
+            "voice_volume": prefs.get("voice_volume", 1.0),
         }
 
     # ---- asset APIs ----
@@ -584,6 +616,87 @@ class GalgamePlugin(Star):
                 deleted.append(name)
         logger.info(f"Batch deleted {len(deleted)} assets")
         return {"deleted": deleted}
+
+    # ---- BGM APIs ----
+
+    async def _api_bgm_list(self):
+        BGM_DIR.mkdir(parents=True, exist_ok=True)
+        entries = []
+        for f in sorted(BGM_DIR.iterdir()):
+            if f.is_file() and f.suffix.lower() in _AUDIO_EXTS:
+                entries.append({"name": f.name, "size": f.stat().st_size})
+        return {"files": entries}
+
+    async def _api_bgm_upload(self):
+        data = await request.get_json() or {}
+        b64 = data.get("data", "")
+        name = data.get("name", "").strip()
+        if not b64:
+            return {"error": "no data"}, 400
+        if not name:
+            name = f"bgm_{uuid.uuid4().hex[:8]}.mp3"
+        if "," in b64:
+            b64 = b64.split(",", 1)[1]
+        if len(b64) > 30 * 1024 * 1024:
+            return {"error": "file too large (max 30MB)"}, 400
+        sp = safe_path(name, BGM_DIR)
+        if not sp or sp.suffix.lower() not in _AUDIO_EXTS:
+            return {"error": "unsupported audio format"}, 400
+        try:
+            raw = base64.b64decode(b64)
+            if len(raw) > 30 * 1024 * 1024:
+                return {"error": "file too large"}, 400
+            BGM_DIR.mkdir(parents=True, exist_ok=True)
+            sp.write_bytes(raw)
+            logger.info(f"Uploaded BGM: {sp.name} ({len(raw)} bytes)")
+            return {"uploaded": sp.name}
+        except Exception as e:
+            logger.warning(f"Failed to save BGM {name}: {e}")
+            return {"error": str(e)}, 500
+
+    async def _api_bgm_delete(self):
+        data = await request.get_json() or {}
+        filename = data.get("filename", "").strip()
+        if not filename:
+            return {"error": "no filename"}, 400
+        sp = safe_path(filename, BGM_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
+            return {"error": "file not found"}, 404
+        try:
+            sp.unlink()
+            logger.info(f"Deleted BGM: {sp.name}")
+        except OSError as e:
+            return {"error": str(e)}, 500
+        prefs = _load_prefs()
+        if prefs.get("bgm_file") == filename:
+            prefs["bgm_file"] = ""
+            _save_prefs(prefs)
+        return {"deleted": sp.name}
+
+    async def _api_bgm_file(self):
+        filename = request.args.get("name", "")
+        sp = safe_path(filename, BGM_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
+            return {"error": "file not found"}, 404
+        mime_map = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4", ".aac": "audio/aac", ".opus": "audio/ogg"}
+        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
+
+    # ---- prefs API ----
+
+    async def _api_prefs_get(self):
+        return _load_prefs()
+
+    async def _api_prefs_set(self):
+        data = await request.get_json() or {}
+        if not isinstance(data, dict) or not data:
+            return {"error": "no data"}, 400
+        prefs = _load_prefs()
+        allowed = {"bgm_file", "bgm_volume", "voice_volume"}
+        for key in data:
+            if key in allowed:
+                prefs[key] = data[key]
+        _save_prefs(prefs)
+        return prefs
 
     # ---- pipeline ----
 

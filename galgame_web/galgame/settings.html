@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>立绘管理 - AI Galgame 虚拟伙伴</title>
+<title>设置 - AI Galgame 虚拟伙伴</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -190,11 +190,32 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   cursor: pointer; z-index: 1;
 }
 .card-check:not(:checked) { opacity: 0.35; }
+/* ---- volume sliders ---- */
+.vol-group { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.vol-label { width: 90px; font-size: 13px; color: #aaa; flex-shrink: 0; }
+.vol-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #333; outline: none; }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; }
+.vol-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; border: none; }
+.vol-val { width: 40px; text-align: right; font-size: 13px; color: #ccc; flex-shrink: 0; }
+/* ---- BGM list ---- */
+.audio-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #2a2a3e; border-radius: 8px; margin-bottom: 8px; }
+.audio-item .name { flex: 1; font-size: 13px; word-break: break-all; color: #ddd; }
+.audio-item .size { font-size: 11px; color: #777; margin-right: 4px; }
+.audio-item.selected { border: 2px solid #8b5cf6; background: #2d2a3e; }
+.audio-item .current-tag { font-size: 11px; color: #8b5cf6; font-weight: bold; }
+.audio-item button { padding: 5px 10px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer; }
+.btn-play { background: #3b82f6; color: #fff; }
+.btn-play.playing { background: #f59e0b; }
+.btn-sel { background: #8b5cf6; color: #fff; }
+.btn-del-audio { background: #ef4444; color: #fff; }
+.bgm-upload-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.bgm-upload-row input[type="file"] { display: none; }
+.bgm-upload-row .btn { padding: 8px 16px; }
 </style>
 </head>
 <body>
 
-<h1>立绘资源管理</h1>
+<h1>设置</h1>
 <a class="back-btn" href="./index.html" title="返回 Galgame 界面">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
   <span>返回</span>
@@ -234,6 +255,34 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   <h2>对话历史头像</h2>
   <div class="hint">对话历史面板中 AI 消息左侧显示的头像。建议<strong>正方形大头照（128×128）</strong>，留空则不显示。</div>
   <div class="slot-grid" id="slots-avatar"></div>
+</div>
+
+<!-- BGM section -->
+<div class="section" id="section-bgm">
+  <h2>BGM 背景音乐</h2>
+  <div class="hint">上传 mp3/wav/ogg 等音频文件作为背景音乐。选择一个文件后主页将循环播放。</div>
+  <div class="bgm-upload-row">
+    <input type="file" id="bgm-upload-input" accept="audio/*" onchange="uploadBgm(this)" />
+    <button class="btn btn-primary" onclick="document.getElementById('bgm-upload-input').click()">上传音频</button>
+    <span class="status" id="bgm-status"></span>
+  </div>
+  <div id="bgm-list"></div>
+</div>
+
+<!-- Volume section -->
+<div class="section" id="section-volume">
+  <h2>音量设置</h2>
+  <div class="hint">拖拽滑块即时调节音量。设置自动保存，下次打开不变。</div>
+  <div class="vol-group">
+    <span class="vol-label">语音音量</span>
+    <input type="range" class="vol-slider" id="voice-volume" min="0" max="100" value="100" oninput="onVoiceVolume()" />
+    <span class="vol-val" id="voice-vol-val">100%</span>
+  </div>
+  <div class="vol-group">
+    <span class="vol-label">BGM 音量</span>
+    <input type="range" class="vol-slider" id="bgm-volume" min="0" max="100" value="50" oninput="onBgmVolume()" />
+    <span class="vol-val" id="bgm-vol-val">50%</span>
+  </div>
 </div>
 
 <!-- All files grid -->
@@ -323,6 +372,192 @@ async function apiPost(endpoint, body) {
   return resp.json();
 }
 
+/* ---- BGM ---- */
+
+var bgmFiles = [];
+var currentBgmFile = "";
+var bgmAudioEl = null;
+var playingBgm = null;
+
+async function loadBgmList() {
+  try {
+    var data = await apiGet("bgm/list");
+    bgmFiles = data.files || [];
+  } catch(e) {
+    bgmFiles = [];
+  }
+  try {
+    var prefs = await apiGet("prefs");
+    currentBgmFile = prefs.bgm_file || "";
+  } catch(e) {
+    currentBgmFile = "";
+  }
+  renderBgmList();
+}
+
+function renderBgmList() {
+  var container = document.getElementById("bgm-list");
+  if (!bgmFiles.length) {
+    container.innerHTML = "<div style='color:#777;font-size:13px;padding:8px 0;'>暂无音乐文件</div>";
+    return;
+  }
+  var html = "";
+  for (var i = 0; i < bgmFiles.length; i++) {
+    var f = bgmFiles[i];
+    var isSelected = f.name === currentBgmFile;
+    var cls = isSelected ? "audio-item selected" : "audio-item";
+    var sizeStr = f.size ? formatSize(f.size) : "";
+    html += "<div class='" + cls + "' id='bgm-" + i + "'>";
+    html += "<span class='name'>" + escHtml(f.name) + "</span>";
+    if (sizeStr) html += "<span class='size'>" + sizeStr + "</span>";
+    if (isSelected) html += "<span class='current-tag'>当前</span>";
+    html += "<button class='btn-play' onclick='toggleBgmPreview(" + i + ", this)'>▶</button>";
+    html += "<button class='btn-sel' onclick='selectBgm(\"" + escJs(f.name) + "\")'>选择</button>";
+    html += "<button class='btn-del-audio' onclick='deleteBgm(\"" + escJs(f.name) + "\")'>删除</button>";
+    html += "</div>";
+  }
+  container.innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function escJs(s) {
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "\\\"");
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + "B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + "KB";
+  return (bytes / 1048576).toFixed(1) + "MB";
+}
+
+function toggleBgmPreview(idx, btn) {
+  if (bgmAudioEl && playingBgm === idx) {
+    bgmAudioEl.pause();
+    bgmAudioEl = null;
+    playingBgm = null;
+    btn.textContent = "▶";
+    btn.classList.remove("playing");
+    return;
+  }
+  if (bgmAudioEl) {
+    bgmAudioEl.pause();
+    var prevBtn = document.querySelector(".btn-play.playing");
+    if (prevBtn) { prevBtn.textContent = "▶"; prevBtn.classList.remove("playing"); }
+  }
+  var f = bgmFiles[idx];
+  bgmAudioEl = new Audio("./bgm/" + encodeURIComponent(f.name));
+  bgmAudioEl.onended = function() {
+    btn.textContent = "▶";
+    btn.classList.remove("playing");
+    playingBgm = null;
+    bgmAudioEl = null;
+  };
+  bgmAudioEl.play().then(function() {
+    btn.textContent = "⏸";
+    btn.classList.add("playing");
+    playingBgm = idx;
+  }).catch(function(e) {
+    console.warn("BGM preview failed:", e);
+    bgmAudioEl = null;
+  });
+}
+
+async function selectBgm(name) {
+  currentBgmFile = name;
+  renderBgmList();
+  try {
+    await apiPost("prefs", { bgm_file: name });
+  } catch(e) {
+    console.warn("Failed to save bgm_file:", e);
+  }
+}
+
+async function uploadBgm(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var MAX = 30 * 1024 * 1024;
+  if (file.size > MAX) {
+    setBgmStatus("文件太大 (最大30MB)", "error");
+    input.value = "";
+    return;
+  }
+  setBgmStatus("上传中...");
+  try {
+    var base64 = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    var data = await apiPost("bgm/upload", { name: file.name, data: base64 });
+    if (data.uploaded) {
+      setBgmStatus("已上传: " + data.uploaded, "success");
+      await loadBgmList();
+    } else {
+      setBgmStatus(data.error || "上传失败", "error");
+    }
+  } catch(e) {
+    setBgmStatus("上传失败: " + e.message, "error");
+  }
+  input.value = "";
+}
+
+async function deleteBgm(name) {
+  if (!confirm("确定删除 " + name + "？")) return;
+  try {
+    var data = await apiPost("bgm/delete", { filename: name });
+    if (data.deleted) {
+      if (currentBgmFile === name) currentBgmFile = "";
+      await loadBgmList();
+    }
+  } catch(e) {
+    alert("删除失败: " + e.message);
+  }
+}
+
+function setBgmStatus(msg, type) {
+  var el = document.getElementById("bgm-status");
+  el.textContent = msg;
+  el.className = "status" + (type ? " " + type : "");
+  if (msg) setTimeout(function() { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
+}
+
+/* ---- volume ---- */
+
+function loadVolumePrefs() {
+  var vv = document.getElementById("voice-volume");
+  var bv = document.getElementById("bgm-volume");
+  var vvv = document.getElementById("voice-vol-val");
+  var bvv = document.getElementById("bgm-vol-val");
+  vv.value = Math.round((config.voice_volume != null ? config.voice_volume : 1.0) * 100);
+  bv.value = Math.round((config.bgm_volume != null ? config.bgm_volume : 0.5) * 100);
+  vvv.textContent = vv.value + "%";
+  bvv.textContent = bv.value + "%";
+}
+
+var _volTimer;
+function saveVolumes() {
+  clearTimeout(_volTimer);
+  _volTimer = setTimeout(function() {
+    var vv = document.getElementById("voice-volume");
+    var bv = document.getElementById("bgm-volume");
+    apiPost("prefs", { voice_volume: parseInt(vv.value) / 100, bgm_volume: parseInt(bv.value) / 100 }).catch(function(){});
+  }, 300);
+}
+
+function onVoiceVolume() {
+  var vv = document.getElementById("voice-volume");
+  document.getElementById("voice-vol-val").textContent = vv.value + "%";
+  saveVolumes();
+}
+
+function onBgmVolume() {
+  var bv = document.getElementById("bgm-volume");
+  document.getElementById("bgm-vol-val").textContent = bv.value + "%";
+  saveVolumes();
+}
+
 async function init() {
   try {
     config = await apiGet("config");
@@ -333,6 +568,8 @@ async function init() {
   document.getElementById("refresh-btn").onclick = loadFiles;
   applyBackground();
   await loadFiles();
+  await loadBgmList();
+  loadVolumePrefs();
 }
 
 function applyBackground() {

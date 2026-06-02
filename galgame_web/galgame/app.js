@@ -12,6 +12,9 @@ var layers = {};
 var characterName = "小星";
 var backgroundFile = "";
 var historyAvatar = "";
+var voiceVolume = 1.0;
+var bgmVolume = 0.5;
+var bgmStarted = false;
 
 var typewriterTimer = null;
 var typewriterSpeed = 60;
@@ -383,6 +386,41 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-bottom", cfg.sprite_bottom != null ? cfg.sprite_bottom : 28);
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
   typewriterSpeed = cfg.typewriter_speed || 60;
+
+  applyBgmAndVolume(cfg);
+}
+
+function applyBgmAndVolume(cfg) {
+  var bgmFile = cfg.bgm_file || "";
+  var bgmVol = cfg.bgm_volume != null ? cfg.bgm_volume : 0.5;
+  var voiceVol = cfg.voice_volume != null ? cfg.voice_volume : 1.0;
+
+  voiceVolume = voiceVol;
+  bgmVolume = bgmVol;
+
+  var ttsAudio = document.getElementById("tts-audio");
+  var bgmAudio = document.getElementById("bgm-audio");
+  if (ttsAudio) ttsAudio.volume = voiceVol;
+  if (bgmAudio) {
+    bgmAudio.volume = bgmVol;
+    if (bgmFile) {
+      bgmAudio.src = "./bgm/" + encodeURIComponent(bgmFile);
+      startBgmOnInteraction(bgmAudio);
+    }
+  }
+}
+
+function startBgmOnInteraction(bgmAudio) {
+  if (bgmStarted) return;
+  function tryPlay() {
+    if (bgmStarted) return;
+    bgmStarted = true;
+    document.removeEventListener("click", tryPlay);
+    document.removeEventListener("keydown", tryPlay);
+    bgmAudio.play().catch(function(e) { console.warn("BGM autoplay blocked:", e); });
+  }
+  document.addEventListener("click", tryPlay, { once: true });
+  document.addEventListener("keydown", tryPlay, { once: true });
 }
 
 function applyBackground() {
@@ -661,6 +699,7 @@ function playTTSAudio(base64data, mime) {
     isAudioPlaying = false;
   };
 
+  audio.volume = voiceVolume;
   audio.play().catch(function (e) {
     console.warn("Audio play failed:", e);
   });

@@ -23,6 +23,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame"
     assets_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "assets"
     audio_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
+    bgm_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "bgm"
     jwt_token: str = ""
 
     MIME = {
@@ -37,6 +38,13 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
         ".svg": "image/svg+xml",
         ".ico": "image/x-icon",
         ".json": "application/json",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".opus": "audio/ogg",
     }
 
     def log_message(self, fmt, *args):
@@ -66,6 +74,10 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             safe_audio = _safe_path(filename, self.audio_dir)
             if safe_audio and safe_audio.is_file():
                 safe = safe_audio
+        elif filename.startswith("bgm/"):
+            safe_bgm = _safe_path(filename, self.bgm_dir)
+            if safe_bgm and safe_bgm.is_file():
+                safe = safe_bgm
         if not safe or not safe.is_file():
             self.send_error(404)
             return
