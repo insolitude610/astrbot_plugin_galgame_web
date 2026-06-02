@@ -10,9 +10,18 @@
 
 **Bug 修复**
 
-- 修复 TTS 不触发问题：AI 使用自由标签（如 `teasing`、`grin`）但不包含配置立绘标签时，`emotions` 为空导致 TTS guard 条件 `if emotions and clean_text` 判定失败，改为 `if clean_text`
+- 修复 TTS 不触发问题：AI 使用自由标签（如 `teasing`、`grin`）但不包含配置立绘标签时，`emotions` 为空导致 TTS guard 条件判定失败，改为 `if clean_text`
 - 修复系统指令回复触发 TTS：`/reset`、`/new` 等以唤醒前缀开头的输入，LLM 回复不再触发语音朗读
 - `_build_tagged_text` 空情绪列表时返回 `[neutral]text` 作为缺省
+- 修复 Markdown 格式被 TTS 朗读：提示词新增禁止 `**粗体**`、`*斜体*`、`` `代码` ``、`#标题` 等格式标记
+- 修复 `tts_enabled` 配置类型 `boolean` → `bool`（AstrBot 不支持 `boolean`）
+
+**新功能**
+
+- **BGM 背景音乐** — 设置页上传 mp3/wav/ogg 音频作为背景音乐，主页首次交互后自动循环播放
+- **音量控制** — 语音朗读和 BGM 音量独立滑块调节，设置持久化到服务端 `prefs.json`，重启/清缓存不丢失
+- **TTS 开关** — 插件配置页新增 `tts_enabled` 布尔开关，关闭后对话正常但不出声，Provider 配置保留
+- **设置页改名** —「立绘管理」→「设置」，整合立绘素材 + BGM + 音量管理
 
 ## v0.6.0
 
