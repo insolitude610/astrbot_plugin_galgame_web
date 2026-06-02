@@ -462,6 +462,7 @@ class GalgamePlugin(Star):
             "bgm_file": prefs.get("bgm_file", ""),
             "bgm_volume": prefs.get("bgm_volume", 0.5),
             "voice_volume": prefs.get("voice_volume", 1.0),
+            "tts_enabled": self.config.get("tts_enabled", True),
         }
 
     # ---- asset APIs ----
@@ -861,7 +862,7 @@ class GalgamePlugin(Star):
         audio_segments = []
         audio_file = ""
         audio_mime_val = ""
-        if clean_text and not matched_prefix:
+        if clean_text and not matched_prefix and self.config.get("tts_enabled", True):
             tts_provider_id = self.config.get("tts_provider", "").strip()
             if tts_provider_id:
                 tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)

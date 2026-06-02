@@ -31,6 +31,12 @@
     "hint": "选择已配置的 TTS 提供商。推荐Fish Audio。留空则不启用语音。",
     "default": ""
   },
+  "tts_enabled": {
+    "description": "启用 TTS 语音朗读",
+    "type": "boolean",
+    "default": true,
+    "hint": "控制是否朗读 AI 回复。关闭后对话仍可用，只是不出声。"
+  },
   "llm_provider": {
     "description": "对话模型 Provider",
     "type": "string",
