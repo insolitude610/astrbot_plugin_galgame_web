@@ -33,7 +33,7 @@
   },
   "tts_enabled": {
     "description": "启用 TTS 语音朗读",
-    "type": "boolean",
+    "type": "bool",
     "default": true,
     "hint": "控制是否朗读 AI 回复。关闭后对话仍可用，只是不出声。"
   },
