@@ -4,7 +4,7 @@ import re
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
 DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
-EMOTION_PATTERN = re.compile(r"\{emotion_(\w+)\}")
+EMOTION_PATTERN = re.compile(r"\{emotion_\s*([^\s}]+)\}")
 
 DEFAULT_GALGAME_PROMPT = (
     "你现在被接入到了一个视觉小说 / 美少女恋爱游戏的对话框中。"
@@ -82,7 +82,7 @@ def extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
     clean = "".join(segments).strip()
     if not emotions:
         for tag in emotion_tags:
-            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
+            p = re.compile(rf"\{{emotion_\s*{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 emotions.append((tag.lower(), m.start()))
                 clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
@@ -107,7 +107,7 @@ def extract_all_emotions(text: str, known_tags: list[str]) -> tuple[str, list, l
 
     if not all_emotions:
         for tag in known_tags:
-            p = re.compile(rf"\{{emotion_{re.escape(tag)}\}}", re.IGNORECASE)
+            p = re.compile(rf"\{{emotion_\s*{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 all_emotions.append((tag.lower(), m.start()))
                 clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
