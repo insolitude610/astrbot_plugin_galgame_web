@@ -106,10 +106,11 @@ function pcmToWavBlob(pcm, rate) {
   view.setUint32(40, totalLen * 2, true);
 
   for (var i = 0; i < totalLen; i++) {
-    var s = Math.max(-32768, Math.min(32767, flat[i]));
+    var s = Math.max(-32768, Math.min(32767, Math.round(flat[i] * 32767)));
     view.setInt16(44 + i * 2, s, true);
   }
 
+  console.log("[audio-debug] WAV samples=" + totalLen + " sampleRate=" + rate + " duration=" + (totalLen / rate).toFixed(2) + "s bytes=" + (44 + totalLen * 2));
   return new Blob([buffer], { type: "audio/wav" });
 }
 
