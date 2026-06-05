@@ -15,6 +15,7 @@ var historyAvatar = "";
 var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
+var historyLimit = 40;
 
 var typewriterTimer = null;
 var typewriterSpeed = 60;
@@ -387,6 +388,7 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-bottom", cfg.sprite_bottom != null ? cfg.sprite_bottom : 28);
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
   typewriterSpeed = cfg.typewriter_speed || 60;
+  historyLimit = cfg.history_limit || 40;
 
   applyBgmAndVolume(cfg);
 }
@@ -819,6 +821,9 @@ async function toggleHistory() {
   try {
     var data = await apiGet("history", { session_id: sessionId });
     var messages = data.messages || [];
+    if (messages.length > historyLimit) {
+      messages = messages.slice(messages.length - historyLimit);
+    }
     var list = el.historyList;
     list.innerHTML = "";
 

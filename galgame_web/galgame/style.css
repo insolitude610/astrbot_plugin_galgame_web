@@ -566,7 +566,7 @@ html, body {
 }
 
 .history-msg {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   animation: history-msg-in .25s ease-out;
 }
 @keyframes history-msg-in {
