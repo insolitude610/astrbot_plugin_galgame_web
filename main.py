@@ -353,10 +353,28 @@ class GalgamePlugin(Star):
 
     # ---- session API ----
 
+    @staticmethod
+    def _find_latest_session() -> str | None:
+        best_sid = None
+        best_mtime = 0
+        for path in SESSIONS_DIR.glob("*.json"):
+            try:
+                mtime = path.stat().st_mtime
+                if mtime > best_mtime:
+                    best_mtime = mtime
+                    best_sid = path.stem
+            except OSError:
+                pass
+        return best_sid
+
     async def _api_session_init(self):
         try:
             data = await request.get_json() or {}
             resume_id = data.get("resume_id", "").strip()
+
+            in_mem = resume_id in self._sessions if resume_id else False
+            on_disk = session_path(resume_id).exists() if resume_id else False
+            logger.info(f"[session] init resume_id={resume_id} in_memory={in_mem} on_disk={on_disk} total_loaded={len(self._sessions)}")
 
             if resume_id and resume_id in self._sessions:
                 s = self._sessions[resume_id]
@@ -367,6 +385,14 @@ class GalgamePlugin(Star):
                 if s:
                     self._sessions[resume_id] = s
                     return {"session_id": resume_id, "current_emotion": s.get("current_emotion", "neutral")}
+
+            latest = self._find_latest_session()
+            if latest:
+                s = load_session(latest)
+                if s and s.get("history"):
+                    logger.info(f"[session] auto-resume latest: {latest}")
+                    self._sessions[latest] = s
+                    return {"session_id": latest, "current_emotion": s.get("current_emotion", "neutral")}
 
             sid = uuid.uuid4().hex
             session = {
