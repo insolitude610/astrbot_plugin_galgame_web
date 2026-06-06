@@ -85,7 +85,6 @@ function loadFavorites() {
       delBtn.textContent = "取消收藏";
       delBtn.onclick = (function(id) {
         return function() {
-          if (!confirm("确定取消收藏这条语音？")) return;
           apiPost("favorites/delete", { id: id }).then(function() {
             document.getElementById("fav-" + id).remove();
             if (!document.querySelector(".fav-card")) {
