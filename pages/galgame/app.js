@@ -918,7 +918,7 @@ async function toggleHistory() {
         playBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
         playBtn.onclick = (function(file) {
           return function() {
-            var audio = new Audio("./audio/" + encodeURIComponent(file));
+            var audio = new Audio("/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(file));
             audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
           };
         })(msg.audio_file);
