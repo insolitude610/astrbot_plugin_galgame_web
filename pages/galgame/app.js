@@ -17,6 +17,17 @@ var bgmVolume = 0.5;
 var bgmStarted = false;
 var historyLimit = 40;
 
+var _memStore = {};
+function getLocal(key) {
+  try { return localStorage.getItem(key); } catch (e) { return _memStore[key] || null; }
+}
+function setLocal(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) { _memStore[key] = val; }
+}
+function removeLocal(key) {
+  try { localStorage.removeItem(key); } catch (e) { delete _memStore[key]; }
+}
+
 var typewriterTimer = null;
 var typewriterSpeed = 60;
 var typewriterFullText = "";
@@ -238,13 +249,12 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
-  localStorage.setItem("galgame_session_id", sid);
-  location.href = "?sid=" + sid;
+  setLocal("galgame_session_id", sid);  location.href = "?sid=" + sid;
 }
 
 function startNewSession() {
   toggleSessionPanel();
-  localStorage.removeItem("galgame_session_id");
+  removeLocal("galgame_session_id");
   location.href = location.pathname;
 }
 
@@ -298,7 +308,7 @@ async function loadSessionPanel() {
         try {
           await apiPost("session/delete", { session_id: sid });
           if (sid === sessionId) {
-            localStorage.removeItem("galgame_session_id");
+  removeLocal("galgame_session_id");
             location.href = location.pathname;
           } else {
             el.remove();
@@ -346,7 +356,7 @@ function finishInit(isResuming) {
 }
 
 async function init() {
-  var cachedBg = localStorage.getItem("galgame_bg") || "";
+  var cachedBg = getLocal("galgame_bg") || "";
   if (cachedBg) {
     el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
   }
@@ -362,13 +372,13 @@ async function init() {
   applyBackground();
 
   var urlSid = getUrlSessionId();
-  var savedId = urlSid || localStorage.getItem("galgame_session_id") || "";
+  var savedId = urlSid || getLocal("galgame_session_id") || "";
 
   var resp = await initSession(savedId);
   if (!resp) return;
 
   sessionId = resp.session_id;
-  localStorage.setItem("galgame_session_id", sessionId);
+  setLocal("galgame_session_id", sessionId);
   if (resp.current_emotion) {
     currentEmotion = resp.current_emotion;
   }
@@ -388,7 +398,7 @@ function applyConfig(cfg) {
   if (!vrmModelPath) vrmModelPath = "./assets/model.vrm";
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
-  if (backgroundFile) localStorage.setItem("galgame_bg", backgroundFile);
+  if (backgroundFile) setLocal("galgame_bg", backgroundFile);
   historyAvatar = cfg.history_avatar || "";
   el.characterName.textContent = characterName;
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
