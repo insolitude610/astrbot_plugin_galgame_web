@@ -919,7 +919,7 @@ async function toggleHistory() {
         playBtn.onclick = (function(file) {
           return function() {
             apiGet("audio/data", { name: file }).then(function(resp) {
-              var audio = new Audio("data:" + resp.mime + ";base64," + resp.data);
+              var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
               audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
             }).catch(function(e) { console.warn("History audio load failed:", e); });
           };

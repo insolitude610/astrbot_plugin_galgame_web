@@ -471,7 +471,7 @@ class GalgamePlugin(Star):
             return {"error": "not found"}, 404
         raw = sp.read_bytes()
         mime_map = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
-        return {"data": base64.b64encode(raw).decode(), "mime": mime_map.get(sp.suffix.lower(), "audio/wav")}
+        return {"audio": base64.b64encode(raw).decode(), "mime": mime_map.get(sp.suffix.lower(), "audio/wav")}
 
     # ---- config API ----
 
