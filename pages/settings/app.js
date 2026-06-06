@@ -581,10 +581,21 @@ async function deleteFile(filename) {
 
 function setStatus(msg, type) {
   var el = document.getElementById("status");
+  if (!el) return;
   el.textContent = msg;
   el.className = "status" + (type ? " " + type : "");
   if (msg) setTimeout(function() { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
 }
 
-init();
+if (window.AstrBotPluginPage) {
+  init();
+} else {
+  var _sPoll = setInterval(function() {
+    if (window.AstrBotPluginPage) {
+      clearInterval(_sPoll);
+      init();
+    }
+  }, 100);
+  setTimeout(function() { clearInterval(_sPoll); }, 10000);
+}
 
