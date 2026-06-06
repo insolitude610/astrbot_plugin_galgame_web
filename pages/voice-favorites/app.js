@@ -113,5 +113,16 @@ function loadBackground() {
   }).catch(function() {});
 }
 
-loadBackground();
-loadFavorites();
+if (window.AstrBotPluginPage) {
+  loadBackground();
+  loadFavorites();
+} else {
+  var _vPoll = setInterval(function() {
+    if (window.AstrBotPluginPage) {
+      clearInterval(_vPoll);
+      loadBackground();
+      loadFavorites();
+    }
+  }, 100);
+  setTimeout(function() { clearInterval(_vPoll); }, 10000);
+}
