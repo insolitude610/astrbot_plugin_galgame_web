@@ -251,13 +251,25 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
-  setLocal("galgame_session_id", sid);  location.href = "?sid=" + sid;
+  toggleSessionPanel();
+  initSession(sid).then(function(resp) {
+    if (!resp) return;
+    sessionId = resp.session_id;
+    setLocal("galgame_session_id", sessionId);
+    if (resp.current_emotion) { currentEmotion = resp.current_emotion; }
+    finishInit(true);
+  });
 }
 
 function startNewSession() {
   toggleSessionPanel();
   removeLocal("galgame_session_id");
-  location.href = location.pathname;
+  apiPost("session/init", { resume_id: "" }).then(function(resp) {
+    if (!resp || !resp.session_id) return;
+    sessionId = resp.session_id;
+    setLocal("galgame_session_id", sessionId);
+    finishInit(false);
+  });
 }
 
 async function loadSessionPanel() {
@@ -407,6 +419,20 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
   typewriterSpeed = cfg.typewriter_speed || 60;
   historyLimit = cfg.history_limit || 40;
+
+  var webPort = cfg.web_port || 6186;
+  var webEnabled = cfg.web_enabled !== false;
+  var baseUrl = "http://localhost:" + webPort;
+  var setLink = document.getElementById("settings-link");
+  if (setLink) {
+    if (webEnabled && webPort > 0) setLink.href = baseUrl + "/settings.html";
+    else setLink.style.display = "none";
+  }
+  var favLink = document.getElementById("favorites-link");
+  if (favLink) {
+    if (webEnabled && webPort > 0) favLink.href = baseUrl + "/favorites.html";
+    else favLink.style.display = "none";
+  }
 
   applyBgmAndVolume(cfg);
 }
