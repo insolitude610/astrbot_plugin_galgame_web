@@ -357,36 +357,34 @@ function finishInit(isResuming) {
   }
 }
 
-async async function init() {
+function init() {
   var cachedBg = getLocal("galgame_bg") || "";
   if (cachedBg) {
     el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
   }
 
-  try {
-    var config = await apiGet("config");
+  apiGet("config").then(function(config) {
     applyConfig(config);
-    await preloadAssets(config);
-  } catch (err) {
+    return preloadAssets(config);
+  }).catch(function(err) {
     console.warn("Failed to load config, using defaults:", err);
     applyConfig({});
-  }
+  }).then(function() {
+    applyBackground();
 
-  applyBackground();
+    var urlSid = getUrlSessionId();
+    var savedId = urlSid || getLocal("galgame_session_id") || "";
 
-  var urlSid = getUrlSessionId();
-  var savedId = urlSid || getLocal("galgame_session_id") || "";
-
-  var resp = await initSession(savedId);
-  if (!resp) return;
-
-  sessionId = resp.session_id;
-  setLocal("galgame_session_id", sessionId);
-  if (resp.current_emotion) {
-    currentEmotion = resp.current_emotion;
-  }
-
-  finishInit(savedId === resp.session_id);
+    return initSession(savedId).then(function(resp) {
+      if (!resp) return;
+      sessionId = resp.session_id;
+      setLocal("galgame_session_id", sessionId);
+      if (resp.current_emotion) {
+        currentEmotion = resp.current_emotion;
+      }
+      finishInit(savedId === resp.session_id);
+    });
+  });
 }
 
 function applyConfig(cfg) {
@@ -413,19 +411,18 @@ function applyConfig(cfg) {
   applyBgmAndVolume(cfg);
 }
 
-async function preloadAssets(cfg) {
+function preloadAssets(cfg) {
   var names = [];
   var exps = cfg.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
   if (cfg.background) names.push(cfg.background);
   if (cfg.history_avatar) names.push(cfg.history_avatar);
-  if (!names.length) return;
-  try {
-    var resp = await apiPost("assets/batch", { names: names });
+  if (!names.length) return Promise.resolve();
+  return apiPost("assets/batch", { names: names }).then(function(resp) {
     (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
-  } catch (e) {
+  }).catch(function(e) {
     console.warn("preloadAssets failed:", e);
-  }
+  });
 }
 
 function applyBgmAndVolume(cfg) {
