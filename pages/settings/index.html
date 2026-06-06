@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>设置 - AI Galgame 虚拟伙伴</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<h1>设置</h1>
+<p class="sub">立绘素材、背景音乐与音量管理</p>
+<div id="mode-indicator"></div>
+
+<div class="section active" id="section-single">
+  <h2>Single 模式 - 表情立绘</h2>
+  <p class="hint">每种情绪对应一张完整 PNG 立绘。从表情槽位上传会自动命名。支持拖拽上传。</p>
+  <div class="slot-grid" id="slots-single"></div>
+</div>
+
+<div class="section inactive" id="section-layered">
+  <h2>VRM 模式 - 3D 模型</h2>
+  <p class="hint">上传 .vrm 3D 模型文件</p>
+  <div class="slot-grid" id="slots-vrm"></div>
+</div>
+
+<div class="section active" id="section-bg">
+  <h2>场景背景</h2>
+  <p class="hint">主页面背景图</p>
+  <div class="slot-grid" id="slots-bg"></div>
+</div>
+
+<div class="section active" id="section-avatar">
+  <h2>历史记录头像</h2>
+  <p class="hint">历史面板 AI 消息左侧圆形头像</p>
+  <div class="slot-grid" id="slots-avatar"></div>
+</div>
+
+<div class="section active" id="section-bgm-audio">
+  <h2>BGM 背景音乐</h2>
+  <p class="hint">上传 mp3/wav/ogg 音频文件作为背景音乐。选择后在主页首次交互后循环播放。</p>
+  <div class="bgm-upload-row">
+    <button class="btn" id="bgm-upload-btn" onclick="document.getElementById('bgm-file-input').click()">上传 BGM 文件</button>
+    <input type="file" id="bgm-file-input" accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,.opus" onchange="uploadBgm(this)">
+  </div>
+  <div id="bgm-list"></div>
+</div>
+
+<div class="section active" id="section-volume">
+  <h2>音量设置</h2>
+  <p class="hint">语音朗读和背景音乐独立调节</p>
+  <div class="vol-group">
+    <span class="vol-label">语音音量</span>
+    <input type="range" class="vol-slider" id="voice-vol" min="0" max="1" step="0.01" value="1.0" oninput="onVoiceVolume()">
+    <span class="vol-val" id="voice-vol-val">100%</span>
+  </div>
+  <div class="vol-group">
+    <span class="vol-label">BGM 音量</span>
+    <input type="range" class="vol-slider" id="bgm-vol" min="0" max="1" step="0.01" value="0.5" oninput="onBgmVolume()">
+    <span class="vol-val" id="bgm-vol-val">50%</span>
+  </div>
+</div>
+
+<div class="section active" id="section-files">
+  <h2>所有已上传文件</h2>
+  <p class="hint">浏览、预览和删除</p>
+  <div class="drag-zone" id="drag-zone">
+    拖拽图片到此处上传
+  </div>
+  <div class="batch-bar" id="batch-bar" style="display:none">
+    <button class="btn danger" id="batch-delete-btn" onclick="batchDelete()">删除选中</button>
+  </div>
+  <div class="file-grid" id="grid-container"></div>
+  <div class="loading" id="loading">加载中...</div>
+</div>
+
+<audio id="bgm-preview-audio" preload="auto" style="display:none"></audio>
+
+<script src="./app.js"></script>
+</body>
+</html>

@@ -421,20 +421,6 @@ function applyConfig(cfg) {
   typewriterSpeed = cfg.typewriter_speed || 60;
   historyLimit = cfg.history_limit || 40;
 
-  var webPort = cfg.web_port || 6186;
-  var webEnabled = cfg.web_enabled !== false;
-  var baseUrl = "http://localhost:" + webPort;
-  var setLink = document.getElementById("settings-link");
-  if (setLink) {
-    if (webEnabled && webPort > 0) setLink.href = baseUrl + "/settings.html";
-    else setLink.style.display = "none";
-  }
-  var favLink = document.getElementById("favorites-link");
-  if (favLink) {
-    if (webEnabled && webPort > 0) favLink.href = baseUrl + "/favorites.html";
-    else favLink.style.display = "none";
-  }
-
   applyBgmAndVolume(cfg);
 }
 
