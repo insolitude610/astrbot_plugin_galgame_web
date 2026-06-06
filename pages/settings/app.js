@@ -273,7 +273,8 @@ async function init() {
     config = {};
   }
 
-  document.getElementById("refresh-btn").onclick = loadFiles;
+  var rb = document.getElementById("refresh-btn");
+  if (rb) rb.onclick = loadFiles;
   applyBackground();
   await loadFiles();
   await loadBgmList();
