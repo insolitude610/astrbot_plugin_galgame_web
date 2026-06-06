@@ -158,7 +158,9 @@ class GalgamePlugin(Star):
         gc_audio_files(self._sessions)
 
         web_port = int(self.config.get("web_port", 0) or 0)
-        if web_port > 0:
+        web_enabled = self.config.get("web_enabled", True)
+        if web_enabled and web_port > 0:
+            GalgameWebHandler.web_password = self.config.get("web_password", "") or ""
             self._setup_proxy_auth()
             self._start_web_server(web_port)
 

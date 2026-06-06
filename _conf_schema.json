@@ -11,6 +11,18 @@
     "default": 6186,
     "hint": "插件将在该端口启动独立 WebUI。浏览器访问 http://localhost:<端口> 即可打开 Galgame 界面。设为 0 则不启动独立服务器。"
   },
+  "web_enabled": {
+    "description": "启用独立 WebUI",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后启动独立 HTTP 服务器。关闭则仅可通过 Dashboard 内嵌页访问。"
+  },
+  "web_password": {
+    "description": "独立 WebUI 访问密码",
+    "type": "string",
+    "default": "",
+    "hint": "留空=无需密码。设置后访问独立 WebUI 需要输入密码才能使用。24 小时内无需重复输入。不影响 Dashboard 内嵌页。"
+  },
   "persona": {
     "description": "角色人格",
     "type": "string",
