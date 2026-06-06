@@ -173,6 +173,7 @@ body {
 <script>
 var PLUGIN = "astrbot_plugin_galgame_web";
 var API_BASE = "/api/plug/" + PLUGIN;
+var currentFavAudio = null;
 
 async function apiGet(endpoint) {
   var resp = await fetch(API_BASE + "/" + endpoint);
@@ -235,7 +236,10 @@ async function loadFavorites() {
       playBtn.textContent = "播放";
       playBtn.onclick = (function(file) {
         return function() {
+          if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
           var audio = new Audio("./audio/" + encodeURIComponent(file));
+          currentFavAudio = audio;
+          audio.onended = audio.onerror = function() { currentFavAudio = null; };
           audio.play().catch(function(e) { console.warn("Play failed:", e); });
         };
       })(f.audio_file);

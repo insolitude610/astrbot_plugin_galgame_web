@@ -1,5 +1,6 @@
 var PLUGIN = "astrbot_plugin_galgame_web";
 var API_BASE = "/api/plug/" + PLUGIN;
+var currentFavAudio = null;
 
 function apiGet(endpoint, params) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiGet) {
@@ -72,9 +73,12 @@ function loadFavorites() {
       playBtn.textContent = "播放";
       playBtn.onclick = (function(file) {
         return function() {
-          apiGet("audio/data", { name: file }).then(function(resp) {
-            var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
-            audio.play().catch(function(e) { console.warn("Play failed:", e); });
+            if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
+            apiGet("audio/data", { name: file }).then(function(resp) {
+              var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
+              currentFavAudio = audio;
+              audio.onended = audio.onerror = function() { currentFavAudio = null; };
+              audio.play().catch(function(e) { console.warn("Play failed:", e); });
           }).catch(function(e) { console.warn("Audio load failed:", e); });
         };
       })(f.audio_file);
