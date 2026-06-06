@@ -6,11 +6,14 @@ var BG_KEYS = ["background"];
 var allFiles = [];
 var config = {};
 var selectedFiles = {};
+var _assetCache = {};
 
 function updateBatchBar() {
   var bar = document.getElementById("batch-bar");
+  if (!bar) return;
   var sa = document.getElementById("select-all");
   var btn = document.getElementById("batch-delete-btn");
+  if (!sa || !btn) return;
   var count = Object.keys(selectedFiles).length;
   bar.style.display = allFiles.length > 0 ? "flex" : "none";
   sa.checked = allFiles.length > 0 && count === allFiles.length;
@@ -21,6 +24,7 @@ function updateBatchBar() {
 
 function toggleSelectAll() {
   var sa = document.getElementById("select-all");
+  if (!sa) return;
   if (sa.checked) {
     for (var i = 0; i < allFiles.length; i++) selectedFiles[allFiles[i].name] = true;
   } else {
@@ -234,35 +238,39 @@ function setBgmStatus(msg, type) {
 /* ---- volume ---- */
 
 function loadVolumePrefs() {
-  var vv = document.getElementById("voice-volume");
-  var bv = document.getElementById("bgm-volume");
+  var vv = document.getElementById("voice-vol");
+  var bv = document.getElementById("bgm-vol");
   var vvv = document.getElementById("voice-vol-val");
   var bvv = document.getElementById("bgm-vol-val");
-  vv.value = Math.round((config.voice_volume != null ? config.voice_volume : 1.0) * 100);
-  bv.value = Math.round((config.bgm_volume != null ? config.bgm_volume : 0.5) * 100);
-  vvv.textContent = vv.value + "%";
-  bvv.textContent = bv.value + "%";
+  if (!vv || !bv || !vvv || !bvv) return;
+  vv.value = (config.voice_volume != null ? config.voice_volume : 1.0);
+  bv.value = (config.bgm_volume != null ? config.bgm_volume : 0.5);
+  vvv.textContent = Math.round(vv.value * 100) + "%";
+  bvv.textContent = Math.round(bv.value * 100) + "%";
 }
 
 var _volTimer;
 function saveVolumes() {
   clearTimeout(_volTimer);
   _volTimer = setTimeout(function() {
-    var vv = document.getElementById("voice-volume");
-    var bv = document.getElementById("bgm-volume");
-    apiPost("prefs", { voice_volume: parseInt(vv.value) / 100, bgm_volume: parseInt(bv.value) / 100 }).catch(function(){});
+    var vv = document.getElementById("voice-vol");
+    var bv = document.getElementById("bgm-vol");
+    if (!vv || !bv) return;
+    apiPost("prefs", { voice_volume: parseFloat(vv.value), bgm_volume: parseFloat(bv.value) }).catch(function(){});
   }, 300);
 }
 
 function onVoiceVolume() {
-  var vv = document.getElementById("voice-volume");
-  document.getElementById("voice-vol-val").textContent = vv.value + "%";
+  var vv = document.getElementById("voice-vol");
+  if (!vv) return;
+  document.getElementById("voice-vol-val").textContent = Math.round(vv.value * 100) + "%";
   saveVolumes();
 }
 
 function onBgmVolume() {
-  var bv = document.getElementById("bgm-volume");
-  document.getElementById("bgm-vol-val").textContent = bv.value + "%";
+  var bv = document.getElementById("bgm-vol");
+  if (!bv) return;
+  document.getElementById("bgm-vol-val").textContent = Math.round(bv.value * 100) + "%";
   saveVolumes();
 }
 
@@ -275,18 +283,35 @@ async function init() {
 
   var rb = document.getElementById("refresh-btn");
   if (rb) rb.onclick = loadFiles;
-  applyBackground();
   await loadFiles();
   await loadBgmList();
   loadVolumePrefs();
+  await preloadAssets();
 }
 
 function applyBackground() {
   var bg = config.background;
-  if (bg) {
-    document.body.style.backgroundImage = "url(/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(bg) + ")";
+  if (bg && _assetCache[bg]) {
+    document.body.style.backgroundImage = "url(" + _assetCache[bg] + ")";
     document.body.classList.add("bg-loaded");
   }
+}
+
+function preloadAssets() {
+  var names = [];
+  var exps = config.expressions || {};
+  for (var k in exps) { if (exps[k]) names.push(exps[k]); }
+  if (config.background) names.push(config.background);
+  if (config.history_avatar) names.push(config.history_avatar);
+  if (!names.length) return Promise.resolve();
+  return apiPost("assets/batch", { names: names }).then(function(resp) {
+    (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
+    applyBackground();
+    renderAll();
+  }).catch(function(e) {
+    console.warn("preloadAssets failed:", e);
+    renderAll();
+  });
 }
 
 /* ---- data ---- */
@@ -389,12 +414,20 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.className = matchedFile ? "slot-card matched" : "slot-card missing";
   card.id = "slot-" + idPrefix + "-" + key;
 
-  if (matchedFile && matchedFile.url) {
-    var img = document.createElement("img");
-    img.className = "slot-img";
-    img.alt = key;
-    img.src = matchedFile.url;
-    card.appendChild(img);
+  if (matchedFile) {
+    var cached = _assetCache[matchedFile.name];
+    if (cached) {
+      var img = document.createElement("img");
+      img.className = "slot-img";
+      img.alt = key;
+      img.src = cached;
+      card.appendChild(img);
+    } else {
+      var ph = document.createElement("div");
+      ph.className = "slot-img placeholder";
+      ph.textContent = "🖼";
+      card.appendChild(ph);
+    }
   } else {
     var ph = document.createElement("div");
     ph.className = "slot-img placeholder";
@@ -472,7 +505,7 @@ function renderFileGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    img.src = f.url || "";
+    img.src = _assetCache[f.name] || f.url || "";
     card.appendChild(img);
 
     var body = document.createElement("div");
