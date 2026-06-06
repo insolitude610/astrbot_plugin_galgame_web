@@ -16,6 +16,7 @@ var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
 var historyLimit = 40;
+var _assetCache = {};
 
 var _memStore = {};
 function getLocal(key) {
@@ -211,6 +212,7 @@ function apiPost(endpoint, body) {
 
 function assetUrl(filename) {
   if (!filename) return "";
+  if (_assetCache[filename]) return _assetCache[filename];
   return "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(filename);
 }
 
@@ -355,7 +357,7 @@ function finishInit(isResuming) {
   }
 }
 
-async function init() {
+async async function init() {
   var cachedBg = getLocal("galgame_bg") || "";
   if (cachedBg) {
     el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
@@ -364,6 +366,7 @@ async function init() {
   try {
     var config = await apiGet("config");
     applyConfig(config);
+    await preloadAssets(config);
   } catch (err) {
     console.warn("Failed to load config, using defaults:", err);
     applyConfig({});
@@ -408,6 +411,21 @@ function applyConfig(cfg) {
   historyLimit = cfg.history_limit || 40;
 
   applyBgmAndVolume(cfg);
+}
+
+async function preloadAssets(cfg) {
+  var names = [];
+  var exps = cfg.expressions || {};
+  for (var k in exps) { if (exps[k]) names.push(exps[k]); }
+  if (cfg.background) names.push(cfg.background);
+  if (cfg.history_avatar) names.push(cfg.history_avatar);
+  if (!names.length) return;
+  try {
+    var resp = await apiPost("assets/batch", { names: names });
+    (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
+  } catch (e) {
+    console.warn("preloadAssets failed:", e);
+  }
 }
 
 function applyBgmAndVolume(cfg) {
