@@ -981,7 +981,17 @@ async function notifyRapidAction(count) {
 
 /* ---- boot ---- */
 
-init();
+if (window.AstrBotPluginPage) {
+  init();
+} else {
+  var _bgPoll = setInterval(function () {
+    if (window.AstrBotPluginPage) {
+      clearInterval(_bgPoll);
+      init();
+    }
+  }, 100);
+  setTimeout(function () { clearInterval(_bgPoll); }, 10000);
+}
 
 window.addEventListener("beforeunload", function () {
   stopVRMRender();
