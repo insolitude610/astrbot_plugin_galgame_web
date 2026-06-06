@@ -34,6 +34,7 @@ var typewriterSpeed = 60;
 var typewriterFullText = "";
 var typewriterLastEmotion = "";
 var isAudioPlaying = false;
+var currentHistoryAudio = null;
 var lastReplyData = null;
 var expressionTimers = [];
 
@@ -918,8 +919,11 @@ async function toggleHistory() {
         playBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
         playBtn.onclick = (function(file) {
           return function() {
+            if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
             apiGet("audio/data", { name: file }).then(function(resp) {
               var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
+              currentHistoryAudio = audio;
+              audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
               audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
             }).catch(function(e) { console.warn("History audio load failed:", e); });
           };
