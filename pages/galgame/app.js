@@ -174,7 +174,7 @@ function apiGet(endpoint, params) {
   if (params) {
     url += "?" + new URLSearchParams(params).toString();
   }
-  return fetch(url).then(function (r) {
+  return fetch(url, { credentials: "include" }).then(function (r) {
     if (!r.ok) throw new Error(endpoint + " returned " + r.status);
     return r.json();
   });
@@ -184,6 +184,7 @@ function apiPost(endpoint, body) {
   return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(body),
   }).then(function (r) {
     if (!r.ok) throw new Error(endpoint + " returned " + r.status);
