@@ -268,7 +268,7 @@ function startNewSession() {
     if (!resp || !resp.session_id) return;
     sessionId = resp.session_id;
     setLocal("galgame_session_id", sessionId);
-    finishInit(false);
+    finishInit(true);
   });
 }
 
@@ -394,7 +394,7 @@ function init() {
       if (resp.current_emotion) {
         currentEmotion = resp.current_emotion;
       }
-      finishInit(savedId === resp.session_id);
+      finishInit(true);
     });
   });
 }
