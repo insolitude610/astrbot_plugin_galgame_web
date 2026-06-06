@@ -171,7 +171,7 @@ var el = {
 
 function apiGet(endpoint, params) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiGet) {
-    return window.AstrBotPluginPage.apiGet(PLUGIN_NAME + "/" + endpoint, params);
+    return window.AstrBotPluginPage.apiGet(endpoint, params);
   }
   var url = API_BASE + "/" + endpoint;
   if (params) {
@@ -185,7 +185,7 @@ function apiGet(endpoint, params) {
 
 function apiPost(endpoint, body) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiPost) {
-    return window.AstrBotPluginPage.apiPost(PLUGIN_NAME + "/" + endpoint, body);
+    return window.AstrBotPluginPage.apiPost(endpoint, body);
   }
   return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
