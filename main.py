@@ -585,7 +585,7 @@ class GalgamePlugin(Star):
         if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
         mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
-        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
+        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"), headers={"Access-Control-Allow-Origin": "*"})
 
     async def _api_assets_batch(self):
         data = await request.get_json() or {}
@@ -709,7 +709,7 @@ class GalgamePlugin(Star):
         if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
         mime_map = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4", ".aac": "audio/aac", ".opus": "audio/ogg"}
-        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
+        return Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"), headers={"Access-Control-Allow-Origin": "*"})
 
     # ---- prefs API ----
 
