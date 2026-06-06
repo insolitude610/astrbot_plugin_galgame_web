@@ -184,6 +184,7 @@ class GalgamePlugin(Star):
         ctx.register_web_api(f"/{pn}/assets/batch-delete", self._api_assets_batch_delete, ["POST"], "Batch delete assets")
         ctx.register_web_api(f"/{pn}/session/list", self._api_session_list, ["GET"], "List available sessions for recovery")
         ctx.register_web_api(f"/{pn}/session/delete", self._api_session_delete, ["POST"], "Delete a session and its AstrBot conversation")
+        ctx.register_web_api(f"/{pn}/audio/data", self._api_audio_data, ["GET"], "Get audio file as base64 JSON")
         ctx.register_web_api(f"/{pn}/favorites/list", self._api_favorites_list, ["GET"], "List saved favorites")
         ctx.register_web_api(f"/{pn}/favorites/add", self._api_favorites_add, ["POST"], "Add a favorite")
         ctx.register_web_api(f"/{pn}/favorites/delete", self._api_favorites_delete, ["POST"], "Delete a favorite")
@@ -462,6 +463,15 @@ class GalgamePlugin(Star):
         if path.exists():
             path.unlink()
         return {"status": "ok"}
+
+    async def _api_audio_data(self):
+        filename = request.args.get("name", "")
+        sp = safe_path(filename, AUDIO_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
+            return {"error": "not found"}, 404
+        raw = sp.read_bytes()
+        mime_map = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
+        return {"data": base64.b64encode(raw).decode(), "mime": mime_map.get(sp.suffix.lower(), "audio/wav")}
 
     # ---- config API ----
 
