@@ -585,8 +585,11 @@ class GalgamePlugin(Star):
         filename = request.args.get("name", "")
         sp = safe_path(filename, ASSETS_DIR)
         if not sp or not sp.exists() or not sp.is_file():
+            sp = safe_path(filename, AUDIO_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif",
+                    ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
         origin = request.headers.get("Origin", "")
         resp = Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
         resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
