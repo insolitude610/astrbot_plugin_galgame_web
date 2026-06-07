@@ -942,12 +942,14 @@ async function toggleHistory() {
             if (IS_DASHBOARD()) {
               apiGet("audio/data", { name: file }).then(function(resp) {
                 var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
+                audio.volume = voiceVolume;
                 currentHistoryAudio = audio;
                 audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
                 audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
               }).catch(function(e) { console.warn("History audio load failed:", e); });
             } else {
               var audio = new Audio("./audio/" + encodeURIComponent(file));
+              audio.volume = voiceVolume;
               currentHistoryAudio = audio;
               audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
               audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
@@ -1077,8 +1079,16 @@ window.addEventListener("beforeunload", function () {
 });
 
 document.addEventListener("visibilitychange", function () {
-  if (document.hidden) stopVRMRender();
-  else if (spriteMode === "vrm" && !vrmStarted) {
-    startVRMRender();
+  if (document.hidden) { stopVRMRender(); }
+  else {
+    if (spriteMode === "vrm" && !vrmStarted) { startVRMRender(); }
+    apiGet("config").then(function(cfg) {
+      voiceVolume = cfg.voice_volume != null ? cfg.voice_volume : 1.0;
+      bgmVolume = cfg.bgm_volume != null ? cfg.bgm_volume : 0.5;
+      var ta = document.getElementById("tts-audio");
+      if (ta) ta.volume = voiceVolume;
+      var ba = document.getElementById("bgm-audio");
+      if (ba) ba.volume = bgmVolume;
+    }).catch(function(){});
   }
 });

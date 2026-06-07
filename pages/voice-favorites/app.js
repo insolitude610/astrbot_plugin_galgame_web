@@ -1,6 +1,7 @@
 var PLUGIN = "astrbot_plugin_galgame_web";
 var API_BASE = "/api/plug/" + PLUGIN;
 var currentFavAudio = null;
+var voiceVolume = 1.0;
 
 function apiGet(endpoint, params) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiGet) {
@@ -76,6 +77,7 @@ function loadFavorites() {
             if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
             apiGet("audio/data", { name: file }).then(function(resp) {
               var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
+              audio.volume = voiceVolume;
               currentFavAudio = audio;
               audio.onended = audio.onerror = function() { currentFavAudio = null; };
               audio.play().catch(function(e) { console.warn("Play failed:", e); });
@@ -115,6 +117,7 @@ function loadBackground() {
     if (cfg.background) {
       document.getElementById("fav-bg").style.backgroundImage = "url(/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(cfg.background) + ")";
     }
+    if (cfg.voice_volume != null) { voiceVolume = cfg.voice_volume; }
   }).catch(function() {});
 }
 
