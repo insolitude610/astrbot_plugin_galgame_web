@@ -1062,13 +1062,15 @@ async function notifyRapidAction(count) {
 
 /* ---- boot ---- */
 
-/* ---- boot ---- */
-
-if (IS_DASHBOARD()) {
-  if (window.AstrBotPluginPage) { init(); }
-  else { var _poll = setInterval(function() { if (window.AstrBotPluginPage) { clearInterval(_poll); init(); } }, 100); setTimeout(function() { clearInterval(_poll); }, 10000); }
-} else {
+if (window.AstrBotPluginPage) {
   init();
+} else {
+  var _poll = setInterval(function() {
+    if (window.AstrBotPluginPage) { clearInterval(_poll); init(); }
+  }, 100);
+  setTimeout(function() {
+    if (!window.AstrBotPluginPage) { clearInterval(_poll); init(); }
+  }, 500);
 }
 
 window.addEventListener("beforeunload", function () {
