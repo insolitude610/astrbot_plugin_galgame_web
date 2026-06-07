@@ -398,7 +398,7 @@ async function init() {
     currentEmotion = resp.current_emotion;
   }
 
-  finishInit(savedId === resp.session_id);
+  finishInit(true);
 }
 
 function applyConfig(cfg) {
@@ -732,27 +732,33 @@ function loadFavoriteCache() {
   });
 }
 
+async function _doFavToggle(file, text, audioMime) {
+  if (_favoriteFiles[file]) {
+    try { await apiPost("favorites/delete", { id: _favoriteFiles[file].id }); } catch(e) { console.warn("fav delete failed, refreshing:", e); }
+    await loadFavoriteCache();
+  } else {
+    await apiPost("favorites/add", { text: text, audio_file: file, audio_mime: audioMime });
+    await loadFavoriteCache();
+  }
+}
+
+function _applyFavVisual(file, btn, isDialogBtn) {
+  var faved = !!_favoriteFiles[file];
+  if (isDialogBtn) {
+    updateFavoriteBtn(file);
+  } else {
+    btn.style.color = faved ? "#ef4444" : "";
+    btn.querySelector("svg").setAttribute("fill", faved ? "#ef4444" : "none");
+    updateFavoriteBtn(lastReplyData && lastReplyData.audio_file === file ? file : "");
+  }
+}
+
 async function toggleFavorite() {
   if (!lastReplyData || !lastReplyData.audio_file) return;
-  var file = lastReplyData.audio_file;
-  var btn = document.getElementById("favorite-btn");
   try {
-    if (_favoriteFiles[file]) {
-      await apiPost("favorites/delete", { id: _favoriteFiles[file].id });
-      delete _favoriteFiles[file];
-      if (btn) btn.classList.remove("favorited");
-    } else {
-      await apiPost("favorites/add", {
-        text: lastReplyData.text,
-        audio_file: file,
-        audio_mime: lastReplyData.audioMime,
-      });
-      await loadFavoriteCache();
-      if (btn) btn.classList.add("favorited");
-    }
-  } catch(e) {
-    console.warn("Favorite toggle failed:", e);
-  }
+    await _doFavToggle(lastReplyData.audio_file, lastReplyData.text, lastReplyData.audioMime);
+    _applyFavVisual(lastReplyData.audio_file, document.getElementById("favorite-btn"), true);
+  } catch(e) { console.warn("Favorite toggle failed:", e); }
 }
 
 /* ---- TTS audio ---- */
@@ -954,33 +960,14 @@ async function toggleHistory() {
         favBtn.className = "msg-fav-btn";
         favBtn.title = "收藏语音";
         favBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
-        favBtn.onclick = (function(m) {
+        favBtn.onclick = (function(m, btn) {
           return async function(e) {
-            var file = m.audio_file;
-            var btn = e.currentTarget;
             try {
-              if (_favoriteFiles[file]) {
-                await apiPost("favorites/delete", { id: _favoriteFiles[file].id });
-                delete _favoriteFiles[file];
-                btn.style.color = "";
-                btn.querySelector("svg").setAttribute("fill", "none");
-                updateFavoriteBtn(lastReplyData && lastReplyData.audio_file === file ? file : "");
-              } else {
-                await apiPost("favorites/add", {
-                  text: m.content,
-                  audio_file: file,
-                  audio_mime: m.audio_mime || "audio/wav",
-                });
-                await loadFavoriteCache();
-                btn.style.color = "#ef4444";
-                btn.querySelector("svg").setAttribute("fill", "#ef4444");
-                if (lastReplyData && lastReplyData.audio_file === file) {
-                  document.getElementById("favorite-btn").classList.add("favorited");
-                }
-              }
-            } catch(e) { console.warn("Favorite toggle failed:", e); }
+              await _doFavToggle(m.audio_file, m.content, m.audio_mime || "audio/wav");
+              _applyFavVisual(m.audio_file, btn, false);
+            } catch(err) { console.warn("Favorite toggle failed:", err); }
           };
-        })(msg);
+        })(msg, favBtn);
         if (_favoriteFiles[msg.audio_file]) {
           favBtn.style.color = "#ef4444";
           favBtn.querySelector("svg").setAttribute("fill", "#ef4444");
