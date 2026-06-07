@@ -625,7 +625,7 @@ class SessionAPI:
                 audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(mime)}"
                 (AUDIO_DIR / audio_file).write_bytes(raw)
                 if self.config.get("audio_format", "wav") == "mp3":
-                    converted = _convert_audio(AUDIO_DIR / audio_file)
+                    converted = await asyncio.to_thread(_convert_audio, AUDIO_DIR / audio_file)
                     if converted:
                         audio_file = converted.name
                         raw = converted.read_bytes()
