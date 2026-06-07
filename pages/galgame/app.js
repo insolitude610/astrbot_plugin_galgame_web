@@ -250,14 +250,25 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
-  setLocal("galgame_session_id", sid);
-  location.href = "?sid=" + sid;
+  toggleSessionPanel();
+  initSession(sid).then(function(resp) {
+    if (!resp) return;
+    sessionId = resp.session_id;
+    setLocal("galgame_session_id", sessionId);
+    if (resp.current_emotion) { currentEmotion = resp.current_emotion; }
+    finishInit(true);
+  });
 }
 
 function startNewSession() {
   toggleSessionPanel();
   removeLocal("galgame_session_id");
-  location.href = location.pathname;
+  apiPost("session/init", { resume_id: "" }).then(function(resp) {
+    if (!resp || !resp.session_id) return;
+    sessionId = resp.session_id;
+    setLocal("galgame_session_id", sessionId);
+    finishInit(true);
+  });
 }
 
 async function loadSessionPanel() {
