@@ -904,14 +904,15 @@ async function toggleHistory() {
         favBtn.title = "收藏语音";
         favBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
         favBtn.onclick = (function(m) {
-          return async function() {
+          return async function(e) {
             var file = m.audio_file;
+            var btn = e.currentTarget;
             try {
               if (_favoriteFiles[file]) {
                 await apiPost("favorites/delete", { id: _favoriteFiles[file].id });
                 delete _favoriteFiles[file];
-                favBtn.style.color = "";
-                favBtn.querySelector("svg").setAttribute("fill", "none");
+                btn.style.color = "";
+                btn.querySelector("svg").setAttribute("fill", "none");
                 updateFavoriteBtn(lastReplyData && lastReplyData.audio_file === file ? file : "");
               } else {
                 await apiPost("favorites/add", {
@@ -920,8 +921,8 @@ async function toggleHistory() {
                   audio_mime: m.audio_mime || "audio/wav",
                 });
                 await loadFavoriteCache();
-                favBtn.style.color = "#ef4444";
-                favBtn.querySelector("svg").setAttribute("fill", "#ef4444");
+                btn.style.color = "#ef4444";
+                btn.querySelector("svg").setAttribute("fill", "#ef4444");
                 if (lastReplyData && lastReplyData.audio_file === file) {
                   document.getElementById("favorite-btn").classList.add("favorited");
                 }
