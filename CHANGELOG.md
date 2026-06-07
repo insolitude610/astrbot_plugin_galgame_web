@@ -54,6 +54,9 @@
 - 修复 meme_manager 产生的 `[IMAGE]` 引用显示在对话框
 - 修复 `_build_tts_segments` 情绪错位（`{emotion_xxx}` 在文本开头时后续分段全用错情绪）
 - 修复 sandboxed iframe 中 `localStorage` 被禁导致页面无法初始化
+- 修复「开始全新对话」不生效：服务端 auto-resume 覆盖 `startNewSession`，新增 `force_new` 参数跳过自动恢复
+- 修复新建会话后对话框残留旧对话文本：`restoreLastMessage` 无历史时清空显示
+- 修复 Dashboard 内嵌页无法删除会话：sandbox 无 `confirm()` 权限，改为直接执行删除
 
 ## v0.6.0
 
