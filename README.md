@@ -1,13 +1,3 @@
-# AI Galgame 虚拟伙伴
-
-> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
->
-> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
->
-> ⚠️ **注意：本插件不建议和消息合并/防抖插件一同使用！！！会产生莫名其妙的 bug！！！**
->
-> 如已安装 `astrbot_plugin_combine_messages` 等消息合并/防抖类插件，请在 AstrBot WebUI 的自定义规则中，为 Galgame 的 webchat 会话禁用该类插件。
-
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
 一个 AstrBot 插件，通过独立本地端口和 Dashboard 内嵌页提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、Fish Audio 情感 TTS 语音朗读、语音输入、BGM 背景音乐、会话恢复、对话历史、语音收藏等交互特性。
@@ -32,18 +22,6 @@
 1. 在 AstrBot WebUI 中打开**插件市场**
 2. 搜索 `astrbot_plugin_galgame_web` 并安装
 3. 启用插件
-
-### 最小配置
-
-在插件详情页设置以下三项即可开始使用：
-
-| 配置项 | 说明 |
-|--------|------|
-| 角色显示名 | 对话框上方显示的名称 |
-| 角色人格 | 选择 AstrBot 已配置的 Persona |
-| LLM Provider | 驱动对话的 AI 模型（deepseek / gpt-4o 等） |
-
-其他配置项（立绘、背景、端口等）保持默认即可，详见下方配置表。
 
 ### 打开界面
 
@@ -166,8 +144,6 @@ http://localhost:6186
 - Blend shape 表情切换
 - 骨骼呼吸微动
 - 3D 旋转拖拽
-
-模型来源：[VRoid Studio](https://vroid.com/en/studio) 免费捏脸导出，或 [VRoid Hub](https://hub.vroid.com/) 下载现成模型。
 
 ---
 
