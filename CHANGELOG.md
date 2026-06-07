@@ -57,6 +57,11 @@
 - 修复「开始全新对话」不生效：服务端 auto-resume 覆盖 `startNewSession`，新增 `force_new` 参数跳过自动恢复
 - 修复新建会话后对话框残留旧对话文本：`restoreLastMessage` 无历史时清空显示
 - 修复 Dashboard 内嵌页无法删除会话：sandbox 无 `confirm()` 权限，改为直接执行删除
+- 修复 ffmpeg 转码阻塞事件循环：`_convert_audio` 改用 `asyncio.to_thread` 在后台线程执行
+
+**审核规范化**
+
+- 数据路径全部改用 `StarTools.get_data_dir(PLUGIN_NAME)`（替代硬编码的 `pathlib.Path("data/plugin_data")/...`），符合官方插件上架规范，确保 Docker 部署数据不丢失
 
 ## v0.6.0
 
