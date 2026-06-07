@@ -16,7 +16,20 @@ var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
 var historyLimit = 40;
+var IS_DASHBOARD = !!window.AstrBotPluginPage;
+var _memStore = {};
+var _assetCache = {};
 var _favoriteFiles = {};
+
+function getLocal(key) {
+  try { return localStorage.getItem(key); } catch (e) { return _memStore[key] || null; }
+}
+function setLocal(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) { _memStore[key] = val; }
+}
+function removeLocal(key) {
+  try { localStorage.removeItem(key); } catch (e) { delete _memStore[key]; }
+}
 
 var typewriterTimer = null;
 var typewriterSpeed = 60;
@@ -172,20 +185,21 @@ var el = {
 /* ---- API helpers ---- */
 
 function apiGet(endpoint, params) {
+  if (IS_DASHBOARD) return window.AstrBotPluginPage.apiGet(endpoint, params);
   var url = API_BASE + "/" + endpoint;
-  if (params) {
-    url += "?" + new URLSearchParams(params).toString();
-  }
-  return fetch(url).then(function (r) {
+  if (params) { url += "?" + new URLSearchParams(params).toString(); }
+  return fetch(url, { credentials: "include" }).then(function (r) {
     if (!r.ok) throw new Error(endpoint + " returned " + r.status);
     return r.json();
   });
 }
 
 function apiPost(endpoint, body) {
+  if (IS_DASHBOARD) return window.AstrBotPluginPage.apiPost(endpoint, body);
   return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(body),
   }).then(function (r) {
     if (!r.ok) throw new Error(endpoint + " returned " + r.status);
@@ -195,7 +209,11 @@ function apiPost(endpoint, body) {
 
 function assetUrl(filename) {
   if (!filename) return "";
-  return "./assets/" + filename;
+  if (IS_DASHBOARD && _assetCache[filename]) return _assetCache[filename];
+  return IS_DASHBOARD
+    ? "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(filename)
+    : "./assets/" + filename;
+}
 }
 
 /* ---- init ---- */
@@ -233,13 +251,12 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
-  localStorage.setItem("galgame_session_id", sid);
-  location.href = "?sid=" + sid;
+  setLocal("galgame_session_id", sid)  location.href = "?sid=" + sid;
 }
 
 function startNewSession() {
   toggleSessionPanel();
-  localStorage.removeItem("galgame_session_id");
+  removeLocal("galgame_session_id");
   location.href = location.pathname;
 }
 
@@ -293,7 +310,7 @@ async function loadSessionPanel() {
         try {
           await apiPost("session/delete", { session_id: sid });
           if (sid === sessionId) {
-            localStorage.removeItem("galgame_session_id");
+            removeLocal("galgame_session_id");
             location.href = location.pathname;
           } else {
             el.remove();
@@ -341,7 +358,7 @@ function finishInit(isResuming) {
 }
 
 async function init() {
-  var cachedBg = localStorage.getItem("galgame_bg") || "";
+  var cachedBg = getLocal("galgame_bg") || "";
   if (cachedBg) {
     el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
   }
@@ -349,6 +366,7 @@ async function init() {
   try {
     var config = await apiGet("config");
     applyConfig(config);
+    await preloadAssets(config);
   } catch (err) {
     console.warn("Failed to load config, using defaults:", err);
     applyConfig({});
@@ -358,13 +376,13 @@ async function init() {
   applyBackground();
 
   var urlSid = getUrlSessionId();
-  var savedId = urlSid || localStorage.getItem("galgame_session_id") || "";
+  var savedId = urlSid || getLocal("galgame_session_id") || "";
 
   var resp = await initSession(savedId);
   if (!resp) return;
 
   sessionId = resp.session_id;
-  localStorage.setItem("galgame_session_id", sessionId);
+  setLocal("galgame_session_id", sessionId);
   if (resp.current_emotion) {
     currentEmotion = resp.current_emotion;
   }
@@ -384,7 +402,7 @@ function applyConfig(cfg) {
   if (!vrmModelPath) vrmModelPath = "./assets/model.vrm";
   characterName = cfg.character_name || "小星";
   backgroundFile = cfg.background || "";
-  if (backgroundFile) localStorage.setItem("galgame_bg", backgroundFile);
+  if (backgroundFile) setLocal("galgame_bg", backgroundFile);
   historyAvatar = cfg.history_avatar || "";
   el.characterName.textContent = characterName;
   document.documentElement.style.setProperty("--sprite-scale", cfg.sprite_scale || 1);
@@ -394,6 +412,19 @@ function applyConfig(cfg) {
   historyLimit = cfg.history_limit || 40;
 
   applyBgmAndVolume(cfg);
+}
+
+function preloadAssets(cfg) {
+  if (!IS_DASHBOARD) return Promise.resolve();
+  var names = [];
+  var exps = cfg.expressions || {};
+  for (var k in exps) { if (exps[k]) names.push(exps[k]); }
+  if (cfg.background) names.push(cfg.background);
+  if (cfg.history_avatar) names.push(cfg.history_avatar);
+  if (!names.length) return Promise.resolve();
+  return apiPost("assets/batch", { names: names }).then(function(resp) {
+    (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
+  }).catch(function(e) { console.warn("preloadAssets failed:", e); });
 }
 
 function applyBgmAndVolume(cfg) {
@@ -891,10 +922,19 @@ async function toggleHistory() {
         playBtn.onclick = (function(file) {
           return function() {
             if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
-            var audio = new Audio("./audio/" + encodeURIComponent(file));
-            currentHistoryAudio = audio;
-            audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
-            audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
+            if (IS_DASHBOARD) {
+              apiGet("audio/data", { name: file }).then(function(resp) {
+                var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
+                currentHistoryAudio = audio;
+                audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
+                audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
+              }).catch(function(e) { console.warn("History audio load failed:", e); });
+            } else {
+              var audio = new Audio("./audio/" + encodeURIComponent(file));
+              currentHistoryAudio = audio;
+              audio.onended = audio.onerror = function() { currentHistoryAudio = null; };
+              audio.play().catch(function(e) { console.warn("History audio play failed:", e); });
+            }
           };
         })(msg.audio_file);
         msgRow.appendChild(playBtn);
@@ -1022,7 +1062,14 @@ async function notifyRapidAction(count) {
 
 /* ---- boot ---- */
 
-init();
+/* ---- boot ---- */
+
+if (IS_DASHBOARD) {
+  if (window.AstrBotPluginPage) { init(); }
+  else { var _poll = setInterval(function() { if (window.AstrBotPluginPage) { clearInterval(_poll); init(); } }, 100); setTimeout(function() { clearInterval(_poll); }, 10000); }
+} else {
+  init();
+}
 
 window.addEventListener("beforeunload", function () {
   stopVRMRender();
