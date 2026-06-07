@@ -13,6 +13,22 @@
 
 > **请使用 `single` 模式。** VRM 模式的 Three.js + three-vrm 集成仍在开发中，可能存在渲染异常、模型加载失败等问题。
 
+
+## 效果展示
+
+> 对话页面
+> <img width="2870" height="1487" alt="image" src="https://github.com/user-attachments/assets/53f9aba9-e3ba-4599-9193-326f00a42a86" />
+> 历史记录
+> <img width="2880" height="1492" alt="image" src="https://github.com/user-attachments/assets/2c95e452-3624-4d5c-ad57-8babab4c5eb3" />
+> 语音收藏
+> <img width="2880" height="1489" alt="image" src="https://github.com/user-attachments/assets/ad57aea8-8766-46c8-a844-4d99f8902552" />
+> 立绘管理/设置
+> <img width="2841" height="1485" alt="image" src="https://github.com/user-attachments/assets/eb35bb37-a5a0-40ff-a995-b2cbf785678d" />
+> 会话记录
+> <img width="2879" height="1476" alt="image" src="https://github.com/user-attachments/assets/a731d289-5c67-44fb-bcf0-ac18391bde58" />
+
+# 立绘需要自己做哦，可以直接AI生图或者从什么galgame里拉出来立绘
+
 ---
 
 ## 快速开始
