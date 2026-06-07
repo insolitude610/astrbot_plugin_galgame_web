@@ -715,10 +715,13 @@ function replayLastResponse() {
 function updateFavoriteBtn(audioFile) {
   var btn = document.getElementById("favorite-btn");
   if (!btn) return;
+  var svg = btn.querySelector("svg");
   if (audioFile && _favoriteFiles[audioFile]) {
     btn.classList.add("favorited");
+    if (svg) { svg.setAttribute("fill", "#ef4444"); svg.setAttribute("stroke", "#ef4444"); }
   } else {
     btn.classList.remove("favorited");
+    if (svg) { svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); }
   }
 }
 
@@ -954,6 +957,7 @@ async function toggleHistory() {
                 await apiPost("favorites/delete", { id: _favoriteFiles[file].id });
                 delete _favoriteFiles[file];
                 favBtn.style.color = "";
+                favBtn.querySelector("svg").setAttribute("fill", "none");
                 updateFavoriteBtn(lastReplyData && lastReplyData.audio_file === file ? file : "");
               } else {
                 await apiPost("favorites/add", {
@@ -963,6 +967,7 @@ async function toggleHistory() {
                 });
                 await loadFavoriteCache();
                 favBtn.style.color = "#ef4444";
+                favBtn.querySelector("svg").setAttribute("fill", "#ef4444");
                 if (lastReplyData && lastReplyData.audio_file === file) {
                   document.getElementById("favorite-btn").classList.add("favorited");
                 }
@@ -972,6 +977,7 @@ async function toggleHistory() {
         })(msg);
         if (_favoriteFiles[msg.audio_file]) {
           favBtn.style.color = "#ef4444";
+          favBtn.querySelector("svg").setAttribute("fill", "#ef4444");
         }
         msgRow.appendChild(favBtn);
       }
