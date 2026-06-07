@@ -43,14 +43,15 @@
 
 有两种访问方式：
 
-1. **Dashboard 内嵌页**（推荐）：插件市场 → 点击 "AI Galgame 虚拟伙伴" 卡片 → 顶部 tab 切换「galgame」/「settings」/「voice-favorites」
-2. **独立 WebUI 端口**：插件启动后自动在本机启动 HTTP 服务器（默认端口 **6186**），浏览器访问：
+1. **独立 WebUI 端口**（推荐）：插件启动后自动在本机启动 HTTP 服务器（默认端口 **6186**），浏览器访问：
 
 ```
 http://localhost:6186
 ```
 
-也可在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 回复访问地址。
+2. **Dashboard 内嵌页**：插件市场 → 点击插件卡片 → 顶部 tab 切换「galgame」/「settings」/「voice-favorites」
+
+> **说明**：更推荐使用独立 WebUI。Dashboard 内嵌页运行在受限 sandbox 中，存在无弹窗确认（`confirm`/`alert` 被禁）、上传预览延迟、音量设置需切换页面刷新等已知限制。独立 WebUI 功能完整，体验最佳。独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。
 
 > **说明**：独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。Dashboard 内嵌页不受密码影响（依赖 Dashboard 自身登录）。
 
@@ -311,7 +312,7 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 - **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。meme_manager 产生的 `[IMAGE]` 引用会自动过滤。
 - **Fish Audio 网络依赖**：Fish Audio API 服务器在境外，需稳定代理。代理不稳定时 TTS 会降级静默跳过，文字正常显示。
 - **VRM 3D 模式**：尚未完善，暂不可用。
-- **Dashboard 内嵌页无弹窗确认**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 权限。删除会话、取消收藏等操作设为直接生效，无浏览器弹窗确认。独立 WebUI 不受此限制。
+- **Dashboard 内嵌页限制**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 弹窗权限（删除会话、取消收藏等操作无确认提示）、上传立绘缩略图存在加载延迟、音量设置需切回 galgame 页等页面重新可见时刷新。推荐使用独立 WebUI 获得完整体验。
 
 ## 许可证
 
