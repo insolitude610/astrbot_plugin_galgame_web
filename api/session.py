@@ -305,7 +305,7 @@ class SessionAPI:
             return session, 400
 
         # Step 2: Handle commands
-        matched_prefix, cmd = self._send_handle_command(text, session, sid)
+        matched_prefix, cmd = await self._send_handle_command(text, session, sid)
 
         # Step 3: Save audio if present
         audio_path = self._send_save_audio(audio_data, text)
@@ -328,7 +328,7 @@ class SessionAPI:
             return self._send_handle_command_result(cmd, session, sid, raw_reply, pipeline_result)
 
         # Step 7: Extract emotions
-        clean_text, emotions, emotions_all = self._send_extract_emotions(raw_reply, session)
+        clean_text, emotions, emotions_all = await self._send_extract_emotions(raw_reply, session)
 
         # Step 8: Synthesize TTS
         audio_b64, audio_mime_val, audio_file = await self._send_synthesize_tts(
@@ -336,7 +336,7 @@ class SessionAPI:
         )
 
         # Step 9: Save and return
-        return self._send_save_and_return(
+        return await self._send_save_and_return(
             session, text, clean_text, emotions, emotions_all,
             audio_b64, audio_mime_val, audio_file, sid
         )
@@ -347,7 +347,7 @@ class SessionAPI:
         session = self._sessions[sid]
         return session
 
-    def _send_handle_command(self, text, session, sid):
+    async def _send_handle_command(self, text, session, sid):
         cfg = self.context.get_config()
         wake_prefixes = cfg.get("wake_prefix", ["/"])
         matched_prefix = next((p for p in wake_prefixes if text.startswith(p)), None)
@@ -411,7 +411,7 @@ class SessionAPI:
                 "audio": pipeline_result.get("audio", ""), "audio_mime": pipeline_result.get("audio_mime", ""),
                 "audio_file": pipeline_result.get("audio_file", ""), "audio_segments": []}
 
-    def _send_extract_emotions(self, raw_reply, session):
+    async def _send_extract_emotions(self, raw_reply, session):
         from ..galgame_web.utils import EMOTION_PATTERN, extract_all_emotions, get_emotion_tags
 
         raw_reply = raw_reply.replace("\\n", "\n")
@@ -501,7 +501,7 @@ class SessionAPI:
 
         return audio_b64, audio_mime_val, audio_file
 
-    def _send_save_and_return(self, session, text, clean_text, emotions, emotions_all,
+    async def _send_save_and_return(self, session, text, clean_text, emotions, emotions_all,
                                audio_b64, audio_mime_val, audio_file, sid):
         from ..galgame_web.session_helpers import PLATFORM_ID, save_session, sync_conv_to_db
         final_emotion = emotions[-1][0] if emotions else "neutral"
