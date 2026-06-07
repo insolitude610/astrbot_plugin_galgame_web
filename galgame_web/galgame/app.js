@@ -230,6 +230,7 @@ function restoreLastMessage() {
         return;
       }
     }
+    el.dialogText.textContent = "";
   }).catch(function(e) {
     console.warn("restoreLastMessage failed:", e);
   });
