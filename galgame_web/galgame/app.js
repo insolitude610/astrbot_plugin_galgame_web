@@ -318,7 +318,6 @@ async function loadSessionPanel() {
     delBtn.onclick = (function(sid, el) {
       return async function(e) {
         e.stopPropagation();
-        if (!confirm("确认删除此对话？")) return;
         try {
           await apiPost("session/delete", { session_id: sid });
           if (sid === sessionId) {

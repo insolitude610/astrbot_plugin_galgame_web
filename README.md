@@ -295,6 +295,7 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 - **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。meme_manager 产生的 `[IMAGE]` 引用会自动过滤。
 - **Fish Audio 网络依赖**：Fish Audio API 服务器在境外，需稳定代理。代理不稳定时 TTS 会降级静默跳过，文字正常显示。
 - **VRM 3D 模式**：尚未完善，暂不可用。
+- **Dashboard 内嵌页无弹窗确认**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 权限。删除会话、取消收藏等操作设为直接生效，无浏览器弹窗确认。独立 WebUI 不受此限制。
 
 ## 许可证
 
