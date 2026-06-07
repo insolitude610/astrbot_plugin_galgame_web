@@ -263,7 +263,7 @@ function switchToSession(sid) {
 function startNewSession() {
   toggleSessionPanel();
   removeLocal("galgame_session_id");
-  apiPost("session/init", { resume_id: "" }).then(function(resp) {
+  apiPost("session/init", { resume_id: "", force_new: true }).then(function(resp) {
     if (!resp || !resp.session_id) return;
     sessionId = resp.session_id;
     setLocal("galgame_session_id", sessionId);

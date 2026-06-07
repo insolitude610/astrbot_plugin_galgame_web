@@ -82,6 +82,7 @@ class SessionAPI:
         try:
             data = await request.get_json() or {}
             resume_id = data.get("resume_id", "").strip()
+            force_new = data.get("force_new", False)
 
             in_mem = resume_id in self._sessions if resume_id else False
             on_disk = session_path(resume_id).exists() if resume_id else False
@@ -106,8 +107,9 @@ class SessionAPI:
                         "current_emotion": s.get("current_emotion", "neutral"),
                     }
 
-            latest = self._find_latest_session()
-            if latest:
+            if not force_new:
+                latest = self._find_latest_session()
+                if latest:
                 s = load_session(latest)
                 if s and s.get("history"):
                     logger.info(f"[session] auto-resume latest: {latest}")
