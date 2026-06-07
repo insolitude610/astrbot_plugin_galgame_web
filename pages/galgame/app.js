@@ -16,7 +16,7 @@ var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
 var historyLimit = 40;
-var IS_DASHBOARD = !!window.AstrBotPluginPage;
+function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
 var _assetCache = {};
 var _favoriteFiles = {};
@@ -185,7 +185,7 @@ var el = {
 /* ---- API helpers ---- */
 
 function apiGet(endpoint, params) {
-  if (IS_DASHBOARD) return window.AstrBotPluginPage.apiGet(endpoint, params);
+  if (IS_DASHBOARD()) return window.AstrBotPluginPage.apiGet(endpoint, params);
   var url = API_BASE + "/" + endpoint;
   if (params) { url += "?" + new URLSearchParams(params).toString(); }
   return fetch(url, { credentials: "include" }).then(function (r) {
@@ -195,7 +195,7 @@ function apiGet(endpoint, params) {
 }
 
 function apiPost(endpoint, body) {
-  if (IS_DASHBOARD) return window.AstrBotPluginPage.apiPost(endpoint, body);
+  if (IS_DASHBOARD()) return window.AstrBotPluginPage.apiPost(endpoint, body);
   return fetch(API_BASE + "/" + endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -209,8 +209,8 @@ function apiPost(endpoint, body) {
 
 function assetUrl(filename) {
   if (!filename) return "";
-  if (IS_DASHBOARD && _assetCache[filename]) return _assetCache[filename];
-  return IS_DASHBOARD
+  if (IS_DASHBOARD() && _assetCache[filename]) return _assetCache[filename];
+  return IS_DASHBOARD()
     ? "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(filename)
     : "./assets/" + filename;
 }
@@ -415,7 +415,7 @@ function applyConfig(cfg) {
 }
 
 function preloadAssets(cfg) {
-  if (!IS_DASHBOARD) return Promise.resolve();
+  if (!IS_DASHBOARD()) return Promise.resolve();
   var names = [];
   var exps = cfg.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
@@ -922,7 +922,7 @@ async function toggleHistory() {
         playBtn.onclick = (function(file) {
           return function() {
             if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
-            if (IS_DASHBOARD) {
+            if (IS_DASHBOARD()) {
               apiGet("audio/data", { name: file }).then(function(resp) {
                 var audio = new Audio("data:" + resp.mime + ";base64," + resp.audio);
                 currentHistoryAudio = audio;
@@ -1064,7 +1064,7 @@ async function notifyRapidAction(count) {
 
 /* ---- boot ---- */
 
-if (IS_DASHBOARD) {
+if (IS_DASHBOARD()) {
   if (window.AstrBotPluginPage) { init(); }
   else { var _poll = setInterval(function() { if (window.AstrBotPluginPage) { clearInterval(_poll); init(); } }, 100); setTimeout(function() { clearInterval(_poll); }, 10000); }
 } else {
