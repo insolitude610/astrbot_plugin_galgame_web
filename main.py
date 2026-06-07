@@ -11,7 +11,7 @@ import jwt
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
-from astrbot.api.star import Context, Star
+from astrbot.api.star import Context, Star, StarTools
 
 from .api.assets import AssetAPI
 from .api.audio import AudioAPI
@@ -39,11 +39,12 @@ from .galgame_web.utils import (
 )
 from .galgame_web.web_handler import GalgameWebHandler
 
-ASSETS_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "assets"
-AUDIO_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "audio"
-BGM_DIR = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "bgm"
-FAVORITES_PATH = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "favorites.json"
-PREFS_PATH = pathlib.Path("data/plugin_data") / PLUGIN_NAME / "prefs.json"
+_DATA_BASE = StarTools.get_data_dir(PLUGIN_NAME)
+ASSETS_DIR = _DATA_BASE / "assets"
+AUDIO_DIR = _DATA_BASE / "audio"
+BGM_DIR = _DATA_BASE / "bgm"
+FAVORITES_PATH = _DATA_BASE / "favorites.json"
+PREFS_PATH = _DATA_BASE / "prefs.json"
 
 
 def _load_prefs() -> dict:

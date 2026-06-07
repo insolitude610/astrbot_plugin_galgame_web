@@ -4,17 +4,15 @@ import pathlib
 import time
 
 from astrbot.api import logger
+from astrbot.api.star import StarTools
 
-SESSIONS_DIR = (
-    pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "sessions"
-)
+_PLUGIN = "astrbot_plugin_galgame_web"
+_DATA = StarTools.get_data_dir(_PLUGIN)
+SESSIONS_DIR = _DATA / "sessions"
+AUDIO_DIR = _DATA / "audio"
+FAVORITES_PATH = _DATA / "favorites.json"
 
 PLATFORM_ID = "webchat"
-
-AUDIO_DIR = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
-FAVORITES_PATH = (
-    pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "favorites.json"
-)
 
 
 def build_umo(webchat_username: str, session_id: str) -> str:
