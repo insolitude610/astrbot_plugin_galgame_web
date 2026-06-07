@@ -110,14 +110,14 @@ class SessionAPI:
             if not force_new:
                 latest = self._find_latest_session()
                 if latest:
-                s = load_session(latest)
-                if s and s.get("history"):
-                    logger.info(f"[session] auto-resume latest: {latest}")
-                    self._sessions[latest] = s
-                    return {
-                        "session_id": latest,
-                        "current_emotion": s.get("current_emotion", "neutral"),
-                    }
+                    s = load_session(latest)
+                    if s and s.get("history"):
+                        logger.info(f"[session] auto-resume latest: {latest}")
+                        self._sessions[latest] = s
+                        return {
+                            "session_id": latest,
+                            "current_emotion": s.get("current_emotion", "neutral"),
+                        }
 
             sid = uuid.uuid4().hex
             session = {
