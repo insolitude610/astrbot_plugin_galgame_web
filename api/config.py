@@ -1,7 +1,9 @@
 class ConfigAPI:
     def _register_config_apis(self):
         pn = self._plugin_name
-        self.context.register_web_api(f"/{pn}/config", self._api_config, ["GET"], "Get plugin configuration")
+        self.context.register_web_api(
+            f"/{pn}/config", self._api_config, ["GET"], "Get plugin configuration"
+        )
 
     async def _api_config(self):
         from ..galgame_web.assets_helpers import list_asset_files, resolve_assets
@@ -21,7 +23,8 @@ class ConfigAPI:
             "expressions_blink": resolved.get("expressions_blink", {}),
             "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
-            "vrm_model": self.config.get("vrm_model", "") or resolved.get("vrm_model", ""),
+            "vrm_model": self.config.get("vrm_model", "")
+            or resolved.get("vrm_model", ""),
             "character_name": self.config.get("character_name", ""),
             "background": resolved["background"],
             "sprite_scale": self.config.get("sprite_scale", 1.0),

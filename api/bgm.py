@@ -5,21 +5,28 @@ from quart import Response, request
 
 from astrbot.api import logger
 
-
 _AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".opus"}
 
 
 class BGMAPI:
     def _register_bgm_apis(self):
         pn = self._plugin_name
-        self.context.register_web_api(f"/{pn}/bgm/list", self._api_bgm_list, ["GET"], "List BGM files")
-        self.context.register_web_api(f"/{pn}/bgm/upload", self._api_bgm_upload, ["POST"], "Upload BGM file")
-        self.context.register_web_api(f"/{pn}/bgm/delete", self._api_bgm_delete, ["POST"], "Delete BGM file")
-        self.context.register_web_api(f"/{pn}/bgm/file", self._api_bgm_file, ["GET"], "Serve BGM file")
+        self.context.register_web_api(
+            f"/{pn}/bgm/list", self._api_bgm_list, ["GET"], "List BGM files"
+        )
+        self.context.register_web_api(
+            f"/{pn}/bgm/upload", self._api_bgm_upload, ["POST"], "Upload BGM file"
+        )
+        self.context.register_web_api(
+            f"/{pn}/bgm/delete", self._api_bgm_delete, ["POST"], "Delete BGM file"
+        )
+        self.context.register_web_api(
+            f"/{pn}/bgm/file", self._api_bgm_file, ["GET"], "Serve BGM file"
+        )
 
     async def _api_bgm_list(self):
-        from ..galgame_web.assets_helpers import safe_path
         from ..main import BGM_DIR
+
         BGM_DIR.mkdir(parents=True, exist_ok=True)
         entries = []
         for f in sorted(BGM_DIR.iterdir()):
@@ -30,6 +37,7 @@ class BGMAPI:
     async def _api_bgm_upload(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import BGM_DIR
+
         data = await request.get_json() or {}
         b64 = data.get("data", "")
         name = data.get("name", "").strip()
@@ -59,6 +67,7 @@ class BGMAPI:
     async def _api_bgm_delete(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import BGM_DIR, _load_prefs, _save_prefs
+
         data = await request.get_json() or {}
         filename = data.get("filename", "").strip()
         if not filename:
@@ -80,12 +89,24 @@ class BGMAPI:
     async def _api_bgm_file(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import BGM_DIR
+
         filename = request.args.get("name", "")
         sp = safe_path(filename, BGM_DIR)
         if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
-        mime_map = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4", ".aac": "audio/aac", ".opus": "audio/ogg"}
+        mime_map = {
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+            ".m4a": "audio/mp4",
+            ".aac": "audio/aac",
+            ".opus": "audio/ogg",
+        }
         origin = request.headers.get("Origin", "")
-        resp = Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
+        resp = Response(
+            sp.read_bytes(),
+            content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"),
+        )
         resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
         return resp

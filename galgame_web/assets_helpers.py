@@ -1,13 +1,11 @@
-import base64
 import pathlib
-import shutil
 
 from astrbot.api import logger
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
-from .utils import EXPRESSION_KEYS
+from .utils import EXPRESSION_KEYS  # noqa: E402
 
 
 def list_asset_files(assets_dir: pathlib.Path) -> list[str]:
@@ -114,7 +112,9 @@ def safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
     return resolved
 
 
-def register_asset(plugin_config: dict, key: str, filename: str, assets_dir: pathlib.Path):
+def register_asset(
+    plugin_config: dict, key: str, filename: str, assets_dir: pathlib.Path
+):
     if "_" not in key:
         return
     parts = key.split("_", 1)
@@ -122,10 +122,16 @@ def register_asset(plugin_config: dict, key: str, filename: str, assets_dir: pat
     sprite_mode = plugin_config.get("sprite_mode", "single")
     try:
         if prefix == "single" and sprite_mode == "single" and base in EXPRESSION_KEYS:
-            if isinstance(plugin_config.get("expressions"), dict) and base in plugin_config["expressions"]:
+            if (
+                isinstance(plugin_config.get("expressions"), dict)
+                and base in plugin_config["expressions"]
+            ):
                 plugin_config["expressions"][base] = filename
         elif prefix == "expr" and sprite_mode == "layered" and base in EXPRESSION_KEYS:
-            if isinstance(plugin_config.get("expressions"), dict) and base in plugin_config["expressions"]:
+            if (
+                isinstance(plugin_config.get("expressions"), dict)
+                and base in plugin_config["expressions"]
+            ):
                 plugin_config["expressions"][base] = filename
         elif prefix == "bg" and "background" in plugin_config:
             plugin_config["background"] = filename

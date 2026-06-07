@@ -9,25 +9,59 @@ from astrbot.api import logger
 class AssetAPI:
     def _register_asset_apis(self):
         pn = self._plugin_name
-        self.context.register_web_api(f"/{pn}/assets/list", self._api_assets_list, ["GET"], "List asset files")
-        self.context.register_web_api(f"/{pn}/assets/upload", self._api_assets_upload, ["POST"], "Upload image files")
-        self.context.register_web_api(f"/{pn}/assets/upload-key", self._api_assets_upload_key, ["POST"], "Upload image by key")
-        self.context.register_web_api(f"/{pn}/assets/delete", self._api_assets_delete, ["POST"], "Delete an asset")
-        self.context.register_web_api(f"/{pn}/assets/file", self._api_assets_file, ["GET"], "Serve an asset file")
-        self.context.register_web_api(f"/{pn}/assets/batch", self._api_assets_batch, ["POST"], "Get base64 data for multiple assets")
-        self.context.register_web_api(f"/{pn}/assets/copy", self._api_assets_copy, ["POST"], "Copy an asset")
-        self.context.register_web_api(f"/{pn}/assets/batch-delete", self._api_assets_batch_delete, ["POST"], "Batch delete assets")
+        self.context.register_web_api(
+            f"/{pn}/assets/list", self._api_assets_list, ["GET"], "List asset files"
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/upload",
+            self._api_assets_upload,
+            ["POST"],
+            "Upload image files",
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/upload-key",
+            self._api_assets_upload_key,
+            ["POST"],
+            "Upload image by key",
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/delete", self._api_assets_delete, ["POST"], "Delete an asset"
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/file", self._api_assets_file, ["GET"], "Serve an asset file"
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/batch",
+            self._api_assets_batch,
+            ["POST"],
+            "Get base64 data for multiple assets",
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/copy", self._api_assets_copy, ["POST"], "Copy an asset"
+        )
+        self.context.register_web_api(
+            f"/{pn}/assets/batch-delete",
+            self._api_assets_batch_delete,
+            ["POST"],
+            "Batch delete assets",
+        )
 
     async def _api_assets_list(self):
         from ..galgame_web.assets_helpers import IMAGE_EXTS
         from ..main import ASSETS_DIR
+
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        entries = [{"name": f.name} for f in sorted(ASSETS_DIR.iterdir()) if f.is_file() and f.suffix.lower() in IMAGE_EXTS]
+        entries = [
+            {"name": f.name}
+            for f in sorted(ASSETS_DIR.iterdir())
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTS
+        ]
         return {"files": entries}
 
     async def _api_assets_upload(self):
         from ..galgame_web.assets_helpers import IMAGE_EXTS, MAX_UPLOAD_BYTES, safe_path
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         files_data = data.get("files", [])
         logger.info(f"[assets] upload received {len(files_data)} items")
@@ -60,8 +94,14 @@ class AssetAPI:
         return {"uploaded": uploaded}
 
     async def _api_assets_upload_key(self):
-        from ..galgame_web.assets_helpers import IMAGE_EXTS, MAX_UPLOAD_BYTES, register_asset, safe_path
+        from ..galgame_web.assets_helpers import (
+            IMAGE_EXTS,
+            MAX_UPLOAD_BYTES,
+            register_asset,
+            safe_path,
+        )
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         key = data.get("key", "").strip()
         b64 = data.get("data", "")
@@ -69,7 +109,13 @@ class AssetAPI:
             return {"error": "key and data required"}, 400
         if "," in b64:
             prefix, b64 = b64.split(",", 1)
-            ext_map = {"jpeg": ".jpg", "jpg": ".jpg", "webp": ".webp", "bmp": ".bmp", "gif": ".gif"}
+            ext_map = {
+                "jpeg": ".jpg",
+                "jpg": ".jpg",
+                "webp": ".webp",
+                "bmp": ".bmp",
+                "gif": ".gif",
+            }
             mime_ext = ".png"
             for tag, ext in ext_map.items():
                 if tag in prefix:
@@ -98,6 +144,7 @@ class AssetAPI:
     async def _api_assets_delete(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         filename = data.get("filename", "")
         if not filename:
@@ -112,27 +159,50 @@ class AssetAPI:
     async def _api_assets_file(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import ASSETS_DIR, AUDIO_DIR
+
         filename = request.args.get("name", "")
         sp = safe_path(filename, ASSETS_DIR)
         if not sp or not sp.exists() or not sp.is_file():
             sp = safe_path(filename, AUDIO_DIR)
         if not sp or not sp.exists() or not sp.is_file():
             return {"error": "file not found"}, 404
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif",
-                    ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".flac": "audio/flac", ".m4a": "audio/mp4"}
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".gif": "image/gif",
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+            ".m4a": "audio/mp4",
+        }
         origin = request.headers.get("Origin", "")
-        resp = Response(sp.read_bytes(), content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"))
+        resp = Response(
+            sp.read_bytes(),
+            content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"),
+        )
         resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
         return resp
 
     async def _api_assets_batch(self):
         from ..galgame_web.assets_helpers import MAX_UPLOAD_BYTES, safe_path
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         names = data.get("names", [])
         if not names:
             return {"error": "no names"}, 400
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif"}
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".gif": "image/gif",
+        }
         result = []
         for name in names:
             sp = safe_path(name, ASSETS_DIR)
@@ -152,6 +222,7 @@ class AssetAPI:
     async def _api_assets_copy(self):
         from ..galgame_web.assets_helpers import IMAGE_EXTS, register_asset, safe_path
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         source = data.get("source", "").strip()
         dest_key = data.get("key", "").strip()
@@ -178,6 +249,7 @@ class AssetAPI:
     async def _api_assets_batch_delete(self):
         from ..galgame_web.assets_helpers import safe_path
         from ..main import ASSETS_DIR
+
         data = await request.get_json() or {}
         filenames = data.get("filenames", [])
         if not filenames:

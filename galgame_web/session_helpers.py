@@ -5,12 +5,16 @@ import time
 
 from astrbot.api import logger
 
-SESSIONS_DIR = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "sessions"
+SESSIONS_DIR = (
+    pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "sessions"
+)
 
 PLATFORM_ID = "webchat"
 
 AUDIO_DIR = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
-FAVORITES_PATH = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "favorites.json"
+FAVORITES_PATH = (
+    pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "favorites.json"
+)
 
 
 def build_umo(webchat_username: str, session_id: str) -> str:
@@ -44,7 +48,7 @@ def load_session(session_id: str) -> dict | None:
     if not path.exists():
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return {
             "umo": data.get("umo", ""),
@@ -90,7 +94,7 @@ def gc_sessions(
     removed = 0
     for path in SESSIONS_DIR.glob("*.json"):
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             if now - data.get("created_at", 0) > ttl:
                 path.unlink()
@@ -116,7 +120,9 @@ async def init_astrbot_conv(
 
     existing_conv_id = await context.conversation_manager.get_curr_conversation_id(umo)
     if existing_conv_id:
-        conv = await context.conversation_manager.get_conversation(umo, existing_conv_id)
+        conv = await context.conversation_manager.get_conversation(
+            umo, existing_conv_id
+        )
         if conv:
             session["umo"] = umo
             session["conv_id"] = existing_conv_id
@@ -197,7 +203,9 @@ async def sync_sessions_to_db(
             continue
 
 
-def _collect_referenced_audio(sessions: dict[str, dict], favorites: list[dict]) -> set[str]:
+def _collect_referenced_audio(
+    sessions: dict[str, dict], favorites: list[dict]
+) -> set[str]:
     refs: set[str] = set()
     for s in sessions.values():
         for msg in s.get("history", []):

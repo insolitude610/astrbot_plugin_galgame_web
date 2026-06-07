@@ -21,15 +21,21 @@ from .api.favorites import FavoritesAPI
 from .api.prefs import PrefsAPI
 from .api.session import SessionAPI
 from .galgame_web.assets_helpers import (
-    IMAGE_EXTS, list_asset_files, register_asset, resolve_assets, safe_path,
+    IMAGE_EXTS,
 )
 from .galgame_web.session_helpers import (
-    SESSIONS_DIR, cleanup_session_audio, delete_astrbot_conv,
-    gc_audio_files, gc_sessions, load_all_sessions,
-    save_session, sync_sessions_to_db,
+    SESSIONS_DIR,
+    delete_astrbot_conv,
+    gc_audio_files,
+    gc_sessions,
+    load_all_sessions,
+    save_session,
+    sync_sessions_to_db,
 )
 from .galgame_web.utils import (
-    EMOTION_PATTERN, PLUGIN_NAME, extract_all_emotions, get_emotion_tags,
+    PLUGIN_NAME,
+    extract_all_emotions,
+    get_emotion_tags,
 )
 from .galgame_web.web_handler import GalgameWebHandler
 
@@ -51,7 +57,9 @@ def _load_prefs() -> dict:
 
 def _save_prefs(data: dict):
     PREFS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREFS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    PREFS_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def _convert_audio(wav_path: pathlib.Path) -> pathlib.Path | None:
@@ -59,7 +67,8 @@ def _convert_audio(wav_path: pathlib.Path) -> pathlib.Path | None:
     try:
         result = subprocess.run(
             ["ffmpeg", "-y", "-i", str(wav_path), "-b:a", "128k", str(mp3_path)],
-            capture_output=True, timeout=10
+            capture_output=True,
+            timeout=10,
         )
         if result.returncode == 0 and mp3_path.exists():
             wav_path.unlink()
@@ -70,7 +79,9 @@ def _convert_audio(wav_path: pathlib.Path) -> pathlib.Path | None:
     return None
 
 
-class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAPI, SessionAPI, Star):
+class GalgamePlugin(
+    AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAPI, SessionAPI, Star
+):
     _plugin_name = PLUGIN_NAME
 
     def __init__(self, context: Context, config: dict | None = None):
@@ -85,12 +96,28 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         self._migrate_old_assets()
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        gc_sessions(self._sessions, self.config, lambda sid: delete_astrbot_conv(self.context, self._webchat_username, sid))
+        gc_sessions(
+            self._sessions,
+            self.config,
+            lambda sid: delete_astrbot_conv(self.context, self._webchat_username, sid),
+        )
         load_all_sessions(self._sessions)
         t = asyncio.ensure_future(
-            sync_sessions_to_db(self.context, self._webchat_username, self.config, self._sessions, lambda sid: save_session(self._sessions, sid))
+            sync_sessions_to_db(
+                self.context,
+                self._webchat_username,
+                self.config,
+                self._sessions,
+                lambda sid: save_session(self._sessions, sid),
+            )
         )
-        t.add_done_callback(lambda _t: logger.warning(f"sync_sessions_to_db failed: {_t.exception()}") if _t.exception() else None)
+        t.add_done_callback(
+            lambda _t: (
+                logger.warning(f"sync_sessions_to_db failed: {_t.exception()}")
+                if _t.exception()
+                else None
+            )
+        )
         gc_audio_files(self._sessions)
 
         web_port = int(self.config.get("web_port", 0) or 0)
@@ -115,7 +142,12 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
 
     def _start_web_server(self, port: int):
         from http.server import ThreadingHTTPServer
-        upstream_port = os.environ.get("DASHBOARD_PORT") or os.environ.get("ASTRBOT_DASHBOARD_PORT") or "6185"
+
+        upstream_port = (
+            os.environ.get("DASHBOARD_PORT")
+            or os.environ.get("ASTRBOT_DASHBOARD_PORT")
+            or "6185"
+        )
         GalgameWebHandler.upstream = f"http://127.0.0.1:{upstream_port}"
         GalgameWebHandler.assets_dir = ASSETS_DIR
         try:
@@ -135,12 +167,17 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
             if secret and username:
                 payload = {
                     "username": username,
-                    "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7),
+                    "exp": datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(days=7),
                 }
-                GalgameWebHandler.jwt_token = jwt.encode(payload, secret, algorithm="HS256")
+                GalgameWebHandler.jwt_token = jwt.encode(
+                    payload, secret, algorithm="HS256"
+                )
                 logger.info("Galgame proxy JWT generated successfully")
             else:
-                logger.warning("Could not generate JWT for proxy: jwt_secret or username missing")
+                logger.warning(
+                    "Could not generate JWT for proxy: jwt_secret or username missing"
+                )
         except Exception as e:
             logger.warning(f"Failed to setup proxy auth: {e}")
 
@@ -153,10 +190,16 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
         marker = ASSETS_DIR / ".migrated"
         if marker.exists():
             return
-        existing = set(f.name for f in ASSETS_DIR.iterdir()) if ASSETS_DIR.is_dir() else set()
+        existing = (
+            {f.name for f in ASSETS_DIR.iterdir()} if ASSETS_DIR.is_dir() else set()
+        )
         count = 0
         for f in old_dir.iterdir():
-            if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS or f.name in existing:
+            if (
+                not f.is_file()
+                or f.suffix.lower() not in IMAGE_EXTS
+                or f.name in existing
+            ):
                 continue
             try:
                 shutil.copy2(f, ASSETS_DIR / f.name)
@@ -221,10 +264,14 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
         emotion_tags = get_emotion_tags(self.config)
         for comp in result.chain:
             if hasattr(comp, "text") and isinstance(comp.text, str):
-                clean, known, all_emotions = extract_all_emotions(comp.text, emotion_tags)
+                clean, known, all_emotions = extract_all_emotions(
+                    comp.text, emotion_tags
+                )
                 if known:
                     session["_pending_emotions"] = known
-                    session["_pending_all_emotions"] = all_emotions if all_emotions else known
+                    session["_pending_all_emotions"] = (
+                        all_emotions if all_emotions else known
+                    )
                 comp.text = clean
 
     # ---- command ----
@@ -232,8 +279,12 @@ class GalgamePlugin(AssetAPI, AudioAPI, BGMAPI, ConfigAPI, FavoritesAPI, PrefsAP
     @filter.command("galgame")
     async def cmd_galgame(self, event: AstrMessageEvent) -> MessageEventResult:
         web_port = int(self.config.get("web_port", 0) or 0)
-        url = f"http://localhost:{web_port}" if web_port > 0 else "（未启用独立 WebUI，请在插件设置中设置 web_port）"
-        yield event.plain_result("AI Galgame 虚拟伙伴\n\n" f"浏览器访问：{url}")
+        url = (
+            f"http://localhost:{web_port}"
+            if web_port > 0
+            else "（未启用独立 WebUI，请在插件设置中设置 web_port）"
+        )
+        yield event.plain_result(f"AI Galgame 虚拟伙伴\n\n浏览器访问：{url}")
 
     async def terminate(self):
         if self._web_server:

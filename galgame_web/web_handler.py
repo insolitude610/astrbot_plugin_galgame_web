@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs
 
 from astrbot.api import logger
 
@@ -75,7 +75,10 @@ def _check_auth_token(password: str, token: str, max_age: int = 86400) -> bool:
         if int(time.time()) - ts > max_age:
             return False
         expected = hmac.new(password.encode(), str(ts).encode(), "sha256").hexdigest()
-        return hashlib.sha256(parts[1].encode()).hexdigest() == hashlib.sha256(expected.encode()).hexdigest()
+        return (
+            hashlib.sha256(parts[1].encode()).hexdigest()
+            == hashlib.sha256(expected.encode()).hexdigest()
+        )
     except (ValueError, IndexError):
         return False
 
@@ -83,9 +86,15 @@ def _check_auth_token(password: str, token: str, max_age: int = 86400) -> bool:
 class GalgameWebHandler(BaseHTTPRequestHandler):
     upstream = "http://127.0.0.1:6185"
     static_dir: pathlib.Path = pathlib.Path(__file__).parent / "galgame"
-    assets_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "assets"
-    audio_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
-    bgm_dir: pathlib.Path = pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "bgm"
+    assets_dir: pathlib.Path = (
+        pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "assets"
+    )
+    audio_dir: pathlib.Path = (
+        pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "audio"
+    )
+    bgm_dir: pathlib.Path = (
+        pathlib.Path("data/plugin_data") / "astrbot_plugin_galgame_web" / "bgm"
+    )
     jwt_token: str = ""
     web_password: str = ""
 
@@ -168,7 +177,11 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
 
     def _handle_login(self):
         length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
+        body = (
+            self.rfile.read(length).decode("utf-8", errors="replace")
+            if length > 0
+            else ""
+        )
         params = parse_qs(body)
         submitted = params.get("password", [""])[0]
         pwd = GalgameWebHandler.web_password
@@ -177,7 +190,9 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             token = _make_auth_token(pwd, ts)
             self.send_response(302)
             self.send_header("Location", "/")
-            self.send_header("Set-Cookie", f"galgame_auth={token}; Path=/; HttpOnly; Max-Age=86400")
+            self.send_header(
+                "Set-Cookie", f"galgame_auth={token}; Path=/; HttpOnly; Max-Age=86400"
+            )
             self.end_headers()
         else:
             self.send_response(302)
@@ -247,7 +262,9 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             if low not in ("host", "connection", "content-length", "transfer-encoding"):
                 req.add_header(key, val)
         if body and method == "POST":
-            req.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
+            req.add_header(
+                "Content-Type", self.headers.get("Content-Type", "application/json")
+            )
         if GalgameWebHandler.jwt_token:
             req.add_header("Authorization", f"Bearer {GalgameWebHandler.jwt_token}")
 
@@ -269,7 +286,9 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body_bytes)
         except urllib.error.HTTPError as e:
-            logger.warning(f"[proxy] upstream HTTP error {e.code} for {method} {self.path}")
+            logger.warning(
+                f"[proxy] upstream HTTP error {e.code} for {method} {self.path}"
+            )
             self.send_error(e.code or 502)
         except Exception as e:
             logger.warning(f"[proxy] upstream error for {method} {self.path}: {e}")

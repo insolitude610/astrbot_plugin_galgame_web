@@ -3,7 +3,15 @@ import re
 
 PLUGIN_NAME = "astrbot_plugin_galgame_web"
 
-DEFAULT_EMOTION_TAGS = ["neutral", "happy", "sad", "angry", "surprised", "blush", "thinking"]
+DEFAULT_EMOTION_TAGS = [
+    "neutral",
+    "happy",
+    "sad",
+    "angry",
+    "surprised",
+    "blush",
+    "thinking",
+]
 EMOTION_PATTERN = re.compile(r"\{emotion_\s*([^\s}]+)\}")
 
 DEFAULT_GALGAME_PROMPT = (
@@ -75,7 +83,7 @@ def extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
     for m in EMOTION_PATTERN.finditer(text):
         tag = m.group(1).lower()
         if tag in emotion_tags:
-            segments.append(text[last_end:m.start()])
+            segments.append(text[last_end : m.start()])
             emotions.append((tag, sum(len(s) for s in segments)))
             last_end = m.end()
     segments.append(text[last_end:])
@@ -85,7 +93,9 @@ def extract_emotions(text: str, emotion_tags: list[str]) -> tuple[str, list]:
             p = re.compile(rf"\{{emotion_\s*{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 emotions.append((tag.lower(), m.start()))
-                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
+                clean = re.sub(
+                    rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE
+                ).strip()
                 break
             if emotions:
                 break
@@ -99,7 +109,7 @@ def extract_all_emotions(text: str, known_tags: list[str]) -> tuple[str, list, l
     last_end = 0
     for m in EMOTION_PATTERN.finditer(text):
         tag = m.group(1).lower()
-        segments.append(text[last_end:m.start()])
+        segments.append(text[last_end : m.start()])
         all_emotions.append((tag, sum(len(s) for s in segments)))
         last_end = m.end()
     segments.append(text[last_end:])
@@ -110,7 +120,9 @@ def extract_all_emotions(text: str, known_tags: list[str]) -> tuple[str, list, l
             p = re.compile(rf"\{{emotion_\s*{re.escape(tag)}\}}", re.IGNORECASE)
             for m in p.finditer(text):
                 all_emotions.append((tag.lower(), m.start()))
-                clean = re.sub(rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE).strip()
+                clean = re.sub(
+                    rf"\{{emotion_{re.escape(tag)}\}}", "", text, flags=re.IGNORECASE
+                ).strip()
                 break
             if all_emotions:
                 break
