@@ -214,7 +214,6 @@ function assetUrl(filename) {
     ? "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(filename)
     : "./assets/" + filename;
 }
-}
 
 /* ---- init ---- */
 
