@@ -251,7 +251,8 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
-  setLocal("galgame_session_id", sid)  location.href = "?sid=" + sid;
+  setLocal("galgame_session_id", sid);
+  location.href = "?sid=" + sid;
 }
 
 function startNewSession() {
