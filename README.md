@@ -10,7 +10,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 
-一个 AstrBot 插件，通过独立本地端口提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、TTS 语音朗读、语音输入、会话恢复、对话历史等交互特性。
+一个 AstrBot 插件，通过独立本地端口和 Dashboard 内嵌页提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、Fish Audio 情感 TTS 语音朗读、语音输入、BGM 背景音乐、会话恢复、对话历史、语音收藏等交互特性。
 
 > **注意**：和 webchat 平台一致，但本插件的 Web 对话 bot 暂不支持发送文件和图片（待开发）。~谁家galgame角色能给你发图片和文件啊（）~
 
@@ -47,15 +47,18 @@
 
 ### 打开界面
 
-插件启动后会自动在本机启动 HTTP 服务器（默认端口 **6186**），浏览器访问：
+有两种访问方式：
+
+1. **Dashboard 内嵌页**（推荐）：插件市场 → 点击 "AI Galgame 虚拟伙伴" 卡片 → 顶部 tab 切换「galgame」/「settings」/「voice-favorites」
+2. **独立 WebUI 端口**：插件启动后自动在本机启动 HTTP 服务器（默认端口 **6186**），浏览器访问：
 
 ```
 http://localhost:6186
 ```
 
-也可以在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 会回复访问地址。
+也可在任意接入 AstrBot 的消息平台发送 `/galgame`，Bot 回复访问地址。
 
-> **说明**：WebUI 通过独立端口访问，不在 AstrBot Dashboard 内嵌显示。端口可在插件配置中修改（设为 `0` 关闭服务器）。
+> **说明**：独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。Dashboard 内嵌页不受密码影响（依赖 Dashboard 自身登录）。
 
 打开后在输入框输入文字即可对话，点击输入框左侧麦克风按钮可语音输入。
 
@@ -72,6 +75,8 @@ http://localhost:6186
 | `tts_enabled` | 启用 TTS 语音朗读 | 默认 `true`，`false` = 静音对话 |
 | `audio_format` | TTS 音频格式 | `wav`=无损(≈2MB/条)；`mp3`=需 ffmpeg(≈200KB/条)，未安装自动回退 wav |
 | `web_port` | 独立 WebUI 端口 | 默认 `6186`，`0` = 关闭 |
+| `web_enabled` | 启用独立 WebUI | 默认 `true`，`false` = 仅 Dashboard 内嵌页 |
+| `web_password` | 独立 WebUI 密码 | 留空 = 无需密码；设置后需输入才能访问 |
 | `sprite_mode` | 立绘渲染模式 | **`single`**（推荐，VRM 尚不可用） |
 | `sprite_scale` | 立绘整体缩放倍数 | 默认 `1.0`，建议 0.5 ~ 2.0 |
 | `sprite_bottom` | 立绘距底部距离 (vh) | 默认 `28`，建议 5 ~ 45 |
@@ -98,6 +103,7 @@ http://localhost:6186
 - **AI 驱动表情切换** —— LLM 回复中插入 `{emotion_happy}` 等标签，前端实时切换角色表情
 - **打字机效果** —— 回复文字逐字显示（60ms/字），表情随文字进度同步切换
 - **TTS 情感语音** —— 按 LLM 输出的 `{emotion_xxx}` 标签边界，在纯文本前拼接 Fish Audio 方括号标签 `[xxx]`，单次调用 TTS provider 合成整段情感语音。Fish Audio S2-Pro 按句子边界自动切换情绪。立绘切换根据音频时长同步，与语音进度一致
+- **BGM 背景音乐** —— 设置页上传 mp3/wav/ogg 音频，主页首次交互后循环播放；语音和 BGM 音量独立滑块调节，持久化到 `prefs.json` 不丢失
 - **语音输入** —— 浏览器麦克风录音 → WAV → AstrBot STT 管道自动转文字
 - **快速点击检测** —— 用户频繁点击/按键时，AI 主动关心
 - **点击快进** — 打字机播放中点击对话框，文字快速弹入显示并切到最终表情，还原 galgame 手感
@@ -105,6 +111,7 @@ http://localhost:6186
 - **对话历史面板** —— 顶部时钟图标进入，气泡式展示最近 N 条历史消息（条数可配置），自动滚到最新，背景色自动适配。支持 AI 消息头像显示、历史语音回放
 - **会话切换面板** —— 顶部列表图标进入，浏览和切换所有历史会话，每条会话右上角 × 按钮可直接删除（同步清理 AstrBot 对话 + 关联音频）
 - **AstrBot 指令兼容** —— 在输入框使用 `/reset`、`/new`、`/del` 等指令，会话状态与 AstrBot 对话生命周期完全同步，指令文本不污染对话记录
+- **Dashboard 内嵌页** —— 从插件卡片入口进入，顶部 tab 可在「galgame」、「settings」（立绘/BGM/音量）、「voice-favorites」（语音收藏）之间切换，无需独立浏览器窗口。内嵌页通过 bridge SDK 自动认证
 - **重播按钮** —— 对话框右上角重播按钮，可重放上次 AI 回复的完整打字机 + 表情切换动画 + TTS 语音
 - **语音收藏** —— 顶部 ❤ 图标进入收藏页面，可收藏喜欢的语音片段，数据持久化不随 /reset 丢失
 - **BGM 背景音乐** —— 设置页面上传 mp3/wav/ogg 等音频，主页循环播放，音量独立可调

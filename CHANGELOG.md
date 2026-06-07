@@ -8,28 +8,55 @@
 - `_build_tagged_text` 重构为按位置分组处理，同位置多标签输出堆叠格式 `[tag1][tag2]text`，自由标签不再被后一个覆盖丢失
 - `_conf_schema.json` 默认提示词与 `DEFAULT_GALGAME_PROMPT` 完全同步，新增 emoji 输出禁止规则
 
+**Dashboard 内嵌页面**
+
+- 新增三个 Dashboard 内嵌页面：`pages/galgame/`（对话）、`pages/settings/`（设置/立绘/BGM/音量）、`pages/voice-favorites/`（语音收藏），通过插件卡片入口顶部 tab 切换
+- 所有内嵌页面通过 bridge SDK (`window.AstrBotPluginPage`) 自动认证，sandboxed iframe 兼容（`localStorage` 沙箱回退、`async/await` → `.then()` 降级、bridge SDK 轮询启动）
+- 对话页和独立 WebUI 的 `app.js` 合并为同一文件，通过 `IS_DASHBOARD()` 运行时自适应双环境
+
+**独立 WebUI 密码保护**
+
+- 新增 `web_enabled` 和 `web_password` 配置项：可关闭独立 HTTP 服务器，或在开启时设置访问密码（HMAC 签名 cookie，24h 有效，无密码时完全跳过）
+- 登录页风格统一（紫色渐变 + 毛玻璃，匹配 galgame 主页面）
+
+**收藏功能改进**
+
+- 对话框 ❤ 按钮改为 toggle：点击收藏（实心红），再次点击取消（空心），立即切换无需刷新
+- 历史面板每条语音的 ❤ 按钮同步 toggle，初始状态自动跟随已收藏列表
+- 收藏数据持久化到 `favorites.json`，独立 WebUI 和 Dashboard 内嵌共享同一份数据
+
+**会话管理增强**
+
+- 会话切换面板：顶部列表图标进入，浏览/切换/删除历史会话，API 原地切换不跳转页面
+- `/new`、`/del`、`/reset` 指令与 AstrBot 对话生命周期完全同步，指令文本不污染对话记录
+- 插件启动时自动清理空壳 session 和被孤立音频文件（收藏保护的语音不会被误删）
+
+**音频管理**
+
+- 音频格式可选 wav/mp3（`audio_format` 配置），mp3 用 ffmpeg 128kbps 转码（~200KB vs ~2MB），未安装 ffmpeg 自动回退
+- 音频孤儿清理：启动时扫描 `audio/` 目录，仅保留被 session history 或收藏引用的文件；删除会话连动清音频
+- 音量全局生效：历史/收藏页面播放尊重音量滑块，页面可见性变化时自动刷新音量
+
+**代码重构**
+
+- `main.py` 拆为 `api/` 子模块（assets/audio/bgm/config/favorites/prefs/session），主文件 1050→220 行
+- `_api_send` 拆为 9 个子步骤方法
+- 全项目通过 ruff format + ruff check（31 issues 全部修复）
+
 **Bug 修复**
 
-- 修复 TTS 不触发问题：AI 使用自由标签（如 `teasing`、`grin`）但不包含配置立绘标签时，`emotions` 为空导致 TTS guard 条件判定失败，改为 `if clean_text`
-- 修复系统指令回复触发 TTS：`/reset`、`/new` 等以唤醒前缀开头的输入，LLM 回复不再触发语音朗读
+- 修复 TTS 不触发：AI 只用自由标签（无立绘标签）时 `emotions` 为空导致 guard 跳过
+- 修复系统指令回复触发 TTS：`/reset`/`/new` 等指令回复不再合成语音
 - `_build_tagged_text` 空情绪列表时返回 `[neutral]text` 作为缺省
-- 修复 Markdown 格式被 TTS 朗读：提示词新增禁止 `**粗体**`、`*斜体*`、`` `代码` ``、`#标题` 等格式标记
-- 修复 `tts_enabled` 配置类型 `boolean` → `bool`（AstrBot 不支持 `boolean`）
-
-**新功能**
-
-- **BGM 背景音乐** — 设置页上传 mp3/wav/ogg 音频作为背景音乐，主页首次交互后自动循环播放
-- **音量控制** — 语音朗读和 BGM 音量独立滑块调节，设置持久化到服务端 `prefs.json`，重启/清缓存不丢失
-- **TTS 开关** — 插件配置页新增 `tts_enabled` 布尔开关，关闭后对话正常但不出声，Provider 配置保留
-- **设置页改名** —「立绘管理」→「设置」，整合立绘素材 + BGM + 音量管理
-- **会话自动恢复** — 重载插件后打开页面，自动找回最近一次有记录的对话，不再每次创建新会话
-- **历史面板显示条数** — 新增 `history_limit` 配置，可限制历史面板最多显示最近 N 条消息，galgame backlog 风格
-
-**其他修复**
-
-- 修复浏览器录音 WAV 编码缺陷：Float32 样本缺少 ×32767 缩放导致音量极低，STT 插件判为静音
-- 修复 `{emotion_ xxx}` 带空格的标签无法被正则匹配和剥离，宽松化正则支持 `emotion_` 与标签名之间的空格
+- 修复 Markdown 格式被 TTS 朗读：提示词禁止 `**粗体**`、`*斜体*`、`` `代码` ``、`#标题` 等
+- 修复 `tts_enabled` 配置类型 `boolean` → `bool`
+- 修复浏览器录音 WAV 编码缺陷：Float32 样本缺少 ×32767 缩放导致音量极低
+- 修复 `{emotion_ xxx}` 带空格的标签无法匹配，正则宽松化
 - 修复模型空回复时前端对话框空白，回退显示省略号
+- 修复 meme_manager 产生的 `[IMAGE]` 引用显示在对话框
+- 修复 `_build_tts_segments` 情绪错位（`{emotion_xxx}` 在文本开头时后续分段全用错情绪）
+- 修复 Dashboard 重复空白 UMO 对话（`init_astrbot_conv` + `sync_sessions_to_db`）
+- 修复 sandboxed iframe 中 `localStorage` 被禁导致页面无法初始化
 
 ## v0.6.0
 
