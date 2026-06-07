@@ -443,7 +443,7 @@ class SessionAPI:
         return clean_text, emotions, emotions_all
 
     async def _send_synthesize_tts(self, clean_text, emotions_all, text, matched_prefix, pipeline_audio):
-        from ..main import AUDIO_DIR, _convert_audio, _detect_audio_mime
+        from ..main import AUDIO_DIR, _convert_audio
         audio_b64 = pipeline_audio
         audio_mime_val = ""
         audio_file = ""
