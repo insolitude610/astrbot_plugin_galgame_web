@@ -551,6 +551,7 @@ async function uploadToSlot(key, input) {
     if (data.uploaded) {
       setStatus("✅ " + key + " → " + data.uploaded, "success");
       await loadFiles();
+      await preloadAssets();
     } else {
       setStatus("❌ " + key + ": " + (data.error || "失败"), "error");
     }
