@@ -663,7 +663,8 @@ class SessionAPI:
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
         async with session["_lock"]:
-            session["history"].append({"role": "user", "content": text})
+            user_text = text or session.pop("_last_user_text", "") or "(语音消息)"
+            session["history"].append({"role": "user", "content": user_text})
             session["history"].append(
                 {
                     "role": "assistant",
