@@ -1,5 +1,12 @@
 # 变更记录
 
+## v0.7.1
+
+**Dashboard 内嵌页修复**
+
+- 修复设置页无法删除文件：移除 `confirm()` 弹窗（Dashboard sandbox 无 modals 权限），单删、批量删、BGM 删均已修复
+- 修复上传后图片显示黑色占位符：`preloadAssets()` 改为先获取全量文件列表再一次性 `assets/batch` 预加载进 `_assetCache`，文件网格全部使用 base64 数据 URL
+
 ## v0.7.0
 
 **配对表情标签系统强化**
