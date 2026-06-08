@@ -43,7 +43,6 @@ function toggleFileSelect(name) {
 async function batchDeleteSelected() {
   var names = Object.keys(selectedFiles);
   if (names.length === 0) return;
-  if (!confirm("确定删除 " + names.length + " 个文件？")) return;
   setStatus("批量删除中...");
   try {
     var data = await apiPost("assets/batch-delete", { filenames: names });
@@ -216,7 +215,6 @@ async function uploadBgm(input) {
 }
 
 async function deleteBgm(name) {
-  if (!confirm("确定删除 " + name + "？")) return;
   try {
     var data = await apiPost("bgm/delete", { filename: name });
     if (data.deleted) {
@@ -298,16 +296,20 @@ function applyBackground() {
 }
 
 function preloadAssets() {
-  var names = [];
-  var exps = config.expressions || {};
-  for (var k in exps) { if (exps[k]) names.push(exps[k]); }
-  if (config.background) names.push(config.background);
-  if (config.history_avatar) names.push(config.history_avatar);
-  if (!names.length) return Promise.resolve();
-  return apiPost("assets/batch", { names: names }).then(function(resp) {
-    (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
-    applyBackground();
-    renderAll();
+  return apiGet("assets/list").then(function(listData) {
+    var allFiles = listData.files || [];
+    var names = [];
+    allFiles.forEach(function(f) { names.push(f.name); });
+    var exps = config.expressions || {};
+    for (var k in exps) { if (exps[k] && names.indexOf(exps[k]) < 0) names.push(exps[k]); }
+    if (config.background && names.indexOf(config.background) < 0) names.push(config.background);
+    if (config.history_avatar && names.indexOf(config.history_avatar) < 0) names.push(config.history_avatar);
+    if (!names.length) { applyBackground(); renderAll(); return; }
+    return apiPost("assets/batch", { names: names }).then(function(resp) {
+      (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
+      applyBackground();
+      renderAll();
+    });
   }).catch(function(e) {
     console.warn("preloadAssets failed:", e);
     renderAll();
@@ -598,7 +600,6 @@ async function loadFiles() {
 }
 
 async function deleteFile(filename) {
-  if (!confirm("确定删除 " + filename + "？")) return;
   setStatus("删除中...");
   try {
     var data = await apiPost("assets/delete", { filename: filename });
