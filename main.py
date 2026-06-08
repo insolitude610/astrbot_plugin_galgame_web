@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import pathlib
-import shutil
 import subprocess
 import threading
 
@@ -20,9 +19,6 @@ from .api.config import ConfigAPI
 from .api.favorites import FavoritesAPI
 from .api.prefs import PrefsAPI
 from .api.session import SessionAPI
-from .galgame_web.assets_helpers import (
-    IMAGE_EXTS,
-)
 from .galgame_web.session_helpers import (
     SESSIONS_DIR,
     delete_astrbot_conv,
@@ -96,7 +92,6 @@ class GalgamePlugin(
 
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-        self._migrate_old_assets()
         gc_sessions(
             self._sessions,
             self.config,
@@ -181,35 +176,6 @@ class GalgamePlugin(
                 )
         except Exception as e:
             logger.warning(f"Failed to setup proxy auth: {e}")
-
-    # ---- asset migration ----
-
-    def _migrate_old_assets(self):
-        old_dir = pathlib.Path(__file__).parent / "galgame_web" / "galgame" / "assets"
-        if not old_dir.is_dir():
-            return
-        marker = ASSETS_DIR / ".migrated"
-        if marker.exists():
-            return
-        existing = (
-            {f.name for f in ASSETS_DIR.iterdir()} if ASSETS_DIR.is_dir() else set()
-        )
-        count = 0
-        for f in old_dir.iterdir():
-            if (
-                not f.is_file()
-                or f.suffix.lower() not in IMAGE_EXTS
-                or f.name in existing
-            ):
-                continue
-            try:
-                shutil.copy2(f, ASSETS_DIR / f.name)
-                count += 1
-            except OSError:
-                pass
-        if count:
-            logger.info(f"Migrated {count} assets from old location to {ASSETS_DIR}")
-        marker.touch()
 
     # ---- llm hooks ----
 
