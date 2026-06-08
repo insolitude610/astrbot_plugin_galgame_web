@@ -196,11 +196,6 @@ class GalgamePlugin(
         emotion_tags = get_emotion_tags(self.config)
         rules = rules.replace("{{emotions}}", ", ".join(emotion_tags))
         req.system_prompt += "\n\n" + rules
-        user_text = event.message_str.strip()
-        for comp in event.message_obj.message:
-            if hasattr(comp, "text") and isinstance(comp.text, str) and comp.text.strip():
-                user_text = comp.text.strip()
-        self._sessions[sid]["_last_user_text"] = user_text
 
     @filter.on_llm_response()
     async def _capture_llm_response(self, event: AstrMessageEvent, resp) -> None:

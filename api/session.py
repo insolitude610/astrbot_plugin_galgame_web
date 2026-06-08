@@ -401,6 +401,22 @@ class SessionAPI:
 
         # Step 3: Save audio if present
         audio_path = self._send_save_audio(audio_data, text)
+        user_audio_file = ""
+        user_audio_mime = ""
+        if audio_data:
+            from ..main import AUDIO_DIR
+
+            raw = None
+            b64 = audio_data.split(",", 1)[-1] if "," in audio_data else audio_data
+            try:
+                raw = base64.b64decode(b64)
+            except Exception:
+                pass
+            if raw:
+                user_audio_mime = self._detect_audio_mime(raw)
+                user_audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
+                AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+                (AUDIO_DIR / user_audio_file).write_bytes(raw)
 
         # Step 4: Run pipeline
         pipeline_result = await self._send_run_pipeline(text, sid, audio_path)
@@ -442,6 +458,8 @@ class SessionAPI:
             audio_mime_val,
             audio_file,
             sid,
+            user_audio_file,
+            user_audio_mime,
         )
 
     def _send_parse_input(self, sid, text, audio_data):
@@ -653,6 +671,8 @@ class SessionAPI:
         audio_mime_val,
         audio_file,
         sid,
+        user_audio_file="",
+        user_audio_mime="",
     ):
         from ..galgame_web.session_helpers import (
             PLATFORM_ID,
@@ -663,8 +683,10 @@ class SessionAPI:
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
         async with session["_lock"]:
-            user_text = text or session.pop("_last_user_text", "") or "(语音消息)"
-            session["history"].append({"role": "user", "content": user_text})
+            user_content = text if text else "(语音消息)"
+            session["history"].append(
+                {"role": "user", "content": user_content, "audio_file": user_audio_file, "audio_mime": user_audio_mime}
+            )
             session["history"].append(
                 {
                     "role": "assistant",

@@ -931,7 +931,7 @@ async function toggleHistory() {
       }
       msgRow.appendChild(bubble);
 
-      if (!isUser && msg.audio_file) {
+      if (msg.audio_file) {
         var playBtn = document.createElement("button");
         playBtn.className = "msg-play-btn";
         playBtn.title = "播放语音";
