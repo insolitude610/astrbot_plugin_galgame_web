@@ -159,7 +159,7 @@ async function toggleRecording() {
       el.micBtn.classList.add("recording");
     } catch (err) {
       console.warn("Microphone access denied:", err);
-      showError("无法访问麦克风，请确认浏览器已授予录音权限");
+      showError("麦克风在 Dashboard 内嵌页暂不可用，请使用独立 WebUI 进行语音输入");
     }
   }
 }
