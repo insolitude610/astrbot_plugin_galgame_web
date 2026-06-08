@@ -873,8 +873,9 @@ async function sendMessage(audioData) {
       finishResponse();
     }
   } catch (err) {
-    console.error("Send failed:", err);
-    showError("发送失败，请重试。");
+    console.warn("Send failed, restoring from history:", err);
+    restoreLastMessage();
+    enableInput();
   }
 }
 
