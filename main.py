@@ -95,8 +95,8 @@ class GalgamePlugin(
         self._webchat_username = dashboard_cfg.get("username", "astrbot")
 
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-        self._migrate_old_assets()
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        self._migrate_old_assets()
         gc_sessions(
             self._sessions,
             self.config,
