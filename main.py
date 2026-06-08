@@ -196,7 +196,19 @@ class GalgamePlugin(
         emotion_tags = get_emotion_tags(self.config)
         rules = rules.replace("{{emotions}}", ", ".join(emotion_tags))
         req.system_prompt += "\n\n" + rules
-        self._sessions[sid]["_last_user_text"] = event.message_str
+        user_text = event.message_str.strip()
+        for comp in event.message_obj.chain:
+            if hasattr(comp, "text") and isinstance(comp.text, str):
+                t = comp.text.strip()
+                if t and "[系统自动注入]" not in t and "[ComponentType" not in t:
+                    user_text = t
+        if "[系统自动注入]" in user_text:
+            parts = user_text.split("\n", 1)
+            if len(parts) > 1:
+                user_text = parts[1].strip()
+            elif "：" in user_text:
+                user_text = user_text.rsplit("：", 1)[-1].strip()
+        self._sessions[sid]["_last_user_text"] = user_text
 
     @filter.on_llm_response()
     async def _capture_llm_response(self, event: AstrMessageEvent, resp) -> None:
