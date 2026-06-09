@@ -47,7 +47,13 @@
     "description": "启用 TTS 语音朗读",
     "type": "bool",
     "default": true,
-    "hint": "控制是否朗读 AI 回复。关闭后对话仍可用，只是不出声。"
+    "hint": "关闭后对话正常但不出声，Provider 配置保留。"
+  },
+  "native_audio": {
+    "description": "原生音频输入（无需 STT）",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后用户录音直接发给多模态模型（如 Gemini 3 Flash），无需配置 STT 插件。需确保使用的 LLM 支持音频输入。"
   },
   "llm_provider": {
     "description": "对话模型 Provider",
