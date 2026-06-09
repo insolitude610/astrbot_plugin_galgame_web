@@ -861,28 +861,4 @@ html, body {
   z-index: 1;
 }
 
-#sp-close,
-#fp-close {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 1102;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  padding: 0;
-  transition: color .2s, background .2s, border-color .2s;
-}
-#sp-close:hover,
-#fp-close:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(0, 0, 0, 0.72);
-  border-color: rgba(255, 255, 255, 0.25);
-}
+
