@@ -24,9 +24,22 @@ var _memStore = {};
 var _assetCache = {};
 var _favoriteFiles = {};
 
-function _bgmUrl(file) {
-  if (IS_DASHBOARD()) return API_BASE + "/bgm/file?name=" + encodeURIComponent(file);
-  return "./bgm/" + encodeURIComponent(file);
+function _setBgmSrc(file) {
+  var ba = document.getElementById("bgm-audio");
+  if (!ba) return;
+  if (IS_DASHBOARD()) {
+    apiGet("bgm/data", { name: file }).then(function(resp) {
+      ba.src = "data:" + resp.mime + ";base64," + resp.audio;
+      ba.volume = bgmVolume;
+      bgmStarted = true;
+      ba.play().catch(function() {});
+    }).catch(function(e) { console.warn("BGM data load failed:", e); });
+  } else {
+    ba.src = "./bgm/" + encodeURIComponent(file);
+    ba.volume = bgmVolume;
+    bgmStarted = true;
+    ba.play().catch(function(e) { console.warn("BGM play failed:", e); });
+  }
 }
 
 function getLocal(key) {
@@ -465,7 +478,7 @@ function applyBgmAndVolume(cfg) {
   if (bgmAudio) {
     bgmAudio.volume = bgmVol;
     if (bgmFile) {
-      bgmAudio.src = _bgmUrl(bgmFile);
+      _setBgmSrc(bgmFile);
       startBgmOnInteraction(bgmAudio);
     }
   }
@@ -1161,14 +1174,8 @@ try {
 function _handleComms(msg) {
   if (!msg || typeof msg !== "object") return;
   if (msg.kind === "bgm-change" && msg.file) {
-    var bgmAudio = document.getElementById("bgm-audio");
-    if (bgmAudio) {
-      bgmAudio.src = _bgmUrl(msg.file);
-      bgmAudio.volume = bgmVolume;
-      _lastBgmFile = msg.file;
-      bgmStarted = true;
-      bgmAudio.play().catch(function(e) { console.warn("BGM play failed:", e); });
-    }
+    _lastBgmFile = msg.file;
+    _setBgmSrc(msg.file);
   } else if (msg.kind === "bgm-pause") {
     var ba = document.getElementById("bgm-audio");
     if (ba) ba.pause();
@@ -1216,11 +1223,7 @@ function _startBgmPoll() {
       var newBgm = cfg.bgm_file || "";
       if (newBgm && newBgm !== _lastBgmFile) {
         _lastBgmFile = newBgm;
-        if (ba) {
-          ba.src = _bgmUrl(newBgm);
-          bgmStarted = true;
-          ba.play().catch(function() {});
-        }
+        _setBgmSrc(newBgm);
       }
     }).catch(function(){});
   }, 8000);

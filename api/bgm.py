@@ -23,6 +23,12 @@ class BGMAPI:
         self.context.register_web_api(
             f"/{pn}/bgm/file", self._api_bgm_file, ["GET"], "Serve BGM file"
         )
+        self.context.register_web_api(
+            f"/{pn}/bgm/data",
+            self._api_bgm_data,
+            ["GET"],
+            "Get BGM file as base64 JSON",
+        )
 
     async def _api_bgm_list(self):
         from ..main import BGM_DIR
@@ -110,3 +116,25 @@ class BGMAPI:
         )
         resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
         return resp
+
+    async def _api_bgm_data(self):
+        from ..galgame_web.assets_helpers import safe_path
+        from ..main import BGM_DIR
+
+        filename = request.args.get("name", "")
+        sp = safe_path(filename, BGM_DIR)
+        if not sp or not sp.exists() or not sp.is_file():
+            return {"error": "not found"}, 404
+        raw = sp.read_bytes()
+        mime_map = {
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+            ".m4a": "audio/mp4",
+            ".aac": "audio/aac",
+        }
+        return {
+            "audio": base64.b64encode(raw).decode(),
+            "mime": mime_map.get(sp.suffix.lower(), "audio/wav"),
+        }
