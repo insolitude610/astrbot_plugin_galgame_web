@@ -144,6 +144,12 @@
     "default": 60,
     "hint": "打字机逐字显示间隔，单位毫秒。数值越小速度越快。建议范围 10 ~ 200。"
   },
+  "font_size": {
+    "description": "对话框字号",
+    "type": "int",
+    "default": 17,
+    "hint": "对话框文字字号，单位 px。建议范围 14 ~ 24。"
+  },
   "history_avatar": {
     "description": "历史记录头像",
     "type": "string",

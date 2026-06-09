@@ -37,6 +37,7 @@ class ConfigAPI:
             "voice_volume": prefs.get("voice_volume", 1.0),
             "tts_enabled": self.config.get("tts_enabled", True),
             "history_limit": self.config.get("history_limit", 40),
+            "font_size": self.config.get("font_size", 17),
             "web_port": self.config.get("web_port", 6186),
             "web_enabled": self.config.get("web_enabled", True),
         }

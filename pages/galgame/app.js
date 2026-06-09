@@ -421,6 +421,8 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
   typewriterSpeed = cfg.typewriter_speed || 60;
   historyLimit = cfg.history_limit || 40;
+  var fs = cfg.font_size || 17;
+  el.dialogText.style.fontSize = fs + "px";
 
   applyBgmAndVolume(cfg);
 }
