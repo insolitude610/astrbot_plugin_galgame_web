@@ -16,6 +16,7 @@ var historyAvatar = "";
 var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
+var _favAudioPlaying = false;
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
@@ -1010,8 +1011,11 @@ function toggleFavorites() {
   if (!overlay || !iframe) return;
   if (overlay.classList.contains("active")) {
     overlay.classList.remove("active");
-    iframe.src = "";
+    if (!_favAudioPlaying) {
+      iframe.src = "";
+    }
   } else {
+    _favAudioPlaying = false;
     overlay.classList.add("active");
     iframe.src = "./favorites.html";
   }
@@ -1115,6 +1119,37 @@ window.addEventListener("pageshow", function (event) {
       var ba = document.getElementById("bgm-audio");
       if (ba) ba.volume = bgmVolume;
     }).catch(function(){});
+  }
+});
+
+window.addEventListener("message", function (event) {
+  var msg = event.data;
+  if (!msg || typeof msg !== "object") return;
+  if (msg.kind === "bgm-change" && msg.file) {
+    var bgmAudio = document.getElementById("bgm-audio");
+    if (bgmAudio) {
+      bgmAudio.src = "./bgm/" + encodeURIComponent(msg.file);
+      bgmAudio.volume = bgmVolume;
+      bgmStarted = true;
+      bgmAudio.play().catch(function(e) { console.warn("BGM play failed:", e); });
+    }
+  } else if (msg.kind === "bgm-volume") {
+    bgmVolume = msg.volume != null ? msg.volume : bgmVolume;
+    var ba = document.getElementById("bgm-audio");
+    if (ba) ba.volume = bgmVolume;
+  } else if (msg.kind === "voice-volume") {
+    voiceVolume = msg.volume != null ? msg.volume : voiceVolume;
+    var ta = document.getElementById("tts-audio");
+    if (ta) ta.volume = voiceVolume;
+  } else if (msg.kind === "fav-audio-start") {
+    _favAudioPlaying = true;
+  } else if (msg.kind === "fav-audio-end") {
+    _favAudioPlaying = false;
+    var fpOv = document.getElementById("fp-overlay");
+    var fpIf = document.getElementById("fp-iframe");
+    if (fpOv && !fpOv.classList.contains("active") && fpIf) {
+      fpIf.src = "";
+    }
   }
 });
 

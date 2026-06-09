@@ -471,6 +471,9 @@ async function selectBgm(name) {
   } catch(e) {
     console.warn("Failed to save bgm_file:", e);
   }
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: "bgm-change", file: name }, "*");
+  }
 }
 
 async function uploadBgm(input) {
@@ -494,6 +497,7 @@ async function uploadBgm(input) {
     if (data.uploaded) {
       setBgmStatus("已上传: " + data.uploaded, "success");
       await loadBgmList();
+      selectBgm(file.name);
     } else {
       setBgmStatus(data.error || "上传失败", "error");
     }
@@ -550,12 +554,18 @@ function onVoiceVolume() {
   var vv = document.getElementById("voice-volume");
   document.getElementById("voice-vol-val").textContent = vv.value + "%";
   saveVolumes();
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: "voice-volume", volume: parseInt(vv.value) / 100 }, "*");
+  }
 }
 
 function onBgmVolume() {
   var bv = document.getElementById("bgm-volume");
   document.getElementById("bgm-vol-val").textContent = bv.value + "%";
   saveVolumes();
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: "bgm-volume", volume: parseInt(bv.value) / 100 }, "*");
+  }
 }
 
 async function init() {

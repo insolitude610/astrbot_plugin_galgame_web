@@ -238,11 +238,25 @@ async function loadFavorites() {
       playBtn.onclick = (function(file) {
         return function() {
           if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
+          var inIframe = window.parent !== window;
+          if (inIframe) {
+            window.parent.postMessage({ kind: "fav-audio-start" }, "*");
+          }
           var audio = new Audio("./audio/" + encodeURIComponent(file));
           audio.volume = voiceVolume;
           currentFavAudio = audio;
-          audio.onended = audio.onerror = function() { currentFavAudio = null; };
-          audio.play().catch(function(e) { console.warn("Play failed:", e); });
+          function _end() {
+            currentFavAudio = null;
+            if (inIframe) {
+              window.parent.postMessage({ kind: "fav-audio-end" }, "*");
+            }
+          }
+          audio.onended = _end;
+          audio.onerror = _end;
+          audio.play().catch(function(e) {
+            console.warn("Play failed:", e);
+            _end();
+          });
         };
       })(f.audio_file);
       card.appendChild(playBtn);
