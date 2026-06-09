@@ -14,6 +14,11 @@ class ConfigAPI:
         resolved = resolve_assets(self.config, files)
         emotion_keys = get_emotion_tags(self.config)
         prefs = _load_prefs()
+        history_avatar = self.config.get("history_avatar", "") \
+            or find_asset_for("history_avatar", files, "avatar") \
+            or find_asset_for("avatar", files)
+        vrm_model = self.config.get("vrm_model", "") \
+            or resolved.get("vrm_model", "")
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
@@ -23,17 +28,14 @@ class ConfigAPI:
             "expressions_blink": resolved.get("expressions_blink", {}),
             "emotion_keys": emotion_keys,
             "layers": resolved["layers"],
-            "vrm_model": self.config.get("vrm_model", "")
-            or resolved.get("vrm_model", ""),
+            "vrm_model": vrm_model,
             "character_name": self.config.get("character_name", ""),
             "background": resolved["background"],
             "sprite_scale": self.config.get("sprite_scale", 1.0),
             "sprite_bottom": self.config.get("sprite_bottom", 28.0),
             "sprite_left": self.config.get("sprite_left", 50.0),
             "typewriter_speed": self.config.get("typewriter_speed", 60),
-            "history_avatar": self.config.get("history_avatar", "")
-            or find_asset_for("history_avatar", files, "avatar")
-            or find_asset_for("avatar", files),
+            "history_avatar": history_avatar,
             "bgm_file": prefs.get("bgm_file", ""),
             "bgm_volume": prefs.get("bgm_volume", 0.5),
             "voice_volume": prefs.get("voice_volume", 1.0),
