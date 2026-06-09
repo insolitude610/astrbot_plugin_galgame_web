@@ -285,7 +285,7 @@ class SessionAPI:
         first = True
         try:
             while True:
-                result = await asyncio.wait_for(back_queue.get(), timeout=120)
+                result = await asyncio.wait_for(back_queue.get(), timeout=300)
                 if first:
                     logger.info(
                         f"[pipeline] first resp after {(time.time() - t1) * 1000:.0f}ms"
@@ -513,7 +513,7 @@ class SessionAPI:
         ev = session.get("_resp_event", asyncio.Event())
         ev.clear()
         try:
-            await asyncio.wait_for(ev.wait(), timeout=120)
+            await asyncio.wait_for(ev.wait(), timeout=300)
         except asyncio.TimeoutError:
             pass
         return session.pop("_last_resp_text", "")
