@@ -134,6 +134,12 @@ class GalgamePlugin(
         self._register_prefs_apis()
         self._register_session_apis()
 
+    def _get_history_limit(self) -> int:
+        max_turns = self.context.get_config().get("provider_settings", {}).get("max_context_length", 50)
+        if max_turns <= 0:
+            max_turns = 200
+        return max_turns * 2
+
     # ---- web server ----
 
     def _start_web_server(self, port: int):

@@ -696,7 +696,7 @@ class SessionAPI:
                 }
             )
             session["current_emotion"] = final_emotion
-            hist_limit = self.config.get("history_limit", 40)
+            hist_limit = self._get_history_limit()
             if len(session["history"]) > hist_limit:
                 session["history"] = session["history"][-hist_limit:]
 

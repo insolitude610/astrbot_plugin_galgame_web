@@ -79,12 +79,6 @@
     "default": 7,
     "hint": "超过该天数的旧会话自动清理。设为 0 则永不清理"
   },
-  "history_limit": {
-    "description": "历史记录显示条数",
-    "type": "int",
-    "default": 40,
-    "hint": "对话历史面板最多显示最近多少条消息。建议 20~100。"
-  },
   "vrm_model": {
     "description": "VRM 3D模型文件",
     "type": "string",
