@@ -878,6 +878,16 @@ function setStatus(msg, type) {
 }
 
 init();
+
+if (window.parent !== window) {
+  var backBtns = document.querySelectorAll('.back-btn');
+  for (var i = 0; i < backBtns.length; i++) {
+    backBtns[i].addEventListener('click', function(e) {
+      e.preventDefault();
+      window.parent.toggleSettings();
+    });
+  }
+}
 </script>
 </body>
 </html>

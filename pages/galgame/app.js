@@ -989,6 +989,32 @@ async function toggleHistory() {
   }
 }
 
+function toggleSettings() {
+  var overlay = document.getElementById("sp-overlay");
+  var iframe = document.getElementById("sp-iframe");
+  if (!overlay || !iframe) return;
+  if (overlay.classList.contains("active")) {
+    overlay.classList.remove("active");
+    iframe.src = "";
+  } else {
+    overlay.classList.add("active");
+    iframe.src = "./settings.html";
+  }
+}
+
+function toggleFavorites() {
+  var overlay = document.getElementById("fp-overlay");
+  var iframe = document.getElementById("fp-iframe");
+  if (!overlay || !iframe) return;
+  if (overlay.classList.contains("active")) {
+    overlay.classList.remove("active");
+    iframe.src = "";
+  } else {
+    overlay.classList.add("active");
+    iframe.src = "./favorites.html";
+  }
+}
+
 /* ---- rapid click / keyboard detection ---- */
 
 function setupRapidDetection() {
@@ -1072,6 +1098,20 @@ if (window.AstrBotPluginPage) {
     if (!window.AstrBotPluginPage) { clearInterval(_poll); init(); }
   }, 500);
 }
+
+window.addEventListener("pageshow", function (event) {
+  if (event.persisted) {
+    if (sessionId) restoreLastMessage();
+    apiGet("config").then(function(cfg) {
+      voiceVolume = cfg.voice_volume != null ? cfg.voice_volume : 1.0;
+      bgmVolume = cfg.bgm_volume != null ? cfg.bgm_volume : 0.5;
+      var ta = document.getElementById("tts-audio");
+      if (ta) ta.volume = voiceVolume;
+      var ba = document.getElementById("bgm-audio");
+      if (ba) ba.volume = bgmVolume;
+    }).catch(function(){});
+  }
+});
 
 window.addEventListener("beforeunload", function () {
   stopVRMRender();

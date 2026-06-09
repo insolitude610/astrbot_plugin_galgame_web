@@ -264,8 +264,9 @@ html, body {
   height: 36px;
   border-radius: 50%;
   background: rgba(255,255,255,.08);
+  border: none;
   color: rgba(255,255,255,.5);
-  text-decoration: none;
+  cursor: pointer;
   transition: color .2s, background .2s;
 }
 #favorites-link:hover {
@@ -456,8 +457,9 @@ html, body {
   height: 36px;
   border-radius: 50%;
   background: rgba(255,255,255,.08);
+  border: none;
   color: rgba(255,255,255,.5);
-  text-decoration: none;
+  cursor: pointer;
   transition: color .2s, background .2s;
 }
 #settings-link:hover {
@@ -832,4 +834,55 @@ html, body {
   color: rgba(220, 200, 255, 0.85);
   border-color: rgba(200, 170, 255, 0.30);
   background: rgba(160, 130, 220, 0.06);
+}
+
+/* ---- Settings / Favorites iframe overlay ---- */
+
+#sp-overlay,
+#fp-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.65);
+}
+#sp-overlay.active,
+#fp-overlay.active {
+  display: block;
+  animation: history-fade-in .3s ease-out;
+}
+
+#sp-iframe,
+#fp-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  position: relative;
+  z-index: 1;
+}
+
+#sp-close,
+#fp-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1102;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  padding: 0;
+  transition: color .2s, background .2s, border-color .2s;
+}
+#sp-close:hover,
+#fp-close:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.72);
+  border-color: rgba(255, 255, 255, 0.25);
 }
