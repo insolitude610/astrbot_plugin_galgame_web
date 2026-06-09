@@ -407,6 +407,7 @@ async function init() {
   }
 
   finishInit(true);
+  _startBgmPoll();
 }
 
 function applyConfig(cfg) {
@@ -775,12 +776,14 @@ async function toggleFavorite() {
 
 /* ---- voice mutex ---- */
 
-function _stopVoice() {
+function _stopVoice(skipFav) {
   if (el.ttsAudio) { el.ttsAudio.pause(); el.ttsAudio.src = ""; }
   if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
-  var fpIf = document.getElementById("fp-iframe");
-  if (fpIf && fpIf.contentWindow) {
-    fpIf.contentWindow.postMessage({ kind: "stop-audio" }, "*");
+  if (!skipFav) {
+    var fpIf = document.getElementById("fp-iframe");
+    if (fpIf && fpIf.contentWindow) {
+      fpIf.contentWindow.postMessage({ kind: "stop-audio" }, "*");
+    }
   }
 }
 
@@ -1184,7 +1187,7 @@ function _handleComms(msg) {
     var ta = document.getElementById("tts-audio");
     if (ta) ta.volume = voiceVolume;
   } else if (msg.kind === "fav-audio-start") {
-    _stopVoice();
+    _stopVoice(true);
     _favAudioPlaying = true;
   } else if (msg.kind === "fav-audio-end") {
     _favAudioPlaying = false;
@@ -1199,26 +1202,33 @@ function _handleComms(msg) {
 window.addEventListener("beforeunload", function () {
   stopVRMRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
+  if (_bgmPollTimer) clearInterval(_bgmPollTimer);
 });
 
-document.addEventListener("visibilitychange", function () {
-  if (document.hidden) { stopVRMRender(); }
-  else {
-    if (spriteMode === "vrm" && !vrmStarted) { startVRMRender(); }
+var _bgmPollTimer = null;
+function _startBgmPoll() {
+  if (_bgmPollTimer) return;
+  _bgmPollTimer = setInterval(function () {
     apiGet("config").then(function(cfg) {
-      voiceVolume = cfg.voice_volume != null ? cfg.voice_volume : 1.0;
       bgmVolume = cfg.bgm_volume != null ? cfg.bgm_volume : 0.5;
-      var ta = document.getElementById("tts-audio");
-      if (ta) ta.volume = voiceVolume;
       var ba = document.getElementById("bgm-audio");
       if (ba) ba.volume = bgmVolume;
       var newBgm = cfg.bgm_file || "";
       if (newBgm && newBgm !== _lastBgmFile) {
         _lastBgmFile = newBgm;
-        ba.src = _bgmUrl(newBgm);
-        bgmStarted = true;
-        ba.play().catch(function() {});
+        if (ba) {
+          ba.src = _bgmUrl(newBgm);
+          bgmStarted = true;
+          ba.play().catch(function() {});
+        }
       }
     }).catch(function(){});
+  }, 8000);
+}
+
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) { stopVRMRender(); }
+  else {
+    if (spriteMode === "vrm" && !vrmStarted) { startVRMRender(); }
   }
 });
