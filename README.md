@@ -77,6 +77,7 @@ http://localhost:6186
 | `sprite_bottom` | 立绘距底部距离 (vh) | 默认 `28`，建议 5 ~ 45 |
 | `sprite_left` | 立绘水平锚点 (%) | 默认 `50`（居中） |
 | `typewriter_speed` | 打字机速度 (ms/字) | 默认 `60`，越小越快，建议 10~200 |
+| `font_size` | 对话框字号 (px) | 默认 `17`，建议 14~24 |
 | `history_avatar` | 历史记录头像 | 设置页直接上传设置，留空则不显示 |
 | `tts_emotion_map` | 立绘情绪→TTS情绪映射 (JSON) | 例：`{"blush":"shy","thinking":"contemplative"}`，留空直接用标签本名 |
 | `background` | 场景背景图 | 留空自动匹配 |
