@@ -16,7 +16,6 @@ var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
 var historyLimit = 40;
-var nativeAudio = false;
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
 var _assetCache = {};
@@ -422,7 +421,6 @@ function applyConfig(cfg) {
   document.documentElement.style.setProperty("--sprite-left", cfg.sprite_left != null ? cfg.sprite_left : 50);
   typewriterSpeed = cfg.typewriter_speed || 60;
   historyLimit = cfg.history_limit || 40;
-  nativeAudio = cfg.native_audio || false;
   var fs = cfg.font_size || 17;
   el.dialogText.style.fontSize = fs + "px";
 
