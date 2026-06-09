@@ -152,6 +152,8 @@ class GalgamePlugin(
         )
         GalgameWebHandler.upstream = f"http://127.0.0.1:{upstream_port}"
         GalgameWebHandler.assets_dir = ASSETS_DIR
+        GalgameWebHandler.audio_dir = AUDIO_DIR
+        GalgameWebHandler.bgm_dir = BGM_DIR
         try:
             self._web_server = ThreadingHTTPServer(("0.0.0.0", port), GalgameWebHandler)
             t = threading.Thread(target=self._web_server.serve_forever, daemon=True)

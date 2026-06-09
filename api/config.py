@@ -23,6 +23,7 @@ class ConfigAPI:
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),
             "rapid_window_seconds": self.config.get("rapid_window_seconds", 3),
+            "rapid_click_enabled": self.config.get("rapid_click_enabled", True),
             "tts_provider": self.config.get("tts_provider", ""),
             "expressions": resolved["expressions"],
             "expressions_blink": resolved.get("expressions_blink", {}),

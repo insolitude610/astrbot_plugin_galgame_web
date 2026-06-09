@@ -337,7 +337,7 @@ class SessionAPI:
         if "," in audio_b64:
             audio_b64 = audio_b64.split(",", 1)[1]
         raw = base64.b64decode(audio_b64)
-        audio_dir = pathlib.Path("data/temp")
+        audio_dir = pathlib.Path(get_astrbot_data_path()) / "temp"
         audio_dir.mkdir(parents=True, exist_ok=True)
         audio_path = audio_dir / f"galgame_audio_{uuid.uuid4().hex}.wav"
         with open(audio_path, "wb") as f:

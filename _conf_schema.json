@@ -73,6 +73,12 @@
     "type": "int",
     "default": 3
   },
+  "rapid_click_enabled": {
+    "description": "启用快速点击检测",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后，当用户短时间内频繁点击/按键时，AI 会主动发送消息关心用户。关闭则不再触发此行为。"
+  },
   "session_retain_days": {
     "description": "会话保留天数",
     "type": "int",

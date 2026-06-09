@@ -7,6 +7,7 @@ var spriteMode = "single";
 var ttsProvider = "";
 var rapidThreshold = 5;
 var rapidWindowMs = 3000;
+var rapidClickEnabled = true;
 var expressions = {};
 var layers = {};
 var characterName = "小星";
@@ -405,6 +406,7 @@ function applyConfig(cfg) {
   spriteMode = cfg.sprite_mode || "single";
   rapidThreshold = cfg.rapid_click_threshold || 5;
   rapidWindowMs = (cfg.rapid_window_seconds || 3) * 1000;
+  rapidClickEnabled = cfg.rapid_click_enabled !== false;
   ttsProvider = cfg.tts_provider || "";
   expressions = cfg.expressions || {};
   expressionsBlink = cfg.expressions_blink || {};
@@ -1018,10 +1020,13 @@ function toggleFavorites() {
 /* ---- rapid click / keyboard detection ---- */
 
 function setupRapidDetection() {
+  if (!rapidClickEnabled) return;
+
   var clickTimestamps = [];
   var keyTimestamps = [];
 
   document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest("#sp-overlay, #fp-overlay, #history-panel, #session-panel")) return;
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
     if (document.getElementById("dialog-box").contains(e.target)) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
