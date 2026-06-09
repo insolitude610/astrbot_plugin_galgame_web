@@ -23,7 +23,7 @@ class PrefsAPI:
         from ..main import _load_prefs, _save_prefs
 
         prefs = _load_prefs()
-        allowed = {"bgm_file", "bgm_volume", "voice_volume"}
+        allowed = {"bgm_file", "bgm_volume", "voice_volume", "bgm_playing"}
         for key in data:
             if key in allowed:
                 prefs[key] = data[key]

@@ -1219,11 +1219,19 @@ function _startBgmPoll() {
     apiGet("config").then(function(cfg) {
       bgmVolume = cfg.bgm_volume != null ? cfg.bgm_volume : 0.5;
       var ba = document.getElementById("bgm-audio");
-      if (ba) ba.volume = bgmVolume;
+      if (!ba) return;
+      ba.volume = bgmVolume;
       var newBgm = cfg.bgm_file || "";
       if (newBgm && newBgm !== _lastBgmFile) {
         _lastBgmFile = newBgm;
         _setBgmSrc(newBgm);
+        return;
+      }
+      var playing = cfg.bgm_playing;
+      if (playing === false && !ba.paused) {
+        ba.pause();
+      } else if (playing === true && ba.paused && ba.src && !ba.src.endsWith("null")) {
+        ba.play().catch(function() {});
       }
     }).catch(function(){});
   }, 8000);

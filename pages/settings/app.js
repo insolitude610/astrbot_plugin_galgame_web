@@ -148,6 +148,7 @@ function toggleMainBgm() {
   _mainBgmPlaying = !_mainBgmPlaying;
   var btn = document.getElementById("bgm-play-pause-btn");
   if (btn) btn.textContent = _mainBgmPlaying ? "\u23F8" : "\u25B6";
+  apiPost("prefs", { bgm_playing: _mainBgmPlaying }).catch(function() {});
   if (bgmChannel) bgmChannel.postMessage({ kind: _mainBgmPlaying ? "bgm-play" : "bgm-pause" });
 }
 
@@ -156,7 +157,7 @@ async function selectBgm(name) {
   currentBgmFile = name;
   renderBgmList();
   try {
-    await apiPost("prefs", { bgm_file: name });
+    await apiPost("prefs", { bgm_file: name, bgm_playing: true });
   } catch(e) {
     console.warn("Failed to save bgm_file:", e);
   }
