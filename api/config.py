@@ -6,7 +6,7 @@ class ConfigAPI:
         )
 
     async def _api_config(self):
-        from ..galgame_web.assets_helpers import list_asset_files, resolve_assets
+        from ..galgame_web.assets_helpers import find_asset_for, list_asset_files, resolve_assets
         from ..galgame_web.utils import get_emotion_tags
         from ..main import ASSETS_DIR, _load_prefs
 
@@ -31,7 +31,9 @@ class ConfigAPI:
             "sprite_bottom": self.config.get("sprite_bottom", 28.0),
             "sprite_left": self.config.get("sprite_left", 50.0),
             "typewriter_speed": self.config.get("typewriter_speed", 60),
-            "history_avatar": self.config.get("history_avatar", ""),
+            "history_avatar": self.config.get("history_avatar", "")
+            or find_asset_for("history_avatar", files, "avatar")
+            or find_asset_for("avatar", files),
             "bgm_file": prefs.get("bgm_file", ""),
             "bgm_volume": prefs.get("bgm_volume", 0.5),
             "voice_volume": prefs.get("voice_volume", 1.0),
