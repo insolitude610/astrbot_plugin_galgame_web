@@ -86,7 +86,7 @@ http://localhost:6186
 | `session_retain_days` | 会话保留天数 | 默认 `7`，`0` = 永不清理 |
 | `rapid_click_threshold` | 快速点击检测阈值（次） | 默认 `5` |
 | `rapid_window_seconds` | 快速点击检测窗口（秒） | 默认 `3` |
-| `history_limit` | 历史面板显示条数 | 默认 `40`，建议 20~100 |
+| `rapid_click_enabled` | 启用快速点击检测 | 默认 `true`，`false`=关闭「AI 主动关心」|
 
 > **关于立绘/背景配置项**：所有素材字段均支持「留空 = 自动匹配」，按[文件命名约定](#文件命名约定)将 PNG 放入 `assets/` 目录，或通过[设置页面](#设置页面)上传即可，无需手动逐个填写。
 
@@ -313,7 +313,7 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 - **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。meme_manager 产生的 `[IMAGE]` 引用会自动过滤。
 - **Fish Audio 网络依赖**：Fish Audio API 服务器在境外，需稳定代理。代理不稳定时 TTS 会降级静默跳过，文字正常显示。
 - **VRM 3D 模式**：尚未完善，暂不可用。
-- **Dashboard 内嵌页限制**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 弹窗权限、无麦克风权限（语音输入不可用）、音量设置需切回 galgame 页等页面重新可见时刷新。推荐使用独立 WebUI 获得完整体验。
+- **Dashboard 内嵌页限制**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 弹窗权限、无麦克风权限（语音输入不可用）、BGM 暂停/播放需切回 galgame 页等待轮询同步（最多 8 秒）。推荐使用独立 WebUI 获得完整体验。
 
 ## 许可证
 

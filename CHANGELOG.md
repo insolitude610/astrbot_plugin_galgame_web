@@ -1,5 +1,31 @@
 # 变更记录
 
+## v0.7.7
+
+**WebUI 交互重构**
+
+- **设置/收藏页改为 iframe 覆盖层** — 独立 WebUI 不再跳转到独立 HTML 页面，而是在主页面上以 iframe 覆盖层打开。页面永不卸载，消息流不中断，AI 回复正常出现。bfcache 恢复时自动刷新对话框文本
+- **跨页面音频持久化** — 设置页选择 BGM 后关闭设置，音乐继续播放不被打断；收藏页语音播到一半切回聊天页不中断。通过 `postMessage` 通信实现
+- **BGM 交互优化** — 上传 BGM 后自动选中并开始循环播放；当前 BGM 项增加暂停/播放按钮，替换原来的本地预览按钮
+- **Dashboard BGM 支持** — 新增 `/bgm/data` 端点（base64 返回），Dashboard 模式通过 bridge SDK 认证通道加载 BGM，绕过沙箱 iframe 的 cookie 隔离问题。通过 8s 轮询 + `bgm_playing` 服务端状态实现暂停/播放
+
+**语音播放互斥**
+
+- 新增 `_stopVoice()` 统一入口 — TTS、历史回放、收藏播放三者互斥，同时只允许一个音频源出声。历史/收藏页同步「播放即停前序」逻辑
+
+**Bug 修复**
+
+- **音频 404** — `GalgameWebHandler.audio_dir`/`.bgm_dir` 未对齐 `AUDIO_DIR`/`BGM_DIR`，导致收藏页语音和 BGM 无法加载
+- **快速点击幽灵消息** — 覆盖层关闭按钮被计入快速点击检测，触发空发送产生 `"(语音消息)"` + AI 空回复。现所有面板/覆盖层内点击均已排除
+- **收藏页孤儿条目** — 加载收藏列表时自动清理音频文件已不存在但收藏条目仍残留的情况
+- **LLM 响应超时** — pipeline 等待从 120s 提高到 300s
+- **temp 目录 CWD 依赖** — 录音临时文件改用 `get_astrbot_data_path()`
+
+**配置变更**
+
+- 删除 `history_limit` 配置项 — 历史记录显示条数改为跟随 AstrBot 平台设置（`provider_settings.max_context_length` ×2）
+- 新增 `rapid_click_enabled`（bool）— 可在 AstrBot 仪表盘插件配置页关闭「快速点击 AI 主动关心」功能
+
 ## v0.7.6
 
 - **对话框字号可调** — 插件配置页新增 `font_size` 配置项，默认 17px，建议 14~24。独立 WebUI 和 Dashboard 内嵌页均生效
