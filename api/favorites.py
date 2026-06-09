@@ -62,14 +62,18 @@ class FavoritesAPI:
         return {"status": "ok"}
 
     def _load_favorites(self) -> list[dict]:
-        from ..main import FAVORITES_PATH
+        from ..main import AUDIO_DIR, FAVORITES_PATH
 
         if not FAVORITES_PATH.exists():
             return []
         try:
-            return json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
+            favs = json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
         except (OSError, json.JSONDecodeError):
             return []
+        cleaned = [f for f in favs if (AUDIO_DIR / f.get("audio_file", "")).is_file()]
+        if len(cleaned) != len(favs):
+            self._save_favorites(cleaned)
+        return cleaned
 
     def _save_favorites(self, favs: list[dict]):
         from ..main import FAVORITES_PATH
