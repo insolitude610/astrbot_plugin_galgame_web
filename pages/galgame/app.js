@@ -1133,6 +1133,15 @@ window.addEventListener("message", function (event) {
       bgmStarted = true;
       bgmAudio.play().catch(function(e) { console.warn("BGM play failed:", e); });
     }
+  } else if (msg.kind === "bgm-pause") {
+    var ba = document.getElementById("bgm-audio");
+    if (ba) ba.pause();
+  } else if (msg.kind === "bgm-play") {
+    var ba = document.getElementById("bgm-audio");
+    if (ba) {
+      ba.volume = bgmVolume;
+      ba.play().catch(function(e) { console.warn("BGM play failed:", e); });
+    }
   } else if (msg.kind === "bgm-volume") {
     bgmVolume = msg.volume != null ? msg.volume : bgmVolume;
     var ba = document.getElementById("bgm-audio");

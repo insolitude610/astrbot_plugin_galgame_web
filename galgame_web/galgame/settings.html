@@ -376,8 +376,7 @@ async function apiPost(endpoint, body) {
 
 var bgmFiles = [];
 var currentBgmFile = "";
-var bgmAudioEl = null;
-var playingBgm = null;
+var _mainBgmPlaying = false;
 
 async function loadBgmList() {
   try {
@@ -410,8 +409,10 @@ function renderBgmList() {
     html += "<div class='" + cls + "' id='bgm-" + i + "'>";
     html += "<span class='name'>" + escHtml(f.name) + "</span>";
     if (sizeStr) html += "<span class='size'>" + sizeStr + "</span>";
-    if (isSelected) html += "<span class='current-tag'>当前</span>";
-    html += "<button class='btn-play' onclick='toggleBgmPreview(" + i + ", this)'>▶</button>";
+    if (isSelected) {
+      html += "<span class='current-tag'>当前</span>";
+      html += "<button class='btn-play' onclick='toggleMainBgm()' id='bgm-play-pause-btn'>" + (_mainBgmPlaying ? "⏸" : "▶") + "</button>";
+    }
     html += "<button class='btn-sel' onclick='selectBgm(\"" + escJs(f.name) + "\")'>选择</button>";
     html += "<button class='btn-del-audio' onclick='deleteBgm(\"" + escJs(f.name) + "\")'>删除</button>";
     html += "</div>";
@@ -431,39 +432,17 @@ function formatSize(bytes) {
   return (bytes / 1048576).toFixed(1) + "MB";
 }
 
-function toggleBgmPreview(idx, btn) {
-  if (bgmAudioEl && playingBgm === idx) {
-    bgmAudioEl.pause();
-    bgmAudioEl = null;
-    playingBgm = null;
-    btn.textContent = "▶";
-    btn.classList.remove("playing");
-    return;
+function toggleMainBgm() {
+  _mainBgmPlaying = !_mainBgmPlaying;
+  var btn = document.getElementById("bgm-play-pause-btn");
+  if (btn) btn.textContent = _mainBgmPlaying ? "\u23F8" : "\u25B6";
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: _mainBgmPlaying ? "bgm-play" : "bgm-pause" }, "*");
   }
-  if (bgmAudioEl) {
-    bgmAudioEl.pause();
-    var prevBtn = document.querySelector(".btn-play.playing");
-    if (prevBtn) { prevBtn.textContent = "▶"; prevBtn.classList.remove("playing"); }
-  }
-  var f = bgmFiles[idx];
-  bgmAudioEl = new Audio("./bgm/" + encodeURIComponent(f.name));
-  bgmAudioEl.onended = function() {
-    btn.textContent = "▶";
-    btn.classList.remove("playing");
-    playingBgm = null;
-    bgmAudioEl = null;
-  };
-  bgmAudioEl.play().then(function() {
-    btn.textContent = "⏸";
-    btn.classList.add("playing");
-    playingBgm = idx;
-  }).catch(function(e) {
-    console.warn("BGM preview failed:", e);
-    bgmAudioEl = null;
-  });
 }
 
 async function selectBgm(name) {
+  _mainBgmPlaying = true;
   currentBgmFile = name;
   renderBgmList();
   try {
