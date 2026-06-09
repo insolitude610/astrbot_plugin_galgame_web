@@ -87,8 +87,8 @@ function apiPost(endpoint, body) {
 
 var bgmFiles = [];
 var currentBgmFile = "";
-var bgmAudioEl = null;
-var playingBgm = null;
+var _mainBgmPlaying = false;
+var bgmChannel;
 
 async function loadBgmList() {
   try {
@@ -121,8 +121,10 @@ function renderBgmList() {
     html += "<div class='" + cls + "' id='bgm-" + i + "'>";
     html += "<span class='name'>" + escHtml(f.name) + "</span>";
     if (sizeStr) html += "<span class='size'>" + sizeStr + "</span>";
-    if (isSelected) html += "<span class='current-tag'>当前</span>";
-    html += "<button class='btn-play' onclick='toggleBgmPreview(" + i + ", this)'>▶</button>";
+    if (isSelected) {
+      html += "<span class='current-tag'>当前</span>";
+      html += "<button class='btn-play' onclick='toggleMainBgm()' id='bgm-play-pause-btn'>" + (_mainBgmPlaying ? "\u23F8" : "\u25B6") + "</button>";
+    }
     html += "<button class='btn-sel' onclick='selectBgm(\"" + escJs(f.name) + "\")'>选择</button>";
     html += "<button class='btn-del-audio' onclick='deleteBgm(\"" + escJs(f.name) + "\")'>删除</button>";
     html += "</div>";
@@ -142,39 +144,15 @@ function formatSize(bytes) {
   return (bytes / 1048576).toFixed(1) + "MB";
 }
 
-function toggleBgmPreview(idx, btn) {
-  if (bgmAudioEl && playingBgm === idx) {
-    bgmAudioEl.pause();
-    bgmAudioEl = null;
-    playingBgm = null;
-    btn.textContent = "▶";
-    btn.classList.remove("playing");
-    return;
-  }
-  if (bgmAudioEl) {
-    bgmAudioEl.pause();
-    var prevBtn = document.querySelector(".btn-play.playing");
-    if (prevBtn) { prevBtn.textContent = "▶"; prevBtn.classList.remove("playing"); }
-  }
-  var f = bgmFiles[idx];
-  bgmAudioEl = new Audio("/api/plug/astrbot_plugin_galgame_web/bgm/file?name=" + encodeURIComponent(f.name));
-  bgmAudioEl.onended = function() {
-    btn.textContent = "▶";
-    btn.classList.remove("playing");
-    playingBgm = null;
-    bgmAudioEl = null;
-  };
-  bgmAudioEl.play().then(function() {
-    btn.textContent = "⏸";
-    btn.classList.add("playing");
-    playingBgm = idx;
-  }).catch(function(e) {
-    console.warn("BGM preview failed:", e);
-    bgmAudioEl = null;
-  });
+function toggleMainBgm() {
+  _mainBgmPlaying = !_mainBgmPlaying;
+  var btn = document.getElementById("bgm-play-pause-btn");
+  if (btn) btn.textContent = _mainBgmPlaying ? "\u23F8" : "\u25B6";
+  if (bgmChannel) bgmChannel.postMessage({ kind: _mainBgmPlaying ? "bgm-play" : "bgm-pause" });
 }
 
 async function selectBgm(name) {
+  _mainBgmPlaying = true;
   currentBgmFile = name;
   renderBgmList();
   try {
@@ -182,6 +160,7 @@ async function selectBgm(name) {
   } catch(e) {
     console.warn("Failed to save bgm_file:", e);
   }
+  if (bgmChannel) bgmChannel.postMessage({ kind: "bgm-change", file: name });
 }
 
 async function uploadBgm(input) {
@@ -205,6 +184,7 @@ async function uploadBgm(input) {
     if (data.uploaded) {
       setBgmStatus("已上传: " + data.uploaded, "success");
       await loadBgmList();
+      selectBgm(file.name);
     } else {
       setBgmStatus(data.error || "上传失败", "error");
     }
@@ -263,6 +243,7 @@ function onVoiceVolume() {
   if (!vv) return;
   document.getElementById("voice-vol-val").textContent = Math.round(vv.value * 100) + "%";
   saveVolumes();
+  if (bgmChannel) bgmChannel.postMessage({ kind: "voice-volume", volume: parseFloat(vv.value) });
 }
 
 function onBgmVolume() {
@@ -270,6 +251,7 @@ function onBgmVolume() {
   if (!bv) return;
   document.getElementById("bgm-vol-val").textContent = Math.round(bv.value * 100) + "%";
   saveVolumes();
+  if (bgmChannel) bgmChannel.postMessage({ kind: "bgm-volume", volume: parseFloat(bv.value) });
 }
 
 async function init() {
@@ -279,10 +261,13 @@ async function init() {
     config = {};
   }
 
+  try { bgmChannel = new BroadcastChannel("galgame-comms"); } catch(e) {}
+
   var rb = document.getElementById("refresh-btn");
   if (rb) rb.onclick = loadFiles;
   await loadFiles();
   await loadBgmList();
+  if (currentBgmFile) _mainBgmPlaying = true;
   loadVolumePrefs();
   await preloadAssets();
 }

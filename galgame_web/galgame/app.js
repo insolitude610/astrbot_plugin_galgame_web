@@ -1125,6 +1125,18 @@ window.addEventListener("pageshow", function (event) {
 window.addEventListener("message", function (event) {
   var msg = event.data;
   if (!msg || typeof msg !== "object") return;
+  _handleComms(msg);
+});
+
+try {
+  var _bgmChannel = new BroadcastChannel("galgame-comms");
+  _bgmChannel.onmessage = function (event) {
+    _handleComms(event.data);
+  };
+} catch(e) {}
+
+function _handleComms(msg) {
+  if (!msg || typeof msg !== "object") return;
   if (msg.kind === "bgm-change" && msg.file) {
     var bgmAudio = document.getElementById("bgm-audio");
     if (bgmAudio) {
@@ -1160,7 +1172,7 @@ window.addEventListener("message", function (event) {
       fpIf.src = "";
     }
   }
-});
+}
 
 window.addEventListener("beforeunload", function () {
   stopVRMRender();
