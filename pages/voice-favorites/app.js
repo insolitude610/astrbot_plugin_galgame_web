@@ -3,6 +3,12 @@ var API_BASE = "/api/plug/" + PLUGIN;
 var currentFavAudio = null;
 var voiceVolume = 1.0;
 
+window.addEventListener("message", function (event) {
+  if (event.data && event.data.kind === "stop-audio") {
+    if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
+  }
+});
+
 function apiGet(endpoint, params) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiGet) {
     return window.AstrBotPluginPage.apiGet(endpoint, params);

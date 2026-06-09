@@ -301,6 +301,12 @@ async function loadBackground() {
 loadBackground();
 loadFavorites();
 
+window.addEventListener("message", function (event) {
+  if (event.data && event.data.kind === "stop-audio") {
+    if (currentFavAudio) { currentFavAudio.pause(); currentFavAudio = null; }
+  }
+});
+
 if (window.parent !== window) {
   var backBtns = document.querySelectorAll('.back-btn');
   for (var i = 0; i < backBtns.length; i++) {

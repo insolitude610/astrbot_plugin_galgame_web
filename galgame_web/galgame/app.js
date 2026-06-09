@@ -17,11 +17,17 @@ var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
 var _favAudioPlaying = false;
+var _lastBgmFile = "";
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
 var _assetCache = {};
 var _favoriteFiles = {};
+
+function _bgmUrl(file) {
+  if (IS_DASHBOARD()) return API_BASE + "/bgm/file?name=" + encodeURIComponent(file);
+  return "./bgm/" + encodeURIComponent(file);
+}
 
 function getLocal(key) {
   try { return localStorage.getItem(key); } catch (e) { return _memStore[key] || null; }
@@ -450,6 +456,7 @@ function applyBgmAndVolume(cfg) {
 
   voiceVolume = voiceVol;
   bgmVolume = bgmVol;
+  _lastBgmFile = bgmFile;
 
   var ttsAudio = document.getElementById("tts-audio");
   var bgmAudio = document.getElementById("bgm-audio");
@@ -457,7 +464,7 @@ function applyBgmAndVolume(cfg) {
   if (bgmAudio) {
     bgmAudio.volume = bgmVol;
     if (bgmFile) {
-      bgmAudio.src = "./bgm/" + encodeURIComponent(bgmFile);
+      bgmAudio.src = _bgmUrl(bgmFile);
       startBgmOnInteraction(bgmAudio);
     }
   }
@@ -766,11 +773,23 @@ async function toggleFavorite() {
   } catch(e) { console.warn("Favorite toggle failed:", e); }
 }
 
+/* ---- voice mutex ---- */
+
+function _stopVoice() {
+  if (el.ttsAudio) { el.ttsAudio.pause(); el.ttsAudio.src = ""; }
+  if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
+  var fpIf = document.getElementById("fp-iframe");
+  if (fpIf && fpIf.contentWindow) {
+    fpIf.contentWindow.postMessage({ kind: "stop-audio" }, "*");
+  }
+}
+
 /* ---- TTS audio ---- */
 
 function playTTSAudio(base64data, mime) {
   if (!base64data) return null;
 
+  _stopVoice();
   var audio = el.ttsAudio;
   var mimeType = mime || "audio/wav";
   audio.src = "data:" + mimeType + ";base64," + base64data;
@@ -941,6 +960,7 @@ async function toggleHistory() {
         playBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
         playBtn.onclick = (function(file) {
           return function() {
+            _stopVoice();
             if (currentHistoryAudio) { currentHistoryAudio.pause(); currentHistoryAudio = null; }
             if (IS_DASHBOARD()) {
               apiGet("audio/data", { name: file }).then(function(resp) {
@@ -1140,8 +1160,9 @@ function _handleComms(msg) {
   if (msg.kind === "bgm-change" && msg.file) {
     var bgmAudio = document.getElementById("bgm-audio");
     if (bgmAudio) {
-      bgmAudio.src = "./bgm/" + encodeURIComponent(msg.file);
+      bgmAudio.src = _bgmUrl(msg.file);
       bgmAudio.volume = bgmVolume;
+      _lastBgmFile = msg.file;
       bgmStarted = true;
       bgmAudio.play().catch(function(e) { console.warn("BGM play failed:", e); });
     }
@@ -1163,6 +1184,7 @@ function _handleComms(msg) {
     var ta = document.getElementById("tts-audio");
     if (ta) ta.volume = voiceVolume;
   } else if (msg.kind === "fav-audio-start") {
+    _stopVoice();
     _favAudioPlaying = true;
   } else if (msg.kind === "fav-audio-end") {
     _favAudioPlaying = false;
@@ -1190,6 +1212,13 @@ document.addEventListener("visibilitychange", function () {
       if (ta) ta.volume = voiceVolume;
       var ba = document.getElementById("bgm-audio");
       if (ba) ba.volume = bgmVolume;
+      var newBgm = cfg.bgm_file || "";
+      if (newBgm && newBgm !== _lastBgmFile) {
+        _lastBgmFile = newBgm;
+        ba.src = _bgmUrl(newBgm);
+        bgmStarted = true;
+        ba.play().catch(function() {});
+      }
     }).catch(function(){});
   }
 });
