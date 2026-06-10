@@ -442,10 +442,15 @@ class SessionAPI:
             raw_reply, session
         )
 
-        # Step 8: Synthesize TTS
-        audio_b64, audio_mime_val, audio_file = await self._send_synthesize_tts(
-            clean_text, emotions_all, text, matched_prefix, audio_b64
-        )
+        # Step 8: Synthesize TTS (use background result if available)
+        _bg_task = session.pop("_bg_tts_task", None)
+        if _bg_task:
+            await _bg_task
+            audio_b64, audio_mime_val, audio_file = session.pop("_bg_tts_result", ("", "", ""))
+        else:
+            audio_b64, audio_mime_val, audio_file = await self._send_synthesize_tts(
+                clean_text, emotions_all, text, matched_prefix, audio_b64
+            )
 
         # Step 9: Save and return
         return await self._send_save_and_return(

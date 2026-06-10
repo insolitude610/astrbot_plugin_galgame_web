@@ -1,10 +1,14 @@
 import asyncio
+import base64
 import datetime
 import json
 import os
 import pathlib
+import re
 import subprocess
 import threading
+import time
+import uuid
 
 import jwt
 
@@ -29,6 +33,7 @@ from .galgame_web.session_helpers import (
     sync_sessions_to_db,
 )
 from .galgame_web.utils import (
+    EMOTION_PATTERN,
     PLUGIN_NAME,
     extract_all_emotions,
     get_emotion_tags,
@@ -218,6 +223,10 @@ class GalgamePlugin(
         text = resp.completion_text or ""
         if text.strip():
             session["_last_resp_text"] = text
+            if self.config.get("tts_enabled", True):
+                session["_bg_tts_task"] = asyncio.ensure_future(
+                    self._do_bg_tts(text, session)
+                )
         ev = session.get("_resp_event")
         if ev and not ev.is_set():
             ev.set()
@@ -248,6 +257,68 @@ class GalgamePlugin(
                         all_emotions if all_emotions else known
                     )
                 comp.text = clean
+
+    async def _do_bg_tts(self, raw_text: str, session: dict):
+        """Synthesize TTS in background, parallel to pipeline decorate/respond stages."""
+        try:
+            emotion_tags = get_emotion_tags(self.config)
+
+            clean_text = re.sub(EMOTION_PATTERN, "", raw_text)
+            clean_text = re.sub(r"\([a-z-]+\)", "", clean_text)
+            clean_text = re.sub(r"<#\d+\.?\d*#>", "", clean_text).strip()
+
+            if not clean_text:
+                session["_bg_tts_result"] = ("", "", "")
+                return
+
+            _, _, emotions_all = extract_all_emotions(raw_text, emotion_tags)
+
+            if not emotions_all:
+                session["_bg_tts_result"] = ("", "", "")
+                return
+
+            tts_emotion_map: dict = {}
+            try:
+                tts_emotion_map = json.loads(self.config.get("tts_emotion_map", "{}") or "{}")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            tts_provider_id = self.config.get("tts_provider", "").strip()
+            if tts_provider_id:
+                tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
+            else:
+                tts_provider = self.context.get_using_tts_provider()
+
+            if not tts_provider:
+                session["_bg_tts_result"] = ("", "", "")
+                return
+
+            tagged_text = self._build_tagged_text(clean_text, emotions_all, tts_emotion_map)
+
+            t0 = time.time()
+            audio_path = await tts_provider.get_audio(tagged_text)
+            if audio_path:
+                raw = pathlib.Path(audio_path).read_bytes()
+                mime = self._detect_audio_mime(raw)
+                audio_b64 = base64.b64encode(raw).decode()
+                audio_mime_val = mime
+                AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+                audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(mime)}"
+                (AUDIO_DIR / audio_file).write_bytes(raw)
+                if self.config.get("audio_format", "wav") == "mp3":
+                    converted = await asyncio.to_thread(_convert_audio, AUDIO_DIR / audio_file)
+                    if converted:
+                        audio_file = converted.name
+                        raw = converted.read_bytes()
+                        audio_b64 = base64.b64encode(raw).decode()
+                        audio_mime_val = "audio/mpeg"
+                logger.info(f"[bg-tts] synthesized {len(raw)} bytes {mime} in {time.time() - t0:.1f}s (parallel)")
+                session["_bg_tts_result"] = (audio_b64, audio_mime_val, audio_file)
+            else:
+                session["_bg_tts_result"] = ("", "", "")
+        except Exception as e:
+            logger.warning(f"[bg-tts] synthesis failed: {e}")
+            session["_bg_tts_result"] = ("", "", "")
 
     # ---- command ----
 
