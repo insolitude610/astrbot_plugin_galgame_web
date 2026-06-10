@@ -316,7 +316,7 @@ class GalgamePlugin(
 
     def _split_sentences(self, text: str):
         parts = re.split(r'(?<=[。！？…~])\s*|(?<=[\.!\?])\s+', text)
-        return [p.strip() for p in parts if p.strip()]
+        return [p for p in parts if p.strip()]
 
     def _build_sentence_tagged_texts(self, clean_text, emotions_all, emotion_map):
         if not emotions_all:
@@ -327,16 +327,17 @@ class GalgamePlugin(
         cursor = 0
         result = []
         for sent in sentences:
-            sent_start = cursor
-            sent_end = cursor + len(sent)
-            sent_emotions = [(tag, pos - sent_start) for tag, pos in emotions_all
+            sent_start = clean_text.index(sent, cursor)
+            sent_end = sent_start + len(sent)
+            sent_emotions = [(tag, pos) for tag, pos in emotions_all
                             if sent_start <= pos < sent_end]
             if sent_emotions:
-                tagged = self._build_tagged_text(sent, sent_emotions, emotion_map)
+                forced = [(tag, 0) for tag, _ in sent_emotions]
+                tagged = self._build_tagged_text(sent, forced, emotion_map)
             else:
                 tagged = f"[neutral]{sent}"
             result.append(tagged)
-            cursor += len(sent)
+            cursor = sent_end
         return result
 
     async def _parallel_tts(self, clean_text, emotions_all, emotion_map, tts_provider):
@@ -347,7 +348,13 @@ class GalgamePlugin(
             path = await tts_provider.get_audio(tagged_sentences[0])
             return pathlib.Path(path) if path else None
 
-        tasks = [tts_provider.get_audio(ts) for ts in tagged_sentences]
+        sem = asyncio.Semaphore(5)
+
+        async def _do_one(ts):
+            async with sem:
+                return await tts_provider.get_audio(ts)
+
+        tasks = [_do_one(ts) for ts in tagged_sentences]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         paths = []
