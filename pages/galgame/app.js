@@ -28,14 +28,9 @@ function _setBgmSrc(file) {
   var ba = document.getElementById("bgm-audio");
   if (!ba) return;
   if (IS_DASHBOARD()) {
-    bgmStarted = true;
     apiGet("bgm/data", { name: file }).then(function(resp) {
       ba.src = "data:" + resp.mime + ";base64," + resp.audio;
       ba.volume = bgmVolume;
-      ba.play().catch(function() {
-        bgmStarted = false;
-        startBgmOnInteraction(ba);
-      });
     }).catch(function(e) { console.warn("BGM data load failed:", e); });
   } else {
     ba.src = "./bgm/" + encodeURIComponent(file);
