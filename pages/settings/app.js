@@ -181,7 +181,7 @@ async function uploadBgm(input) {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-    var data = await apiPost("bgm/upload", { name: file.name, data: base64 });
+    var data = await _proxyApiPost("bgm/upload", { name: file.name, data: base64 });
     if (data.uploaded) {
       setBgmStatus("已上传: " + data.uploaded, "success");
       await loadBgmList();
@@ -193,6 +193,26 @@ async function uploadBgm(input) {
     setBgmStatus("上传失败: " + e.message, "error");
   }
   input.value = "";
+}
+
+function _proxyApiPost(endpoint, body) {
+  return new Promise(function(resolve, reject) {
+    if (bgmChannel) {
+      var msgId = "proxy-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      var handler = function(e) {
+        if (e.data && e.data.kind === "api-response" && e.data.msgId === msgId) {
+          bgmChannel.removeEventListener("message", handler);
+          if (e.data.error) reject(new Error(e.data.error));
+          else resolve(e.data.result);
+        }
+      };
+      bgmChannel.addEventListener("message", handler);
+      bgmChannel.postMessage({ kind: "api-proxy", msgId: msgId, endpoint: endpoint, body: body });
+      setTimeout(function() { bgmChannel.removeEventListener("message", handler); reject(new Error("timeout")); }, 30000);
+    } else {
+      apiPost(endpoint, body).then(resolve, reject);
+    }
+  });
 }
 
 async function deleteBgm(name) {

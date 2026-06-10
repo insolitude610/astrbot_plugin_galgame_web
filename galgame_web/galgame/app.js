@@ -28,11 +28,14 @@ function _setBgmSrc(file) {
   var ba = document.getElementById("bgm-audio");
   if (!ba) return;
   if (IS_DASHBOARD()) {
+    bgmStarted = true;
     apiGet("bgm/data", { name: file }).then(function(resp) {
       ba.src = "data:" + resp.mime + ";base64," + resp.audio;
       ba.volume = bgmVolume;
-      bgmStarted = true;
-      ba.play().catch(function() {});
+      ba.play().catch(function() {
+        bgmStarted = false;
+        startBgmOnInteraction(ba);
+      });
     }).catch(function(e) { console.warn("BGM data load failed:", e); });
   } else {
     ba.src = "./bgm/" + encodeURIComponent(file);
@@ -1193,6 +1196,12 @@ function _handleComms(msg) {
     voiceVolume = msg.volume != null ? msg.volume : voiceVolume;
     var ta = document.getElementById("tts-audio");
     if (ta) ta.volume = voiceVolume;
+  } else if (msg.kind === "api-proxy") {
+    apiPost(msg.endpoint, msg.body).then(function(result) {
+      if (_bgmChannel) _bgmChannel.postMessage({ kind: "api-response", msgId: msg.msgId, result: result });
+    }).catch(function(e) {
+      if (_bgmChannel) _bgmChannel.postMessage({ kind: "api-response", msgId: msg.msgId, error: e.message });
+    });
   } else if (msg.kind === "fav-audio-start") {
     _stopVoice(true);
     _favAudioPlaying = true;
