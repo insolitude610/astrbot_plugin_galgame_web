@@ -196,6 +196,9 @@ async function uploadBgm(input) {
 }
 
 function _proxyApiPost(endpoint, body) {
+  if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiPost) {
+    return apiPost(endpoint, body);
+  }
   return new Promise(function(resolve, reject) {
     if (bgmChannel) {
       var msgId = "proxy-" + Date.now() + "-" + Math.random().toString(36).slice(2);
