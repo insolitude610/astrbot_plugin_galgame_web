@@ -229,6 +229,7 @@ async function deleteBgm(name) {
 
 function setBgmStatus(msg, type) {
   var el = document.getElementById("bgm-status");
+  if (!el) return;
   el.textContent = msg;
   el.className = "status" + (type ? " " + type : "");
   if (msg) setTimeout(function() { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
