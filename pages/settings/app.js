@@ -58,11 +58,13 @@ async function batchDeleteSelected() {
   }
 }
 
-function apiGet(endpoint) {
+function apiGet(endpoint, params) {
   if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiGet) {
-    return window.AstrBotPluginPage.apiGet(endpoint);
+    return window.AstrBotPluginPage.apiGet(endpoint, params);
   }
-  return fetch(API_BASE + "/" + endpoint, { credentials: "include" }).then(function(resp) {
+  var url = API_BASE + "/" + endpoint;
+  if (params) url += "?" + new URLSearchParams(params).toString();
+  return fetch(url, { credentials: "include" }).then(function(resp) {
     if (!resp.ok) throw new Error(endpoint + " returned " + resp.status);
     return resp.json();
   });
