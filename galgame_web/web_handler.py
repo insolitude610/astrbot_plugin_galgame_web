@@ -3,6 +3,7 @@ import hmac
 import pathlib
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs
@@ -208,7 +209,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
         self.wfile.write(html)
 
     def _serve_static(self):
-        path = self.path.split("?")[0]
+        path = urllib.parse.unquote(self.path.split("?")[0])
         if path == "/":
             path = "/index.html"
         filename = path.lstrip("/")
