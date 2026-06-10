@@ -273,10 +273,6 @@ class GalgamePlugin(
 
             _, _, emotions_all = extract_all_emotions(raw_text, emotion_tags)
 
-            if not emotions_all:
-                session["_bg_tts_result"] = ("", "", "")
-                return
-
             tts_emotion_map: dict = {}
             try:
                 tts_emotion_map = json.loads(self.config.get("tts_emotion_map", "{}") or "{}")
@@ -293,12 +289,10 @@ class GalgamePlugin(
                 session["_bg_tts_result"] = ("", "", "")
                 return
 
-            tagged_text = self._build_tagged_text(clean_text, emotions_all, tts_emotion_map)
-
             t0 = time.time()
-            audio_path = await tts_provider.get_audio(tagged_text)
+            audio_path = await self._parallel_tts(clean_text, emotions_all, tts_emotion_map, tts_provider)
             if audio_path:
-                raw = pathlib.Path(audio_path).read_bytes()
+                raw = audio_path.read_bytes()
                 mime = self._detect_audio_mime(raw)
                 audio_b64 = base64.b64encode(raw).decode()
                 audio_mime_val = mime
@@ -319,6 +313,84 @@ class GalgamePlugin(
         except Exception as e:
             logger.warning(f"[bg-tts] synthesis failed: {e}")
             session["_bg_tts_result"] = ("", "", "")
+
+    def _split_sentences(self, text: str):
+        parts = re.split(r'(?<=[。！？…~])\s*|(?<=[\.!\?])\s+', text)
+        return [p.strip() for p in parts if p.strip()]
+
+    def _build_sentence_tagged_texts(self, clean_text, emotions_all, emotion_map):
+        if not emotions_all:
+            return [f"[neutral]{clean_text}"]
+        sentences = self._split_sentences(clean_text)
+        if len(sentences) <= 1:
+            return [self._build_tagged_text(clean_text, emotions_all, emotion_map)]
+        cursor = 0
+        result = []
+        for sent in sentences:
+            sent_start = cursor
+            sent_end = cursor + len(sent)
+            sent_emotions = [(tag, pos - sent_start) for tag, pos in emotions_all
+                            if sent_start <= pos < sent_end]
+            if sent_emotions:
+                tagged = self._build_tagged_text(sent, sent_emotions, emotion_map)
+            else:
+                tagged = f"[neutral]{sent}"
+            result.append(tagged)
+            cursor += len(sent)
+        return result
+
+    async def _parallel_tts(self, clean_text, emotions_all, emotion_map, tts_provider):
+        tagged_sentences = self._build_sentence_tagged_texts(
+            clean_text, emotions_all, emotion_map
+        )
+        if len(tagged_sentences) <= 1:
+            path = await tts_provider.get_audio(tagged_sentences[0])
+            return pathlib.Path(path) if path else None
+
+        tasks = [tts_provider.get_audio(ts) for ts in tagged_sentences]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        paths = []
+        for r in results:
+            if isinstance(r, str) and pathlib.Path(r).exists():
+                paths.append(pathlib.Path(r))
+            elif isinstance(r, Exception):
+                logger.warning(f"[bg-tts] parallel TTS sentence failed: {r}")
+
+        if not paths:
+            return None
+        if len(paths) == 1:
+            return paths[0]
+
+        return await asyncio.to_thread(self._concat_audio, paths)
+
+    def _concat_audio(self, paths):
+        concat_file = paths[0].parent / f"_concat_{uuid.uuid4().hex}.txt"
+        output = paths[0].parent / f"{uuid.uuid4().hex}.wav"
+        with open(concat_file, 'w', encoding='utf-8') as f:
+            for p in paths:
+                f.write(f"file '{p}'\n")
+        try:
+            result = subprocess.run(
+                ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+                 '-i', str(concat_file), '-c', 'copy', str(output)],
+                capture_output=True, timeout=30
+            )
+            if result.returncode == 0 and output.exists():
+                for p in paths:
+                    try:
+                        p.unlink()
+                    except OSError:
+                        pass
+                return output
+        except Exception:
+            pass
+        finally:
+            try:
+                concat_file.unlink()
+            except OSError:
+                pass
+        return paths[0]
 
     # ---- command ----
 

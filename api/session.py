@@ -622,9 +622,6 @@ class SessionAPI:
         except (json.JSONDecodeError, TypeError):
             pass
 
-        if not emotions_all:
-            return audio_b64, audio_mime_val, audio_file
-
         tts_provider_id = self.config.get("tts_provider", "").strip()
         if tts_provider_id:
             tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
@@ -635,10 +632,9 @@ class SessionAPI:
             logger.warning("[fishaudio_tts] No TTS provider configured, skipping TTS")
             return audio_b64, audio_mime_val, audio_file
 
-        tagged_text = self._build_tagged_text(clean_text, emotions_all, tts_emotion_map)
         try:
             t0_tts = time.time()
-            audio_path = await tts_provider.get_audio(tagged_text)
+            audio_path = await self._parallel_tts(clean_text, emotions_all, tts_emotion_map, tts_provider)
             if audio_path:
                 raw = pathlib.Path(audio_path).read_bytes()
                 mime = self._detect_audio_mime(raw)

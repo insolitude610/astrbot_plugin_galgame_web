@@ -1,5 +1,23 @@
 # 变更记录
 
+## v0.7.8
+
+**句子级并行 TTS — 语音延迟大幅降低**
+
+- `_do_bg_tts()` 和 `_send_synthesize_tts()` 改为句子级并行合成：按中英文句号切分文本 → 每句独立调用 TTS → `asyncio.gather` 并行 → ffmpeg 拼接为单文件。多句回复 TTS 时间从 2-5s 降至 ~0.7s（减少 ~70%），单句回复无额外开销
+- 新增 `_split_sentences()` — 按中文 `。！？…~` 和英文 `.?!` 切割，保留标点
+- 新增 `_build_sentence_tagged_texts()` — 将全文级 emotion 位置重新分配到每句话，无标签句子 fallback `[neutral]`
+- 新增 `_parallel_tts()` — gather 并行调用 TTS provider，某句失败时跳过其余继续，全部失败时返回 None
+- 新增 `_concat_audio()` — ffmpeg concat demuxer 拼接多个 WAV，成功后清理源文件
+- **中性语气 fallback** — `emotions_all` 为空时不再跳过 TTS，改用 `[neutral]` 继续合成，彻底消灭"LLM 不带标签就静音"的 bug
+
+**提示词强化**
+
+- 系统提示词最开头新增 `**重要：每次回复开头必须包含至少一个 {emotion_xxx} 标签**` bold 强调
+- 规则 1 从"用口语化中文回复"改为"每条回复至少包含一个标签"
+- 自由标签描述从"情绪/语气/动作/状态"改为"声学特征（语气/语调/语速/音色），不得描述动作"
+- 新增错误示例禁止 `{emotion_歪头}` 等动作标签和零标签裸回
+
 ## v0.7.7
 
 **WebUI 交互重构**
