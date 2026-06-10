@@ -1181,7 +1181,11 @@ function _handleComms(msg) {
     var ba = document.getElementById("bgm-audio");
     if (ba) {
       ba.volume = bgmVolume;
-      ba.play().catch(function(e) { console.warn("BGM play failed:", e); });
+    ba.play().catch(function(e) {
+      console.warn("BGM play failed:", e);
+      bgmStarted = false;
+      startBgmOnInteraction(ba);
+    });
     }
   } else if (msg.kind === "bgm-volume") {
     bgmVolume = msg.volume != null ? msg.volume : bgmVolume;
