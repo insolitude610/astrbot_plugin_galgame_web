@@ -149,6 +149,22 @@ function toggleMainBgm() {
   var btn = document.getElementById("bgm-play-pause-btn");
   if (btn) btn.textContent = _mainBgmPlaying ? "\u23F8" : "\u25B6";
   apiPost("prefs", { bgm_playing: _mainBgmPlaying }).catch(function() {});
+
+  var preview = document.getElementById("bgm-preview-audio");
+  if (_mainBgmPlaying) {
+    if (preview && currentBgmFile) {
+      apiGet("bgm/data", { name: currentBgmFile }).then(function(resp) {
+        preview.src = "data:" + resp.mime + ";base64," + resp.audio;
+        preview.play().catch(function() {});
+      }).catch(function() {
+        preview.src = "/api/plug/astrbot_plugin_galgame_web/bgm/file?name=" + encodeURIComponent(currentBgmFile);
+        preview.play().catch(function() {});
+      });
+    }
+  } else {
+    if (preview) { preview.pause(); preview.src = ""; }
+  }
+
   if (bgmChannel) bgmChannel.postMessage({ kind: _mainBgmPlaying ? "bgm-play" : "bgm-pause" });
 }
 
