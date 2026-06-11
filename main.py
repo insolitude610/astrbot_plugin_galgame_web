@@ -290,7 +290,9 @@ class GalgamePlugin(
                 return
 
             t0 = time.time()
+            logger.info(f"[bg-tts-debug] calling _parallel_tts clean_len={len(clean_text)} emos={emotions_all}")
             audio_path = await self._parallel_tts(clean_text, emotions_all, tts_emotion_map, tts_provider)
+            logger.info(f"[bg-tts-debug] _parallel_tts returned {'path' if audio_path else 'None'}")
             if audio_path:
                 raw = audio_path.read_bytes()
                 mime = self._detect_audio_mime(raw)
@@ -347,6 +349,7 @@ class GalgamePlugin(
         tagged_sentences = self._build_sentence_tagged_texts(
             clean_text, emotions_all, emotion_map
         )
+        logger.info(f"[bg-tts-debug] _parallel_tts {len(tagged_sentences)} sentences, first={tagged_sentences[0][:50] if tagged_sentences else 'none'}")
         if len(tagged_sentences) <= 1:
             path = await tts_provider.get_audio(tagged_sentences[0])
             return pathlib.Path(path) if path else None
