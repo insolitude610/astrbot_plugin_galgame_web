@@ -319,25 +319,28 @@ class GalgamePlugin(
         return [p for p in parts if p.strip()]
 
     def _build_sentence_tagged_texts(self, clean_text, emotions_all, emotion_map):
-        if not emotions_all:
-            return [f"[neutral]{clean_text}"]
         sentences = self._split_sentences(clean_text)
         if len(sentences) <= 1:
-            return [self._build_tagged_text(clean_text, emotions_all, emotion_map)]
+            if emotions_all:
+                return [self._build_tagged_text(clean_text, emotions_all, emotion_map)]
+            return [f"[neutral]{clean_text}"]
         cursor = 0
         result = []
         for sent in sentences:
             sent_start = clean_text.index(sent, cursor)
-            sent_end = sent_start + len(sent)
-            sent_emotions = [(tag, pos) for tag, pos in emotions_all
-                            if sent_start <= pos < sent_end]
+            if emotions_all:
+                sent_end_field = sent_start + len(sent)
+                sent_emotions = [(tag, pos) for tag, pos in emotions_all
+                                if sent_start <= pos < sent_end_field]
+            else:
+                sent_emotions = []
             if sent_emotions:
                 forced = [(tag, 0) for tag, _ in sent_emotions]
                 tagged = self._build_tagged_text(sent, forced, emotion_map)
             else:
                 tagged = f"[neutral]{sent}"
             result.append(tagged)
-            cursor = sent_end
+            cursor = sent_start + len(sent)
         return result
 
     async def _parallel_tts(self, clean_text, emotions_all, emotion_map, tts_provider):
@@ -352,7 +355,7 @@ class GalgamePlugin(
 
         async def _do_one(ts):
             async with sem:
-                return await tts_provider.get_audio(ts)
+                return await asyncio.to_thread(tts_provider.get_audio, ts)
 
         tasks = [_do_one(ts) for ts in tagged_sentences]
         results = await asyncio.gather(*tasks, return_exceptions=True)
