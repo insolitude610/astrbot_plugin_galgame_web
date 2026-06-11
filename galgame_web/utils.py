@@ -13,6 +13,7 @@ DEFAULT_EMOTION_TAGS = [
     "thinking",
 ]
 EMOTION_PATTERN = re.compile(r"\{emotion_\s*([^\s}]+)\}")
+_EMOTION_TYPO_PATTERN = re.compile(r"\{emot\w*_\s*[^\s}]+\}")
 
 DEFAULT_GALGAME_PROMPT = (
     "**重要：每次回复开头必须包含至少一个 {emotion_xxx} 格式的情绪标签来描述说话语气，不可省略。无论使用中文还是英文回复，此规则绝对强制，不因语言切换而豁免。**\n\n"
@@ -40,6 +41,7 @@ DEFAULT_GALGAME_PROMPT = (
     "   ❌ 错误：今天天气真好！(开心)                     ← 不能用括号写法\n"
     "   ❌ 错误：{emotion_歪头}{emotion_thinking}       ← 自由标签必须是声音特征，不能是动作或事件\n"
     "   ❌ 错误：Nova是主人专属的小猫娘喵~               ← 缺少 {emotion_xxx} 标签，每条回复至少带一个\n"
+    "   ❌ 错误：{emusement_happy}今天天气真好！          ← 拼写错误，emotion_ 前缀不能写成 emusement_\n"
     "4. 不要输出任何标签以外的东西，不要用括号写心理活动，直接说话\n"
     "5. 你只能输出纯文本对话。禁止：工具/函数调用、图片/文件/附件、emoji、Markdown格式"
     "（**粗体**、*斜体*、`代码块`、#标题等）。你的文字将被语音朗读，Markdown标记符会破坏朗读效果，请直接说话不要使用任何格式标记。"

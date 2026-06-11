@@ -35,6 +35,7 @@ from .galgame_web.session_helpers import (
 from .galgame_web.utils import (
     EMOTION_PATTERN,
     PLUGIN_NAME,
+    _EMOTION_TYPO_PATTERN,
     extract_all_emotions,
     get_emotion_tags,
 )
@@ -257,6 +258,7 @@ class GalgamePlugin(
                         all_emotions if all_emotions else known
                     )
                 comp.text = clean
+                comp.text = re.sub(_EMOTION_TYPO_PATTERN, "", comp.text)
 
     async def _do_bg_tts(self, raw_text: str, session: dict):
         """Synthesize TTS in background, parallel to pipeline decorate/respond stages."""
