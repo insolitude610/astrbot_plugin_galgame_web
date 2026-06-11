@@ -444,6 +444,7 @@ class SessionAPI:
 
         # Step 8: Synthesize TTS (use background result if available)
         _bg_task = session.pop("_bg_tts_task", None)
+        logger.info(f"[tts-debug] step8 bg_task={'yes' if _bg_task else 'no'} clean='{clean_text[:20] if clean_text else 'empty'}' emos={len(emotions_all) if emotions_all else 0}")
         if _bg_task:
             await _bg_task
             audio_b64, audio_mime_val, audio_file = session.pop("_bg_tts_result", ("", "", ""))
@@ -612,6 +613,7 @@ class SessionAPI:
             return audio_b64, audio_mime_val, audio_file
 
         if not clean_text or matched_prefix:
+            logger.info(f"[tts-debug] synth early return clean='{clean_text[:20] if clean_text else 'empty'}' match={'yes' if matched_prefix else 'no'}")
             return audio_b64, audio_mime_val, audio_file
 
         tts_emotion_map = {}
