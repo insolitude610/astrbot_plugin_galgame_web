@@ -358,7 +358,7 @@ class GalgamePlugin(
 
         async def _do_one(ts):
             async with sem:
-                return await asyncio.to_thread(tts_provider.get_audio, ts)
+                return await tts_provider.get_audio(ts)
 
         tasks = [_do_one(ts) for ts in tagged_sentences]
         results = await asyncio.gather(*tasks, return_exceptions=True)
