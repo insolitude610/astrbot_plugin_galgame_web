@@ -1023,8 +1023,8 @@ async function toggleHistory() {
       list.appendChild(row);
     }
 
-    list.scrollTop = list.scrollHeight;
     panel.classList.add("active");
+    list.scrollTop = list.scrollHeight;
   } catch (err) {
     console.error("Failed to load history:", err);
   }
