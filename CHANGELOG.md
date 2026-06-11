@@ -1,6 +1,20 @@
 # 变更记录
 
-## v0.7.8
+## v0.7.9
+
+**TTS 并行修复与可靠性提升**
+
+- **TTS 真正并行** — 修复 `get_audio()` 并非 async 导致的并发失效。空 emotion 也切句并行，3 句从串行 6s→并行 2s
+- **emotion 强制句首** — 切句后所有 emotion 标签 force 到位置 0，确保 Fish Audio 正确识别
+- **Semaphore(5) 并发控制** — 限制同时最多 5 路 TTS 调用，避免被 Fish Audio 限流
+- **提示词英文强化** — "无论中英文此规则绝对强制"，AI 英文回复不再遗漏 emotion 标签
+- **兜底过滤拼写错误** — 新增 `{emot\w*_\s*[^\s}]+\}` 正则，过滤 AI 拼错前缀的伪标签（如 `{emusement_happy}`）
+
+**Bug 修复**
+
+- **麦克风错误提示** — 独立 WebUI 不再误显 Dashboard 专属提示，按 `IS_DASHBOARD()` 区分
+- **历史面板滚动** — 先 `active` 再 `scrollTop`，修复 `display:none` 时无法计算 `scrollHeight`
+- **录音编码修复** — Float32→Int16 转换补上 `×32767` 缩放，修复 STT 判为静音
 
 **句子级并行 TTS — 语音延迟大幅降低**
 
