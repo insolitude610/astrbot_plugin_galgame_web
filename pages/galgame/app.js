@@ -859,7 +859,8 @@ function enableInput() {
 
 /* ---- input handling ---- */
 
-function toggleExpand() {
+function toggleExpand(e) {
+  if (e) e.stopPropagation();
   var expanded = document.body.classList.toggle("text-expanded");
   var btn = document.getElementById("expand-btn");
   if (btn) btn.classList.toggle("expanded", expanded);
@@ -1077,7 +1078,7 @@ function setupRapidDetection() {
   var keyTimestamps = [];
 
   document.addEventListener("click", function (e) {
-    if (e.target.closest && e.target.closest("#sp-overlay, #fp-overlay, #history-panel, #session-panel")) return;
+    if (e.target.closest && e.target.closest("#sp-overlay, #fp-overlay, #history-panel, #session-panel, #expand-btn")) return;
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
     if (document.getElementById("dialog-box").contains(e.target)) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
