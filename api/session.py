@@ -48,7 +48,7 @@ class SessionAPI:
         self.context.register_web_api(
             f"/{pn}/session/delete",
             self._api_session_delete,
-            ["POST"],
+            ["GET", "POST"],
             "Delete a session and its AstrBot conversation",
         )
         self.context.register_web_api(
@@ -190,7 +190,7 @@ class SessionAPI:
         )
 
         data = await request.get_json() or {}
-        sid = data.get("session_id", "").strip()
+        sid = data.get("session_id", "").strip() or request.args.get("session_id", "").strip()
         if not sid:
             return {"error": "session_id required"}, 400
         if sid in self._sessions:

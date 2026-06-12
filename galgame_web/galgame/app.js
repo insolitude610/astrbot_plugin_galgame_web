@@ -350,11 +350,9 @@ async function loadSessionPanel() {
         } else {
           el.remove();
         }
-        if (!IS_DASHBOARD()) {
-          apiPost("session/delete", { session_id: sid }).catch(function(e2) {
-            console.warn("Delete session failed:", e2);
-          });
-        }
+        apiGet("session/delete", { session_id: sid }).catch(function(e2) {
+          console.warn("Delete session failed:", e2);
+        });
       };
     })(s.session_id, item);
     item.appendChild(delBtn);
