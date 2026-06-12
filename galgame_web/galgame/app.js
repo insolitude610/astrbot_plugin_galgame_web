@@ -339,29 +339,20 @@ async function loadSessionPanel() {
     delBtn.title = "删除此对话";
     delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
     delBtn.onclick = (function(sid, el) {
-      return async function(e) {
+      return function(e) {
         e.stopPropagation();
         var btn = e.currentTarget;
         if (btn.disabled) return;
         btn.disabled = true;
-        try {
-          var resp = await fetch("/api/plug/astrbot_plugin_galgame_web/session/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ session_id: sid }),
-          });
-          if (!resp.ok) throw new Error("delete returned " + resp.status);
-          if (sid === sessionId) {
-            removeLocal("galgame_session_id");
-            location.href = location.pathname;
-          } else {
-            el.remove();
-          }
-        } catch(e2) {
-          console.warn("Delete session failed:", e2);
-          btn.disabled = false;
+        if (sid === sessionId) {
+          removeLocal("galgame_session_id");
+          location.href = location.pathname;
+        } else {
+          el.remove();
         }
+        apiPost("session/delete", { session_id: sid }).catch(function(e2) {
+          console.warn("Delete session failed:", e2);
+        });
       };
     })(s.session_id, item);
     item.appendChild(delBtn);
