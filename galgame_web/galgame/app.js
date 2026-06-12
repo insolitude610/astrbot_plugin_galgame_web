@@ -286,12 +286,19 @@ function switchToSession(sid) {
 
 function startNewSession() {
   toggleSessionPanel();
-  removeLocal("galgame_session_id");
-  apiPost("session/init", { resume_id: "", force_new: true }).then(function(resp) {
-    if (!resp || !resp.session_id) return;
-    sessionId = resp.session_id;
-    setLocal("galgame_session_id", sessionId);
-    finishInit(true);
+  apiGet("session/list").then(function(data) {
+    var sessions = (data && data.sessions) || [];
+    for (var i = 0; i < sessions.length; i++) {
+      if (sessions[i].message_count === 0) {
+        switchToSession(sessions[i].session_id);
+        return;
+      }
+    }
+    removeLocal("galgame_session_id");
+    location.href = location.pathname;
+  }).catch(function() {
+    removeLocal("galgame_session_id");
+    location.href = location.pathname;
   });
 }
 
@@ -334,31 +341,33 @@ async function loadSessionPanel() {
       '<div class="session-item-preview">' + preview + '</div>' +
       '<span class="session-item-count">' + s.message_count + ' 条消息</span>';
 
-    var delBtn = document.createElement("button");
-    delBtn.className = "session-item-del";
-    delBtn.title = "删除此对话";
-    delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-    delBtn.onclick = (function(sid, el) {
-      return async function(e) {
-        e.stopPropagation();
-        var btn = e.currentTarget;
-        if (btn.disabled) return;
-        btn.disabled = true;
-        try {
-          await apiPost("session/delete", { session_id: sid });
-          if (sid === sessionId) {
-            removeLocal("galgame_session_id");
-            location.href = location.pathname;
-          } else {
-            el.remove();
+    if (s.message_count > 0) {
+      var delBtn = document.createElement("button");
+      delBtn.className = "session-item-del";
+      delBtn.title = "删除此对话";
+      delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      delBtn.onclick = (function(sid, el) {
+        return async function(e) {
+          e.stopPropagation();
+          var btn = e.currentTarget;
+          if (btn.disabled) return;
+          btn.disabled = true;
+          try {
+            await apiPost("session/delete", { session_id: sid });
+            if (sid === sessionId) {
+              removeLocal("galgame_session_id");
+              location.href = location.pathname;
+            } else {
+              el.remove();
+            }
+          } catch(e2) {
+            console.warn("Delete session failed:", e2);
+            btn.disabled = false;
           }
-        } catch(e2) {
-          console.warn("Delete session failed:", e2);
-          btn.disabled = false;
-        }
-      };
-    })(s.session_id, item);
-    item.appendChild(delBtn);
+        };
+      })(s.session_id, item);
+      item.appendChild(delBtn);
+    }
 
     listEl.appendChild(item);
   }
