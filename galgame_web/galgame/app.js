@@ -345,7 +345,13 @@ async function loadSessionPanel() {
         if (btn.disabled) return;
         btn.disabled = true;
         try {
-          await apiPost("session/delete", { session_id: sid });
+          var resp = await fetch("/api/plug/astrbot_plugin_galgame_web/session/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ session_id: sid }),
+          });
+          if (!resp.ok) throw new Error("delete returned " + resp.status);
           if (sid === sessionId) {
             removeLocal("galgame_session_id");
             location.href = location.pathname;
