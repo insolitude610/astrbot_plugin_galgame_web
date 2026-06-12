@@ -18,6 +18,8 @@ var bgmVolume = 0.5;
 var bgmStarted = false;
 var _favAudioPlaying = false;
 var _lastBgmFile = "";
+var _deleteQueue = [];
+var _deleteTimer = null;
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
@@ -295,6 +297,15 @@ function startNewSession() {
   });
 }
 
+function _processDeleteQueue() {
+  if (_deleteQueue.length === 0) { _deleteTimer = null; return; }
+  var item = _deleteQueue.shift();
+  apiGet("session/delete", { session_id: item.sid }).catch(function(e2) {
+    console.warn("Delete session failed:", e2);
+  });
+  _deleteTimer = setTimeout(_processDeleteQueue, 800);
+}
+
 async function loadSessionPanel() {
   var listEl = document.getElementById("session-list");
   listEl.innerHTML = '<div class="session-loading">正在查找历史对话...</div>';
@@ -350,9 +361,8 @@ async function loadSessionPanel() {
         } else {
           el.remove();
         }
-        apiGet("session/delete", { session_id: sid }).catch(function(e2) {
-          console.warn("Delete session failed:", e2);
-        });
+        _deleteQueue.push({ sid: sid });
+        if (!_deleteTimer) _processDeleteQueue();
       };
     })(s.session_id, item);
     item.appendChild(delBtn);
