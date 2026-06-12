@@ -341,8 +341,9 @@ async function loadSessionPanel() {
     delBtn.onclick = (function(sid, el) {
       return async function(e) {
         e.stopPropagation();
-        if (delBtn.disabled) return;
-        delBtn.disabled = true;
+        var btn = e.currentTarget;
+        if (btn.disabled) return;
+        btn.disabled = true;
         try {
           await apiPost("session/delete", { session_id: sid });
           if (sid === sessionId) {
@@ -353,7 +354,7 @@ async function loadSessionPanel() {
           }
         } catch(e2) {
           console.warn("Delete session failed:", e2);
-          delBtn.disabled = false;
+          btn.disabled = false;
         }
       };
     })(s.session_id, item);
