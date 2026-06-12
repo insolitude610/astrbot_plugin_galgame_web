@@ -859,9 +859,18 @@ function enableInput() {
 
 /* ---- input handling ---- */
 
+function toggleExpand() {
+  var expanded = document.body.classList.toggle("text-expanded");
+  var btn = document.getElementById("expand-btn");
+  if (btn) btn.classList.toggle("expanded", expanded);
+  if (expanded) el.userInput.focus();
+}
+
 function setupInput() {
   el.sendBtn.addEventListener("click", function () { sendMessage(); });
   el.micBtn.addEventListener("click", toggleRecording);
+  el.expandBtn = document.getElementById("expand-btn");
+  if (el.expandBtn) el.expandBtn.addEventListener("click", toggleExpand);
   el.userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
