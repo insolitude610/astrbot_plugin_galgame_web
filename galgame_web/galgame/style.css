@@ -384,6 +384,9 @@ html, body {
   min-height: 320px;
   max-height: 60vh;
 }
+.text-expanded #input-row {
+  align-items: flex-end;
+}
 
 #expand-btn {
   background: none;
