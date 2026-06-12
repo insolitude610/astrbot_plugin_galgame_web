@@ -300,7 +300,7 @@ function startNewSession() {
 function _processDeleteQueue() {
   if (_deleteQueue.length === 0) { _deleteTimer = null; return; }
   var item = _deleteQueue.shift();
-  apiGet("session/delete", { session_id: item.sid }).catch(function(e2) {
+  apiPost("session/delete", { session_id: item.sid }).catch(function(e2) {
     console.warn("Delete session failed:", e2);
   });
   _deleteTimer = setTimeout(_processDeleteQueue, 800);
