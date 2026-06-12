@@ -381,8 +381,8 @@ html, body {
   cursor: not-allowed;
 }
 .text-expanded #user-input {
-  min-height: 180px;
-  max-height: 50vh;
+  min-height: 320px;
+  max-height: 60vh;
 }
 
 #expand-btn {
