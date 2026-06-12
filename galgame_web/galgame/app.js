@@ -285,7 +285,6 @@ function switchToSession(sid) {
 }
 
 function startNewSession() {
-  toggleSessionPanel();
   apiGet("session/list").then(function(data) {
     var sessions = (data && data.sessions) || [];
     for (var i = 0; i < sessions.length; i++) {
