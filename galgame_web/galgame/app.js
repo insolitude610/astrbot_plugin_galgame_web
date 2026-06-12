@@ -863,7 +863,7 @@ function setupInput() {
   el.sendBtn.addEventListener("click", function () { sendMessage(); });
   el.micBtn.addEventListener("click", toggleRecording);
   el.userInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
