@@ -18,8 +18,6 @@ var bgmVolume = 0.5;
 var bgmStarted = false;
 var _favAudioPlaying = false;
 var _lastBgmFile = "";
-var _deleteQueue = [];
-var _deleteTimer = null;
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
@@ -297,15 +295,6 @@ function startNewSession() {
   });
 }
 
-function _processDeleteQueue() {
-  if (_deleteQueue.length === 0) { _deleteTimer = null; return; }
-  var item = _deleteQueue.shift();
-  apiPost("session/delete", { session_id: item.sid }).catch(function(e2) {
-    console.warn("Delete session failed:", e2);
-  });
-  _deleteTimer = setTimeout(_processDeleteQueue, 800);
-}
-
 async function loadSessionPanel() {
   var listEl = document.getElementById("session-list");
   listEl.innerHTML = '<div class="session-loading">正在查找历史对话...</div>';
@@ -350,19 +339,23 @@ async function loadSessionPanel() {
     delBtn.title = "删除此对话";
     delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
     delBtn.onclick = (function(sid, el) {
-      return function(e) {
+      return async function(e) {
         e.stopPropagation();
         var btn = e.currentTarget;
         if (btn.disabled) return;
         btn.disabled = true;
-        if (sid === sessionId) {
-          removeLocal("galgame_session_id");
-          location.href = location.pathname;
-        } else {
-          el.remove();
+        try {
+          await apiPost("session/delete", { session_id: sid });
+          if (sid === sessionId) {
+            removeLocal("galgame_session_id");
+            location.href = location.pathname;
+          } else {
+            el.remove();
+          }
+        } catch(e2) {
+          console.warn("Delete session failed:", e2);
+          btn.disabled = false;
         }
-        _deleteQueue.push({ sid: sid });
-        if (!_deleteTimer) _processDeleteQueue();
       };
     })(s.session_id, item);
     item.appendChild(delBtn);
