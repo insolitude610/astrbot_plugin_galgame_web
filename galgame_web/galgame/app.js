@@ -18,7 +18,6 @@ var bgmVolume = 0.5;
 var bgmStarted = false;
 var _favAudioPlaying = false;
 var _lastBgmFile = "";
-var _deleteLock = Promise.resolve();
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
@@ -345,11 +344,6 @@ async function loadSessionPanel() {
         var btn = e.currentTarget;
         if (btn.disabled) return;
         btn.disabled = true;
-        var done;
-        var myLock = new Promise(function(r) { done = r; });
-        var prev = _deleteLock;
-        _deleteLock = myLock;
-        await prev;
         try {
           await apiPost("session/delete", { session_id: sid });
           if (sid === sessionId) {
@@ -361,8 +355,6 @@ async function loadSessionPanel() {
         } catch(e2) {
           console.warn("Delete session failed:", e2);
           btn.disabled = false;
-        } finally {
-          done();
         }
       };
     })(s.session_id, item);
