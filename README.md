@@ -2,6 +2,8 @@
 
 一个 AstrBot 插件，通过独立本地端口和 Dashboard 内嵌页提供 Galgame 风格的 AI 虚拟伙伴 WebUI。支持双图交叉渐变表情切换、打字机动画、Fish Audio 情感 TTS 语音朗读、语音输入、BGM 背景音乐、会话恢复、对话历史、语音收藏等交互特性。
 
+> ⚠️ **重要提示**：Dashboard 内嵌页存在较多已知问题（会话删除白屏、BGM 延迟、语音输入不可用等）。**强烈推荐使用独立 WebUI** （`http://localhost:6186`），功能完整、体验最佳。
+
 > **注意**：和 webchat 平台一致，但本插件的 Web 对话 bot 暂不支持发送文件和图片（待开发）。~谁家galgame角色能给你发图片和文件啊（）~
 
 ## ⚠️ 当前状态
@@ -51,7 +53,7 @@ http://localhost:6186
 
 2. **Dashboard 内嵌页**：插件市场 → 点击插件卡片 → 顶部 tab 切换「galgame」/「settings」/「voice-favorites」
 
-> **说明**：更推荐使用独立 WebUI。Dashboard 内嵌页运行在受限 sandbox 中，存在无弹窗确认（`confirm`/`alert` 被禁）、上传预览延迟、音量设置需切换页面刷新等已知限制。独立 WebUI 功能完整，体验最佳。独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。
+> ⚠️ **说明**：**强烈推荐使用独立 WebUI。** Dashboard 内嵌页运行在受限 sandbox 中，存在会话删除白屏、BGM 播放延迟（8s 轮询）、语音输入不可用、无弹窗确认等已知问题。独立 WebUI 功能完整，体验最佳。独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。
 
 > **说明**：独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。Dashboard 内嵌页不受密码影响（依赖 Dashboard 自身登录）。
 
@@ -314,7 +316,7 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 - **不支持发送文件/图片**：Web 对话 bot 暂不支持 AI 发送图片或文件（待开发）。meme_manager 产生的 `[IMAGE]` 引用会自动过滤。
 - **Fish Audio 网络依赖**：Fish Audio API 服务器在境外，需稳定代理。代理不稳定时 TTS 会降级静默跳过，文字正常显示。
 - **VRM 3D 模式**：尚未完善，暂不可用。
-- **Dashboard 内嵌页限制**：Dashboard 内嵌页运行在受限 sandbox 中，无 `confirm()`/`alert()` 弹窗权限、无麦克风权限（语音输入不可用）、BGM 暂停/播放需切回 galgame 页等待轮询同步（最多 8 秒）。推荐使用独立 WebUI 获得完整体验。
+- **Dashboard 内嵌页限制**：⚠️ Dashboard 内嵌页存在较多已知问题——会话删除可能触发白屏、BGM 播放需 8s 轮询同步、语音输入不可用、无弹窗确认权限。**强烈推荐使用独立 WebUI**（`http://localhost:6186`）获得完整体验。
 
 ## 许可证
 
