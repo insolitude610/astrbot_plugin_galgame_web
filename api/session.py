@@ -195,11 +195,11 @@ class SessionAPI:
             return {"error": "session_id required"}, 400
         if sid in self._sessions:
             cleanup_session_audio(self._sessions[sid]["history"])
-            await delete_astrbot_conv(self.context, self._webchat_username, sid)
             del self._sessions[sid]
         path = session_path(sid)
         if path.exists():
             path.unlink()
+        asyncio.ensure_future(delete_astrbot_conv(self.context, self._webchat_username, sid))
         return {"status": "ok"}
 
     async def _api_rapid_action(self):
