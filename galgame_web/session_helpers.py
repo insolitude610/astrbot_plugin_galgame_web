@@ -178,6 +178,17 @@ async def sync_sessions_to_db(
         conv_id = session.get("conv_id", "")
         umo = session.get("umo", "")
 
+        if not history and not umo:
+            path = session_path(sid)
+            if path.exists():
+                path.unlink()
+            del sessions[sid]
+            logger.info(f"Cleaned up dead session: {sid[:8]}")
+            continue
+
+        if not history:
+            continue
+
         conv_exists = False
         if conv_id and umo:
             try:
@@ -186,19 +197,9 @@ async def sync_sessions_to_db(
             except Exception:
                 pass
 
-        if not history and not conv_exists:
-            path = session_path(sid)
-            if path.exists():
-                path.unlink()
-            del sessions[sid]
-            logger.info(f"Cleaned up dead session: {sid[:8]}")
-            continue
-
         if not conv_id or not conv_exists:
             await init_astrbot_conv(context, webchat_username, config, sid, session)
             save_fn(sid)
-        elif not history:
-            continue
 
     for path in SESSIONS_DIR.glob("*.json"):
         sid = path.stem
@@ -207,7 +208,7 @@ async def sync_sessions_to_db(
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-            if not data.get("history"):
+            if not data.get("history") and not data.get("umo"):
                 path.unlink()
                 logger.info(f"Cleaned up blank session file: {sid[:8]}")
         except (OSError, json.JSONDecodeError):
