@@ -142,6 +142,10 @@ class SessionAPI:
             if blank_sid:
                 s = load_session(blank_sid)
                 if s:
+                    if not s.get("umo"):
+                        from ..galgame_web.session_helpers import build_umo
+
+                        s["umo"] = build_umo(self._webchat_username, blank_sid)
                     logger.info(f"[session] reusing blank session: {blank_sid}")
                     self._sessions[blank_sid] = s
                     return {
@@ -163,13 +167,11 @@ class SessionAPI:
             }
             self._sessions[sid] = session
             try:
-                from ..galgame_web.session_helpers import init_astrbot_conv
+                from ..galgame_web.session_helpers import build_umo
 
-                await init_astrbot_conv(
-                    self.context, self._webchat_username, self.config, sid, session
-                )
+                session["umo"] = build_umo(self._webchat_username, sid)
             except Exception:
-                logger.exception(f"Failed to init conversation for {sid}")
+                logger.exception(f"Failed to build umo for {sid}")
             from ..galgame_web.session_helpers import save_session
 
             save_session(self._sessions, sid)
@@ -600,21 +602,20 @@ class SessionAPI:
         emotion_tags = get_emotion_tags(self.config)
 
         async with session["_lock"]:
-            if not session.get("conv_id"):
-
-                async def _sync_conv():
-                    new_cid = await self.context.conversation_manager.get_curr_conversation_id(
-                        session["umo"]
-                    )
-                    if new_cid:
-                        async with session["_lock"]:
-                            session["conv_id"] = new_cid
-
-                import asyncio
-
-                asyncio.ensure_future(_sync_conv())
+            need_sync = not session.get("conv_id")
             pending_emotions = session.pop("_pending_emotions", None)
             pending_all = session.pop("_pending_all_emotions", None)
+
+        if need_sync:
+            try:
+                new_cid = await self.context.conversation_manager.get_curr_conversation_id(
+                    session["umo"]
+                )
+                if new_cid:
+                    async with session["_lock"]:
+                        session["conv_id"] = new_cid
+            except Exception:
+                pass
 
         if pending_emotions:
             clean_text = raw_reply
