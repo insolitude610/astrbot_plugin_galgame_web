@@ -299,10 +299,11 @@ class SessionAPI:
             parts.append({"type": "record", "path": audio_path})
         if text:
             parts.append({"type": "plain", "text": text})
+        selected_provider = self.config.get("llm_provider", "").strip() or None
         payload = {
             "message": parts,
             "message_id": msg_id,
-            "selected_provider": None,
+            "selected_provider": selected_provider,
             "selected_model": None,
             "enable_streaming": False,
         }
