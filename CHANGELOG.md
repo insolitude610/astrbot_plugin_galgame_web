@@ -1,5 +1,15 @@
 # 变更记录
 
+## v0.7.12
+
+**会话生命周期重构**
+
+- **延迟创建 AstrBot 对话** — 新建会话不再立即调用 `init_astrbot_conv` 在数据库创建 conversation 记录，改为仅设置 `umo`。用户发送第一条消息并收到 AI 回复后，才通过 pipeline 自动补全 `conv_id`。不发消息就不会在 AstrBot 数据库产生任何记录，从根源消灭空白会话累积。
+- **空白会话复用** — `_api_session_init` 新增 `_find_blank_session()`，新建会话前优先查找已有空白会话（无 history）复用，不再每次打开页面都创建新会话文件。
+- **sync_sessions_to_db 修复** — 启动时不再误删延迟初始化的空白会话（有 `umo` 但无 history 的会话被正确保留）。仅删除既无 `history` 又无 `umo` 的真正死会话。磁盘清理同步检查 `umo` 字段。
+- **llm_provider 配置生效** — `_push_through_pipeline` 现在读取插件配置中的 `llm_provider` 并传入 pipeline。用户不选时传 `None` 走全局默认，选了则覆盖。此前该配置项始终为 `None`，实际未生效。
+- `_send_extract_emotions` 中将 `conv_id` 同步从后台任务（`ensure_future`）改为同步 `await`，并移出锁块避免死锁。
+
 ## v0.7.11
 
 - **可展开输入框** — 发送按钮旁新增 ↙↗ 按钮，点击展开至 320px 方便长篇输入，再点恢复单行。展开时自动聚焦。placeholder 提示 Enter 发送 / Shift+Enter 换行
