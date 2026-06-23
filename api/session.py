@@ -76,6 +76,25 @@ class SessionAPI:
                 pass
         return best_sid
 
+    @staticmethod
+    def _find_blank_session() -> str | None:
+        from ..galgame_web.session_helpers import SESSIONS_DIR
+
+        best_sid = None
+        best_mtime = 0
+        for path in SESSIONS_DIR.glob("*.json"):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                if not data.get("history"):
+                    mtime = path.stat().st_mtime
+                    if mtime > best_mtime:
+                        best_mtime = mtime
+                        best_sid = path.stem
+            except (OSError, json.JSONDecodeError):
+                pass
+        return best_sid
+
     async def _api_session_init(self):
         from ..galgame_web.session_helpers import load_session, session_path
 
@@ -118,6 +137,17 @@ class SessionAPI:
                             "session_id": latest,
                             "current_emotion": s.get("current_emotion", "neutral"),
                         }
+
+            blank_sid = self._find_blank_session()
+            if blank_sid:
+                s = load_session(blank_sid)
+                if s:
+                    logger.info(f"[session] reusing blank session: {blank_sid}")
+                    self._sessions[blank_sid] = s
+                    return {
+                        "session_id": blank_sid,
+                        "current_emotion": s.get("current_emotion", "neutral"),
+                    }
 
             sid = uuid.uuid4().hex
             session = {

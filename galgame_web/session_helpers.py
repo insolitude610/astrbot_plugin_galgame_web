@@ -200,6 +200,19 @@ async def sync_sessions_to_db(
         elif not history:
             continue
 
+    for path in SESSIONS_DIR.glob("*.json"):
+        sid = path.stem
+        if sid in sessions:
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if not data.get("history"):
+                path.unlink()
+                logger.info(f"Cleaned up blank session file: {sid[:8]}")
+        except (OSError, json.JSONDecodeError):
+            pass
+
 
 def _collect_referenced_audio(
     sessions: dict[str, dict], favorites: list[dict]
