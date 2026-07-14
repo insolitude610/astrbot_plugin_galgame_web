@@ -1,11 +1,16 @@
 import asyncio
+import importlib
 import json
 import sys
 import types
+from pathlib import Path
 
-from galgame_security_fix.api import favorites as favorites_module
-from galgame_security_fix.api import session as session_module
-from galgame_security_fix.galgame_web import session_helpers
+PACKAGE_NAME = Path(__file__).resolve().parents[1].name
+favorites_module = importlib.import_module(f"{PACKAGE_NAME}.api.favorites")
+session_module = importlib.import_module(f"{PACKAGE_NAME}.api.session")
+session_helpers = importlib.import_module(
+    f"{PACKAGE_NAME}.galgame_web.session_helpers"
+)
 
 
 class _Request:
@@ -66,10 +71,11 @@ def test_loading_favorites_does_not_truncate_legacy_data(tmp_path, monkeypatch):
     ]
     favorites_path.write_text(json.dumps(favorites), encoding="utf-8")
 
-    main_stub = types.ModuleType("galgame_security_fix.main")
+    main_module_name = f"{PACKAGE_NAME}.main"
+    main_stub = types.ModuleType(main_module_name)
     main_stub.AUDIO_DIR = audio_dir
     main_stub.FAVORITES_PATH = favorites_path
-    monkeypatch.setitem(sys.modules, "galgame_security_fix.main", main_stub)
+    monkeypatch.setitem(sys.modules, main_module_name, main_stub)
 
     api = object.__new__(favorites_module.FavoritesAPI)
     loaded = api._load_favorites()
