@@ -19,6 +19,7 @@ _MIME_EXT = {
     "audio/ogg": ".ogg",
     "audio/flac": ".flac",
     "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
 }
 MAX_TEXT_CHARS = 20_000
 MAX_VOICE_BYTES = 15 * 1024 * 1024
@@ -100,28 +101,48 @@ class SessionAPI:
                 pass
         return best_sid
 
-    @staticmethod
-    def _find_blank_session() -> str | None:
+    def _find_blank_session(self) -> str | None:
         from ..galgame_web.session_helpers import SESSIONS_DIR, is_valid_session_id
 
         best_sid = None
         best_mtime = 0
         for path in SESSIONS_DIR.glob("*.json"):
-            if not is_valid_session_id(path.stem):
+            sid = path.stem
+            if not is_valid_session_id(sid):
                 continue
             try:
-                with open(path, encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, dict) and not data.get("history"):
+                in_memory = self._sessions.get(sid)
+                if in_memory is not None:
+                    send_lock = in_memory.get("_send_lock")
+                    if (
+                        in_memory.get("history")
+                        or (send_lock is not None and send_lock.locked())
+                        or in_memory.get("pending_rapid_clicks", 0) > 0
+                    ):
+                        continue
+                    is_blank = True
+                else:
+                    with open(path, encoding="utf-8") as f:
+                        data = json.load(f)
+                    is_blank = isinstance(data, dict) and not data.get("history")
+                if is_blank:
                     mtime = path.stat().st_mtime
                     if mtime > best_mtime:
                         best_mtime = mtime
-                        best_sid = path.stem
+                        best_sid = sid
             except (OSError, json.JSONDecodeError):
                 pass
         return best_sid
 
     async def _api_session_init(self):
+        init_lock = getattr(self, "_session_init_lock", None)
+        if init_lock is None:
+            init_lock = asyncio.Lock()
+            self._session_init_lock = init_lock
+        async with init_lock:
+            return await self._api_session_init_serialized()
+
+    async def _api_session_init_serialized(self):
         from ..galgame_web.session_helpers import (
             SESSIONS_DIR,
             is_valid_session_id,
@@ -167,10 +188,17 @@ class SessionAPI:
             if not force_new:
                 latest = self._find_latest_session()
                 if latest:
-                    s = load_session(latest)
-                    if s and s.get("history"):
+                    s = self._sessions.get(latest)
+                    if s is None:
+                        s = load_session(latest)
+                    send_lock = s.get("_send_lock") if s else None
+                    if s and (
+                        s.get("history")
+                        or (send_lock is not None and send_lock.locked())
+                    ):
                         logger.info(f"[session] auto-resume latest: {latest}")
-                        self._sessions[latest] = s
+                        if latest not in self._sessions:
+                            self._sessions[latest] = s
                         return {
                             "session_id": latest,
                             "current_emotion": s.get("current_emotion", "neutral"),
@@ -180,14 +208,17 @@ class SessionAPI:
             # avoids accumulating blank, undeletable sessions on repeated clicks.
             blank_sid = self._find_blank_session()
             if blank_sid:
-                s = load_session(blank_sid)
+                s = self._sessions.get(blank_sid)
+                if s is None:
+                    s = load_session(blank_sid)
                 if s:
                     if not s.get("umo"):
                         from ..galgame_web.session_helpers import build_umo
 
                         s["umo"] = build_umo(self._webchat_username, blank_sid)
                     logger.info(f"[session] reusing blank session: {blank_sid}")
-                    self._sessions[blank_sid] = s
+                    if blank_sid not in self._sessions:
+                        self._sessions[blank_sid] = s
                     return {
                         "session_id": blank_sid,
                         "current_emotion": s.get("current_emotion", "neutral"),
@@ -275,9 +306,10 @@ class SessionAPI:
 
     async def _api_session_delete(self):
         from ..galgame_web.session_helpers import (
-            cleanup_session_audio,
+            cleanup_unreferenced_audio,
             delete_astrbot_conv,
             is_valid_session_id,
+            load_session,
             session_path,
         )
 
@@ -291,15 +323,23 @@ class SessionAPI:
         path = session_path(sid)
         if sid not in self._sessions and not path.exists():
             return {"error": "session not found"}, 404
+        removed_history = []
         if sid in self._sessions:
             session = self._sessions[sid]
             send_lock = session.setdefault("_send_lock", asyncio.Lock())
             async with send_lock:
-                cleanup_session_audio(session["history"])
+                removed_history = list(session.get("history", []))
                 del self._sessions[sid]
+        elif path.exists():
+            stored = load_session(sid)
+            if stored:
+                removed_history = list(stored.get("history", []))
         if path.exists():
             path.unlink()
-        asyncio.ensure_future(delete_astrbot_conv(self.context, self._webchat_username, sid))
+        cleanup_unreferenced_audio(removed_history, self._sessions)
+        self._track_task(
+            delete_astrbot_conv(self.context, self._webchat_username, sid)
+        )
         return {"status": "ok"}
 
     async def _api_rapid_action(self):
@@ -314,10 +354,20 @@ class SessionAPI:
             return {"error": "invalid session_id"}, 400
         if not isinstance(count, int) or isinstance(count, bool):
             return {"error": "invalid count"}, 400
+        if not self.config.get("rapid_click_enabled", True):
+            return {"error": "rapid click disabled"}, 403
+        threshold = self.config.get("rapid_click_threshold", 5)
+        if not isinstance(threshold, int) or isinstance(threshold, bool):
+            threshold = 5
         count = max(0, min(count, 1000))
+        if count < max(1, threshold):
+            return {"error": "rapid click threshold not reached"}, 400
         if sid in self._sessions:
             async with self._sessions[sid]["_lock"]:
-                self._sessions[sid]["pending_rapid_clicks"] = count
+                self._sessions[sid]["pending_rapid_clicks"] = max(
+                    count,
+                    self._sessions[sid].get("pending_rapid_clicks", 0),
+                )
         return {"status": "ok"}
 
     # ---- pipeline ----
@@ -343,6 +393,8 @@ class SessionAPI:
             return "audio/mpeg"
         if head == b"ID3\x03" or head == b"ID3\x02" or head == b"ID3\x04":
             return "audio/mpeg"
+        if raw[0] == 0xFF and raw[1] & 0xF6 == 0xF0:
+            return "audio/aac"
         if len(raw) >= 12 and raw[4:8] == b"ftyp":
             return "audio/mp4"
         return "audio/wav"
@@ -487,9 +539,19 @@ class SessionAPI:
 
     # ---- _api_send broken into sub-steps ----
 
+    async def _run_in_thread_to_completion(self, func, *args):
+        worker = asyncio.create_task(asyncio.to_thread(func, *args))
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            await asyncio.gather(worker, return_exceptions=True)
+            raise
+
     async def _api_send(self):
         from ..galgame_web.session_helpers import is_valid_session_id
 
+        if getattr(self, "_terminating", False):
+            return {"error": "plugin is reloading"}, 503
         data = await request.get_json() or {}
         if not isinstance(data, dict) or not data:
             return {"error": "no data"}, 400
@@ -510,10 +572,30 @@ class SessionAPI:
         except ValueError as e:
             return {"error": str(e)}, 400
 
-        session = self._sessions[sid]
-        send_lock = session.setdefault("_send_lock", asyncio.Lock())
-        async with send_lock:
-            return await self._do_send(sid, text, audio_raw)
+        active_tasks = getattr(self, "_active_send_tasks", None)
+        if active_tasks is None:
+            active_tasks = set()
+            self._active_send_tasks = active_tasks
+        current_task = asyncio.current_task()
+        if current_task:
+            active_tasks.add(current_task)
+        try:
+            session = self._sessions[sid]
+            send_lock = session.setdefault("_send_lock", asyncio.Lock())
+            async with send_lock:
+                if getattr(self, "_terminating", False):
+                    return {"error": "plugin is reloading"}, 503
+                async with session["_lock"]:
+                    rapid_count = session.get("pending_rapid_clicks", 0)
+                    session["pending_rapid_clicks"] = 0
+                if not text and not audio_raw:
+                    if rapid_count <= 0:
+                        return {"error": "text or audio required"}, 400
+                    text = "(戳了戳)"
+                return await self._do_send(sid, text, audio_raw)
+        finally:
+            if current_task:
+                active_tasks.discard(current_task)
 
     async def _do_send(self, sid: str, text: str, audio_raw: bytes):
         """Core send logic, broken into sub-steps."""
@@ -567,7 +649,7 @@ class SessionAPI:
         # Step 6: Check if command - return early
         is_command = bool(matched_prefix and cmd in ("new", "del", "reset"))
         if is_command:
-            return self._send_handle_command_result(
+            return await self._send_handle_command_result(
                 cmd, session, sid, raw_reply, pipeline_result
             )
 
@@ -623,12 +705,18 @@ class SessionAPI:
                 else ""
             )
             if cmd in ("reset", "new", "del"):
+                removed_history = []
                 async with session["_lock"]:
+                    removed_history = list(session.get("history", []))
                     session["history"] = []
                     session["current_emotion"] = "neutral"
-                from ..galgame_web.session_helpers import save_session
+                from ..galgame_web.session_helpers import (
+                    cleanup_unreferenced_audio,
+                    save_session,
+                )
 
-                save_session(self._sessions, sid)
+                if save_session(self._sessions, sid):
+                    cleanup_unreferenced_audio(removed_history, self._sessions)
         return matched_prefix, cmd
 
     def _send_save_audio(self, audio_raw, text):
@@ -663,26 +751,22 @@ class SessionAPI:
             pass
         return session.pop("_last_resp_text", "")
 
-    def _send_handle_command_result(
+    async def _send_handle_command_result(
         self, cmd, session, sid, raw_reply, pipeline_result
     ):
-        async def _sync():
-            if cmd == "new":
-                new_cid = (
-                    await self.context.conversation_manager.get_curr_conversation_id(
-                        session["umo"]
-                    )
+        if cmd == "new":
+            new_cid = (
+                await self.context.conversation_manager.get_curr_conversation_id(
+                    session["umo"]
                 )
-                if new_cid:
-                    async with session["_lock"]:
-                        session["conv_id"] = new_cid
-            elif cmd == "del":
+            )
+            if new_cid:
                 async with session["_lock"]:
-                    session["conv_id"] = ""
+                    session["conv_id"] = new_cid
+        elif cmd == "del":
+            async with session["_lock"]:
+                session["conv_id"] = ""
 
-        import asyncio
-
-        asyncio.ensure_future(_sync())
         from ..galgame_web.session_helpers import save_session
 
         save_session(self._sessions, sid)
@@ -787,7 +871,9 @@ class SessionAPI:
                 audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(mime)}"
                 (AUDIO_DIR / audio_file).write_bytes(raw)
                 if self.config.get("audio_format", "wav") == "mp3":
-                    converted = await asyncio.to_thread(_convert_audio, AUDIO_DIR / audio_file)
+                    converted = await self._run_in_thread_to_completion(
+                        _convert_audio, AUDIO_DIR / audio_file
+                    )
                     if converted:
                         audio_file = converted.name
                         raw = converted.read_bytes()
@@ -820,12 +906,14 @@ class SessionAPI:
     ):
         from ..galgame_web.session_helpers import (
             PLATFORM_ID,
+            cleanup_unreferenced_audio,
             save_session,
             sync_conv_to_db,
         )
 
         final_emotion = emotions[-1][0] if emotions else "neutral"
 
+        removed_history = []
         async with session["_lock"]:
             user_content = text if text else "(语音消息)"
             session["history"].append(
@@ -842,33 +930,40 @@ class SessionAPI:
             session["current_emotion"] = final_emotion
             hist_limit = self._get_history_limit()
             if len(session["history"]) > hist_limit:
+                removed_history = session["history"][:-hist_limit]
                 session["history"] = session["history"][-hist_limit:]
 
-        save_session(self._sessions, sid)
+        if save_session(self._sessions, sid):
+            cleanup_unreferenced_audio(removed_history, self._sessions)
 
         character_name = self.config.get("character_name", "角色")
-        conv_id = session.get("conv_id", "")
         try:
 
             async def _save_history():
                 await self.context.message_history_manager.insert(
                     platform_id=PLATFORM_ID,
-                    user_id=conv_id,
-                    content={"type": "user", "message": text},
+                    user_id=sid,
+                    content={
+                        "type": "user",
+                        "message": [{"type": "plain", "text": user_content}],
+                    },
                     sender_id="user",
                     sender_name="用户",
                 )
                 await self.context.message_history_manager.insert(
                     platform_id=PLATFORM_ID,
-                    user_id=conv_id,
-                    content={"type": "bot", "message": clean_text},
+                    user_id=sid,
+                    content={
+                        "type": "bot",
+                        "message": [{"type": "plain", "text": clean_text}],
+                    },
                     sender_id="bot",
                     sender_name=character_name,
                 )
 
             import asyncio
 
-            asyncio.ensure_future(_save_history())
+            self._track_task(_save_history())
         except Exception as e:
             logger.warning(f"Failed to save user message to history: {e}")
 
@@ -879,7 +974,7 @@ class SessionAPI:
 
             import asyncio
 
-            asyncio.ensure_future(_sync())
+            self._track_task(_sync())
         except Exception as e:
             logger.warning(f"Failed to sync conversation to DB: {e}")
 

@@ -143,8 +143,9 @@ class BGMAPI:
             ".flac": "audio/flac",
             ".m4a": "audio/mp4",
             ".aac": "audio/aac",
+            ".opus": "audio/ogg",
         }
         return {
             "audio": base64.b64encode(raw).decode(),
-            "mime": mime_map.get(sp.suffix.lower(), "audio/wav"),
+            "mime": mime_map.get(sp.suffix.lower(), "application/octet-stream"),
         }

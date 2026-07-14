@@ -1,7 +1,7 @@
 name: "astrbot_plugin_galgame_web"
 author: "solitude"
 desc: "Galgame风格AI虚拟伙伴插件 —— 双图交叉渐变表情切换、打字机动画、语音输入、TTS语音朗读、会话恢复、快速点击检测"
-version: "0.7.13"
+version: "0.7.14"
 repo: "https://github.com/insolitude610/astrbot_plugin_galgame_web"
 display_name: "类Galgame网页端聊天窗口"
 short_desc: "在浏览器中呈现可交互的AI虚拟伙伴，支持情绪驱动表情切换、语音对话与TTS朗读"

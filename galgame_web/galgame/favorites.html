@@ -152,6 +152,16 @@ body {
 
 .loading { text-align: center; padding: 60px 20px; color: rgba(200, 160, 120, 0.35); font-size: 14px; }
 .empty { text-align: center; padding: 80px 20px; color: rgba(200, 160, 120, 0.28); font-size: 14px; }
+@media (max-width: 640px) {
+  html, body { min-height: 100%; height: auto; overflow: auto; }
+  #fav-container { margin: 12px; height: calc(100vh - 24px); }
+  #fav-header { padding: 12px 14px; }
+  #fav-sub { display: block; margin: 3px 0 0; }
+  #fav-list { padding: 12px; }
+  .fav-card { align-items: flex-start; flex-wrap: wrap; padding: 12px; }
+  .fav-text { flex-basis: calc(100% - 90px); }
+  .fav-date { order: 3; flex: 1; }
+}
 </style>
 </head>
 <body>

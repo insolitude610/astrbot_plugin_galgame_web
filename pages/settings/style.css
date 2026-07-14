@@ -158,6 +158,24 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .status.success { color: #4ade80; }
 .status.error { color: #ef4444; }
 .loading { text-align: center; padding: 20px; color: #888; }
+.drag-zone {
+  border: 1px dashed #555;
+  padding: 18px;
+  margin-bottom: 12px;
+  text-align: center;
+  color: #999;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.drag-zone:hover,
+.drag-zone.drag-active {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, .08);
+  color: #c4b5fd;
+}
+.batch-bar { align-items: center; gap: 12px; margin-bottom: 8px; }
+.select-all-label { color: #aaa; cursor: pointer; font-size: 12px; user-select: none; }
+.select-all-label input { margin-right: 4px; accent-color: #8b5cf6; }
 
 /* grid for all files */
 .grid {
@@ -205,4 +223,12 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .bgm-upload-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .bgm-upload-row input[type="file"] { display: none; }
 .bgm-upload-row .btn { padding: 8px 16px; }
+
+@media (max-width: 640px) {
+  body { padding: 14px; }
+  .section { padding: 12px; }
+  .slot-grid, .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audio-item { flex-wrap: wrap; }
+  .audio-item .name { flex-basis: 100%; }
+}
 

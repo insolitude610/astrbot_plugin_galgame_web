@@ -65,11 +65,16 @@
 <div class="section active" id="section-files">
   <h2>所有已上传文件</h2>
   <p class="hint">浏览、预览和删除</p>
-  <div class="drag-zone" id="drag-zone">
+  <div class="drag-zone" id="drag-zone" role="button" tabindex="0">
     拖拽图片到此处上传
   </div>
+  <input type="file" id="bulk-file-input" accept="image/*" multiple hidden>
   <div class="batch-bar" id="batch-bar" style="display:none">
-    <button class="btn danger" id="batch-delete-btn" onclick="batchDeleteSelected()">删除选中</button>
+    <label class="select-all-label">
+      <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+      全选
+    </label>
+    <button class="btn btn-danger" id="batch-delete-btn" onclick="batchDeleteSelected()" disabled>删除已选 (0)</button>
   </div>
   <div class="file-grid" id="grid-container"></div>
   <div class="loading" id="loading">加载中...</div>

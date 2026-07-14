@@ -12,6 +12,7 @@ ALLOWED_AUDIO_MIMES = {
     "audio/ogg",
     "audio/flac",
     "audio/mp4",
+    "audio/aac",
 }
 
 
@@ -86,10 +87,14 @@ class FavoritesAPI:
             return {"error": "id required"}, 400
         favs = self._load_favorites()
         orig_len = len(favs)
+        removed_favorites = [f for f in favs if f.get("id") == fid]
         favs = [f for f in favs if f.get("id") != fid]
         if len(favs) == orig_len:
             return {"error": "not found"}, 404
         self._save_favorites(favs)
+        from ..galgame_web.session_helpers import cleanup_unreferenced_audio
+
+        cleanup_unreferenced_audio(removed_favorites, self._sessions)
         return {"status": "ok"}
 
     def _load_favorites(self) -> list[dict]:
@@ -116,9 +121,7 @@ class FavoritesAPI:
         return cleaned
 
     def _save_favorites(self, favs: list[dict]):
+        from ..galgame_web.session_helpers import atomic_write_json
         from ..main import FAVORITES_PATH
 
-        FAVORITES_PATH.parent.mkdir(parents=True, exist_ok=True)
-        FAVORITES_PATH.write_text(
-            json.dumps(favs, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        atomic_write_json(FAVORITES_PATH, favs)

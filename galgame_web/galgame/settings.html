@@ -190,6 +190,21 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   cursor: pointer; z-index: 1;
 }
 .card-check:not(:checked) { opacity: 0.35; }
+.drag-zone {
+  border: 1px dashed #555; padding: 18px; margin: 12px 0;
+  text-align: center; color: #999; cursor: pointer;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.drag-zone:hover, .drag-zone.drag-active {
+  border-color: #8b5cf6; background: rgba(139,92,246,.08); color: #c4b5fd;
+}
+@media (max-width: 640px) {
+  body { padding: 14px; }
+  .section { padding: 12px; }
+  .slot-grid, .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audio-item { flex-wrap: wrap; }
+  .audio-item .name { flex-basis: 100%; }
+}
 /* ---- volume sliders ---- */
 .vol-group { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .vol-label { width: 90px; font-size: 13px; color: #aaa; flex-shrink: 0; }
@@ -287,6 +302,8 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 
 <!-- All files grid -->
 <h3 style="margin-top: 28px;">所有已上传文件</h3>
+<div class="drag-zone" id="drag-zone" role="button" tabindex="0">拖拽图片到此处上传</div>
+<input type="file" id="bulk-file-input" accept="image/*" multiple hidden>
 <div id="batch-bar" style="display:none; margin-bottom:8px; align-items:center; gap:12px;">
   <label style="font-size:12px;color:#aaa;cursor:pointer;user-select:none;">
     <input type="checkbox" id="select-all" onchange="toggleSelectAll()" style="margin-right:4px;accent-color:#8b5cf6;">
@@ -452,6 +469,84 @@ function renderBgmList() {
     container.appendChild(row);
   }
 }
+
+function readFileAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadAssetFiles(fileList) {
+  var files = Array.prototype.slice.call(fileList || []);
+  if (!files.length) return;
+  if (files.length > 32) {
+    setStatus("一次最多上传 32 张图片", "error");
+    return;
+  }
+  var totalBytes = 0;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    var imageName = /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
+    if ((!file.type.startsWith("image/") && !imageName) || file.size > 10 * 1024 * 1024) {
+      setStatus("文件格式不支持或单张超过 10MB: " + file.name, "error");
+      return;
+    }
+    totalBytes += file.size;
+  }
+  if (totalBytes > 30 * 1024 * 1024) {
+    setStatus("一次上传的图片总大小不能超过 30MB", "error");
+    return;
+  }
+  setStatus("正在上传 " + files.length + " 个文件...");
+  try {
+    var payload = await Promise.all(files.map(async function(file) {
+      return { name: file.name, data: await readFileAsDataUrl(file) };
+    }));
+    var result = await apiPost("assets/upload", { files: payload });
+    if (!result.uploaded || !result.uploaded.length) {
+      throw new Error(result.error || "没有文件被上传");
+    }
+    setStatus("已上传 " + result.uploaded.length + " 个文件", "success");
+    await loadFiles();
+  } catch(e) {
+    setStatus("上传失败: " + e.message, "error");
+  }
+}
+
+function setupDragUpload() {
+  var zone = document.getElementById("drag-zone");
+  var input = document.getElementById("bulk-file-input");
+  if (!zone || !input || zone.dataset.ready === "1") return;
+  zone.dataset.ready = "1";
+  zone.addEventListener("click", function() { input.click(); });
+  zone.addEventListener("keydown", function(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
+  input.addEventListener("change", function() {
+    uploadAssetFiles(input.files).finally(function() { input.value = ""; });
+  });
+  ["dragenter", "dragover"].forEach(function(name) {
+    zone.addEventListener(name, function(event) {
+      event.preventDefault();
+      zone.classList.add("drag-active");
+    });
+  });
+  ["dragleave", "drop"].forEach(function(name) {
+    zone.addEventListener(name, function(event) {
+      event.preventDefault();
+      zone.classList.remove("drag-active");
+    });
+  });
+  zone.addEventListener("drop", function(event) {
+    uploadAssetFiles(event.dataTransfer.files);
+  });
+}
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + "B";
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + "KB";
@@ -582,6 +677,7 @@ async function init() {
   }
 
   document.getElementById("refresh-btn").onclick = loadFiles;
+  setupDragUpload();
   applyBackground();
   await loadFiles();
   await loadBgmList();

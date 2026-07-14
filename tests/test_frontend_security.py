@@ -17,6 +17,13 @@ def test_galgame_frontends_validate_messages_and_render_preview_as_text():
         assert "location.reload()" in source
         assert "el.userInput.value = text" in source
         assert "bgmStartPending" in source
+        assert "if (_inputSetup) return" in source
+        assert "if (_rapidSetup || !rapidClickEnabled) return" in source
+        assert "_rapidActionPending" in source
+        assert "_newSessionPending" in source
+        assert "switchSeq !== _sessionSwitchSeq" in source
+        assert "sessionId !== expectedSession" in source
+        assert "resetConversationUi()" in source
 
     for relative in ("pages/galgame/index.html", "galgame_web/galgame/index.html"):
         source = (ROOT / relative).read_text(encoding="utf-8")
@@ -34,6 +41,24 @@ def test_settings_frontends_do_not_build_bgm_actions_with_html_strings():
 
     config_source = (ROOT / "api/config.py").read_text(encoding="utf-8")
     assert '"bgm_playing": prefs.get("bgm_playing", True)' in config_source
+
+
+def test_settings_pages_support_batch_selection_and_drag_upload():
+    dashboard_html = (ROOT / "pages/settings/index.html").read_text(encoding="utf-8")
+    dashboard_js = (ROOT / "pages/settings/app.js").read_text(encoding="utf-8")
+    standalone = (ROOT / "galgame_web/galgame/settings.html").read_text(
+        encoding="utf-8"
+    )
+
+    for source in (dashboard_html, standalone):
+        assert 'id="select-all"' in source
+        assert 'id="drag-zone"' in source
+        assert 'id="bulk-file-input"' in source
+    for source in (dashboard_js, standalone):
+        assert "function setupDragUpload()" in source
+        assert 'apiPost("assets/upload"' in source
+    assert "async function fetchAssetChunk(chunk)" in dashboard_js
+    assert "fetchAssetChunk(chunk.slice(0, middle))" in dashboard_js
 
 
 def test_external_webui_proxy_allowlist_covers_frontend_calls():

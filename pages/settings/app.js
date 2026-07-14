@@ -7,6 +7,10 @@ var allFiles = [];
 var config = {};
 var selectedFiles = {};
 var _assetCache = {};
+var _assetWaiters = {};
+var _assetQueue = {};
+var _assetQueueTimer = null;
+var _assetObserver = null;
 
 function updateBatchBar() {
   var bar = document.getElementById("batch-bar");
@@ -47,6 +51,7 @@ async function batchDeleteSelected() {
   try {
     var data = await apiPost("assets/batch-delete", { filenames: names });
     if (data.deleted && data.deleted.length > 0) {
+      data.deleted.forEach(function(name) { delete _assetCache[name]; });
       setStatus("已删除 " + data.deleted.length + " 个文件", "success");
       selectedFiles = {};
       await loadFiles();
@@ -165,6 +170,155 @@ function renderBgmList() {
     row.appendChild(deleteBtn);
     container.appendChild(row);
   }
+}
+
+async function fetchAssetChunk(chunk) {
+  try {
+    var response = await apiPost("assets/batch", { names: chunk });
+    (response.files || []).forEach(function(file) {
+      _assetCache[file.name] = file.data;
+      var waiters = _assetWaiters[file.name] || [];
+      waiters.forEach(function(img) { img.src = file.data; });
+      delete _assetWaiters[file.name];
+    });
+  } catch (error) {
+    if (chunk.length <= 1) throw error;
+    var middle = Math.ceil(chunk.length / 2);
+    await fetchAssetChunk(chunk.slice(0, middle));
+    await fetchAssetChunk(chunk.slice(middle));
+  }
+}
+
+async function fetchAssetNames(names) {
+  var unique = [];
+  names.forEach(function(name) {
+    if (name && !_assetCache[name] && unique.indexOf(name) < 0) unique.push(name);
+  });
+  for (var offset = 0; offset < unique.length; offset += 24) {
+    await fetchAssetChunk(unique.slice(offset, offset + 24));
+  }
+}
+
+function flushAssetQueue() {
+  _assetQueueTimer = null;
+  var names = Object.keys(_assetQueue).slice(0, 24);
+  names.forEach(function(name) { delete _assetQueue[name]; });
+  if (!names.length) return;
+  fetchAssetNames(names).catch(function(error) {
+    console.warn("asset preview load failed:", error);
+  }).finally(function() {
+    if (Object.keys(_assetQueue).length) {
+      _assetQueueTimer = setTimeout(flushAssetQueue, 0);
+    }
+  });
+}
+
+function queueAssetPreview(name) {
+  if (!name || _assetCache[name]) return;
+  _assetQueue[name] = true;
+  if (!_assetQueueTimer) _assetQueueTimer = setTimeout(flushAssetQueue, 0);
+}
+
+function attachAssetPreview(img, name) {
+  if (_assetCache[name]) {
+    img.src = _assetCache[name];
+    return;
+  }
+  (_assetWaiters[name] || (_assetWaiters[name] = [])).push(img);
+  if (!("IntersectionObserver" in window)) {
+    queueAssetPreview(name);
+    return;
+  }
+  if (!_assetObserver) {
+    _assetObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        _assetObserver.unobserve(entry.target);
+        queueAssetPreview(entry.target.dataset.assetName);
+      });
+    }, { rootMargin: "200px" });
+  }
+  img.dataset.assetName = name;
+  _assetObserver.observe(img);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadAssetFiles(fileList) {
+  var files = Array.prototype.slice.call(fileList || []);
+  if (!files.length) return;
+  if (files.length > 32) {
+    setStatus("一次最多上传 32 张图片", "error");
+    return;
+  }
+  var totalBytes = 0;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    var imageName = /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
+    if ((!file.type.startsWith("image/") && !imageName) || file.size > 10 * 1024 * 1024) {
+      setStatus("文件格式不支持或单张超过 10MB: " + file.name, "error");
+      return;
+    }
+    totalBytes += file.size;
+  }
+  if (totalBytes > 30 * 1024 * 1024) {
+    setStatus("一次上传的图片总大小不能超过 30MB", "error");
+    return;
+  }
+  setStatus("正在上传 " + files.length + " 个文件...");
+  try {
+    var payload = await Promise.all(files.map(async function(file) {
+      return { name: file.name, data: await readFileAsDataUrl(file) };
+    }));
+    var result = await apiPost("assets/upload", { files: payload });
+    if (!result.uploaded || !result.uploaded.length) {
+      throw new Error(result.error || "没有文件被上传");
+    }
+    setStatus("已上传 " + result.uploaded.length + " 个文件", "success");
+    await loadFiles();
+    await preloadAssets();
+  } catch(e) {
+    setStatus("上传失败: " + e.message, "error");
+  }
+}
+
+function setupDragUpload() {
+  var zone = document.getElementById("drag-zone");
+  var input = document.getElementById("bulk-file-input");
+  if (!zone || !input || zone.dataset.ready === "1") return;
+  zone.dataset.ready = "1";
+  zone.addEventListener("click", function() { input.click(); });
+  zone.addEventListener("keydown", function(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
+  input.addEventListener("change", function() {
+    uploadAssetFiles(input.files).finally(function() { input.value = ""; });
+  });
+  ["dragenter", "dragover"].forEach(function(name) {
+    zone.addEventListener(name, function(event) {
+      event.preventDefault();
+      zone.classList.add("drag-active");
+    });
+  });
+  ["dragleave", "drop"].forEach(function(name) {
+    zone.addEventListener(name, function(event) {
+      event.preventDefault();
+      zone.classList.remove("drag-active");
+    });
+  });
+  zone.addEventListener("drop", function(event) {
+    uploadAssetFiles(event.dataTransfer.files);
+  });
 }
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + "B";
@@ -312,6 +466,7 @@ async function init() {
   }
 
   try { bgmChannel = new BroadcastChannel("galgame-comms"); } catch(e) {}
+  setupDragUpload();
 
   var rb = document.getElementById("refresh-btn");
   if (rb) rb.onclick = loadFiles;
@@ -330,20 +485,14 @@ function applyBackground() {
 }
 
 function preloadAssets() {
-  return apiGet("assets/list").then(function(listData) {
-    var allFiles = listData.files || [];
-    var names = [];
-    allFiles.forEach(function(f) { names.push(f.name); });
-    var exps = config.expressions || {};
-    for (var k in exps) { if (exps[k] && names.indexOf(exps[k]) < 0) names.push(exps[k]); }
-    if (config.background && names.indexOf(config.background) < 0) names.push(config.background);
-    if (config.history_avatar && names.indexOf(config.history_avatar) < 0) names.push(config.history_avatar);
-    if (!names.length) { applyBackground(); renderAll(); return; }
-    return apiPost("assets/batch", { names: names }).then(function(resp) {
-      (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
-      applyBackground();
-      renderAll();
-    });
+  var names = [];
+  var exps = config.expressions || {};
+  for (var k in exps) { if (exps[k]) names.push(exps[k]); }
+  if (config.background) names.push(config.background);
+  if (config.history_avatar) names.push(config.history_avatar);
+  return fetchAssetNames(names).then(function() {
+    applyBackground();
+    renderAll();
   }).catch(function(e) {
     console.warn("preloadAssets failed:", e);
     renderAll();
@@ -397,6 +546,9 @@ function getMatchedFile(key, prefix) {
 /* ---- render ---- */
 
 function renderAll() {
+  if (_assetObserver) _assetObserver.disconnect();
+  _assetObserver = null;
+  _assetWaiters = {};
   renderModeIndicator();
   renderSingleSlots();
   renderVRMSlot();
@@ -460,19 +612,11 @@ function slotCard(key, matchedFile, label, idPrefix) {
   card.id = "slot-" + idPrefix + "-" + key;
 
   if (matchedFile) {
-    var cached = _assetCache[matchedFile.name];
-    if (cached) {
-      var img = document.createElement("img");
-      img.className = "slot-img";
-      img.alt = key;
-      img.src = cached;
-      card.appendChild(img);
-    } else {
-      var ph = document.createElement("div");
-      ph.className = "slot-img placeholder";
-      ph.textContent = "🖼";
-      card.appendChild(ph);
-    }
+    var img = document.createElement("img");
+    img.className = "slot-img";
+    img.alt = key;
+    attachAssetPreview(img, matchedFile.name);
+    card.appendChild(img);
   } else {
     var ph = document.createElement("div");
     ph.className = "slot-img placeholder";
@@ -550,7 +694,7 @@ function renderFileGrid() {
     img.className = "card-img";
     img.alt = f.name;
     img.loading = "lazy";
-    img.src = _assetCache[f.name] || f.url || "";
+    attachAssetPreview(img, f.name);
     card.appendChild(img);
 
     var body = document.createElement("div");
@@ -612,6 +756,7 @@ async function assignToSlot(key, sourceName) {
     if (data.copied) {
       setStatus("✅ " + data.source + " → " + data.copied, "success");
       await loadFiles();
+      await preloadAssets();
     } else {
       setStatus("❌ " + (data.error || "失败"), "error");
     }
@@ -647,6 +792,7 @@ async function deleteFile(filename) {
   try {
     var data = await apiPost("assets/delete", { filename: filename });
     if (data.deleted) {
+      delete _assetCache[filename];
       setStatus("已删除: " + data.deleted, "success");
       await loadFiles();
     } else {

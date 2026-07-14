@@ -884,4 +884,29 @@ html, body {
   z-index: 1;
 }
 
+@media (max-width: 640px) {
+  #sprite-single,
+  #sprite-container {
+    width: min(72vw, 420px);
+    height: min(52vh, 560px);
+  }
+  #dialog-box {
+    margin: 0 10px;
+    min-height: 24vh;
+    max-height: 34vh;
+    padding: 22px 16px 14px;
+  }
+  #input-row {
+    gap: 6px;
+    margin: 0 10px;
+    padding: 9px 10px;
+  }
+  #user-input { min-width: 0; font-size: 15px; }
+  .text-expanded #user-input { min-height: 40vh; }
+  #history-content,
+  #session-content { inset: 54px 10px 10px; }
+  #history-list,
+  #session-list { padding: 10px; }
+}
+
 

@@ -19,6 +19,12 @@ var bgmStarted = false;
 var bgmStartPending = false;
 var _favAudioPlaying = false;
 var _lastBgmFile = "";
+var _inputSetup = false;
+var _rapidSetup = false;
+var _dialogSetup = false;
+var _rapidActionPending = false;
+var _newSessionPending = false;
+var _sessionSwitchSeq = 0;
 
 function IS_DASHBOARD() { return !!window.AstrBotPluginPage; }
 var _memStore = {};
@@ -254,7 +260,9 @@ function assetUrl(filename) {
 
 function restoreLastMessage() {
   if (!sessionId) return;
-  apiGet("history", { session_id: sessionId }).then(function(data) {
+  var expectedSession = sessionId;
+  apiGet("history", { session_id: expectedSession }).then(function(data) {
+    if (sessionId !== expectedSession) return;
     var msgs = data.messages || [];
     for (var i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "assistant") {
@@ -286,21 +294,49 @@ function toggleSessionPanel() {
 }
 
 function switchToSession(sid) {
+  var switchSeq = ++_sessionSwitchSeq;
   toggleSessionPanel();
   initSession(sid).then(function(resp) {
-    if (!resp) return;
+    if (!resp || switchSeq !== _sessionSwitchSeq) return;
+    resetConversationUi();
     sessionId = resp.session_id;
     setLocal("galgame_session_id", sessionId);
-    if (resp.current_emotion) { currentEmotion = resp.current_emotion; }
+    currentEmotion = "";
+    switchExpression(resp.current_emotion || "neutral");
     finishInit(true);
   });
 }
 
+function resetConversationUi() {
+  if (typewriterTimer) clearTimeout(typewriterTimer);
+  typewriterTimer = null;
+  typewriterFullText = "";
+  clearExpressionTimers();
+  _stopVoice();
+  isAudioPlaying = false;
+  _favAudioPlaying = false;
+  lastReplyData = null;
+  el.dialogText.textContent = "";
+  document.getElementById("replay-btn").classList.remove("active");
+  document.getElementById("favorite-btn").classList.remove("active");
+  updateFavoriteBtn("");
+}
+
 async function startNewSession() {
-  var resp = await initSession("", true);
-  if (!resp) return;
-  setLocal("galgame_session_id", resp.session_id);
-  location.reload();
+  if (_newSessionPending) return;
+  _newSessionPending = true;
+  ++_sessionSwitchSeq;
+  var button = document.getElementById("session-new");
+  if (button) button.disabled = true;
+  try {
+    var resp = await initSession("", true);
+    if (!resp) return;
+    setLocal("galgame_session_id", resp.session_id);
+    location.reload();
+  } finally {
+    _newSessionPending = false;
+    if (button) button.disabled = false;
+  }
 }
 
 async function loadSessionPanel() {
@@ -407,7 +443,10 @@ function finishInit(isResuming) {
   setupInput();
   setupRapidDetection();
   applySprites();
-  document.getElementById("dialog-box").addEventListener("click", skipTypewriter);
+  if (!_dialogSetup) {
+    document.getElementById("dialog-box").addEventListener("click", skipTypewriter);
+    _dialogSetup = true;
+  }
   if (spriteMode === "vrm") {
     import("./vrm.js").then(function(m) { vrmModule = m; startVRMRender(); });
   }
@@ -896,6 +935,8 @@ function toggleExpand(e) {
 }
 
 function setupInput() {
+  if (_inputSetup) return;
+  _inputSetup = true;
   el.sendBtn.addEventListener("click", function () { sendMessage(); });
   el.micBtn.addEventListener("click", toggleRecording);
   el.expandBtn = document.getElementById("expand-btn");
@@ -1100,7 +1141,8 @@ function toggleFavorites() {
 /* ---- rapid click / keyboard detection ---- */
 
 function setupRapidDetection() {
-  if (!rapidClickEnabled) return;
+  if (_rapidSetup || !rapidClickEnabled) return;
+  _rapidSetup = true;
 
   var clickTimestamps = [];
   var keyTimestamps = [];
@@ -1132,42 +1174,47 @@ function setupRapidDetection() {
 }
 
 async function notifyRapidAction(count) {
-  if (!sessionId) return;
+  if (!sessionId || _rapidActionPending || typewriterTimer || el.userInput.disabled) return;
+  _rapidActionPending = true;
   try {
+    disableInput();
     await apiPost("rapid_action", {
       session_id: sessionId,
       count: count,
     });
-    if (!typewriterTimer) {
-      disableInput();
-      var resp = await apiPost("send", { session_id: sessionId, text: "" });
-      if (resp.reply) {
-        var emotionMap = {};
-        var emotionList = resp.emotions || [];
-        emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
-        lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
+    var resp = await apiPost("send", { session_id: sessionId, text: "" });
+    if (resp.reply) {
+      var emotionMap = {};
+      var emotionList = resp.emotions || [];
+      emotionList.forEach(function(e) { emotionMap[e[1]] = e[0]; });
+      lastReplyData = { text: resp.reply, emotionMap: emotionMap, audio: resp.audio || "", audioMime: resp.audio_mime || "audio/wav", audio_file: resp.audio_file || "" };
       document.getElementById("replay-btn").classList.add("active");
       updateFavoriteBtn(resp.audio_file || "");
-        if (resp.audio && emotionList.length) {
-          typewriterAppend(resp.reply, {});
-          finishResponse();
-          var audio = playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
-          if (audio) {
-            audio.onloadedmetadata = function() {
-              scheduleExpressionTimers(emotionList, resp.reply.length, audio.duration);
-            };
-            audio.onended = function() { clearExpressionTimers(); };
-            audio.onerror = function() { clearExpressionTimers(); };
-          }
-        } else {
-          typewriterAppend(resp.reply, emotionMap);
-          finishResponse();
-          if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+      if (resp.audio && emotionList.length) {
+        typewriterAppend(resp.reply, {});
+        finishResponse();
+        var audio = playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
+        if (audio) {
+          audio.onloadedmetadata = function() {
+            scheduleExpressionTimers(emotionList, resp.reply.length, audio.duration);
+          };
+          audio.onended = function() { clearExpressionTimers(); };
+          audio.onerror = function() { clearExpressionTimers(); };
         }
+      } else {
+        typewriterAppend(resp.reply, emotionMap);
+        finishResponse();
+        if (resp.audio) playTTSAudio(resp.audio, resp.audio_mime || "audio/wav");
       }
+    } else {
+      finishResponse();
     }
   } catch (err) {
     console.warn("Rapid action failed:", err);
+    enableInput();
+  } finally {
+    _rapidActionPending = false;
+    if (el.userInput.disabled) enableInput();
   }
 }
 
