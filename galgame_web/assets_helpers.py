@@ -1,9 +1,12 @@
 import pathlib
+import re
 
 from astrbot.api import logger
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+VALID_ASSET_PREFIXES = {"single", "expr", "bg", "avatar", "vrm"}
+ASSET_KEY_PART_PATTERN = re.compile(r"^[\w-]{1,64}$", re.UNICODE)
 
 from .utils import EXPRESSION_KEYS  # noqa: E402
 
@@ -103,22 +106,47 @@ def resolve_assets(config: dict, files: list[str]) -> dict:
 
 
 def safe_path(name: str, base_dir: pathlib.Path) -> pathlib.Path | None:
-    stem = pathlib.Path(name).name
-    if not stem or stem != name.split("/")[-1].split("\\")[-1]:
+    if (
+        not isinstance(name, str)
+        or not name
+        or "\x00" in name
+        or "/" in name
+        or "\\" in name
+    ):
         return None
-    resolved = (base_dir / stem).resolve()
-    if not str(resolved).startswith(str(base_dir.resolve())):
+    candidate = pathlib.Path(name)
+    if candidate.is_absolute() or candidate.name != name:
+        return None
+    base = base_dir.resolve()
+    resolved = (base / candidate).resolve()
+    try:
+        resolved.relative_to(base)
+    except ValueError:
         return None
     return resolved
+
+
+def parse_asset_key(key: str) -> tuple[str, str] | None:
+    if not isinstance(key, str) or "_" not in key:
+        return None
+    prefix, base = key.split("_", 1)
+    if prefix not in VALID_ASSET_PREFIXES:
+        return None
+    if not ASSET_KEY_PART_PATTERN.fullmatch(base):
+        return None
+    return prefix, base
 
 
 def register_asset(
     plugin_config: dict, key: str, filename: str, assets_dir: pathlib.Path
 ):
-    if "_" not in key:
-        return
-    parts = key.split("_", 1)
-    prefix, base = parts[0], parts[1]
+    parsed = parse_asset_key(key)
+    if not parsed:
+        raise ValueError("invalid asset key")
+    prefix, base = parsed
+    current_path = safe_path(filename, assets_dir)
+    if not current_path or current_path.suffix.lower() not in IMAGE_EXTS:
+        raise ValueError("invalid asset filename")
     sprite_mode = plugin_config.get("sprite_mode", "single")
     try:
         if prefix == "single" and sprite_mode == "single" and base in EXPRESSION_KEYS:
@@ -140,8 +168,13 @@ def register_asset(
     except Exception:
         logger.exception(f"_register_asset failed for key={key}")
     for ext in IMAGE_EXTS:
-        old_path = assets_dir / f"{base}{ext}"
-        if old_path.exists() and old_path.is_file() and old_path.name != filename:
+        old_path = safe_path(f"{base}{ext}", assets_dir)
+        if (
+            old_path
+            and old_path.exists()
+            and old_path.is_file()
+            and old_path.name != current_path.name
+        ):
             try:
                 old_path.unlink()
                 logger.info(f"Removed old non-prefixed file: {old_path.name}")

@@ -113,7 +113,12 @@ function loadFavorites() {
     }
     loading.style.display = "none";
   }).catch(function(e) {
-    list.innerHTML = '<div class="loading" style="color:rgba(220,150,140,.7);">加载失败: ' + e.message + '</div>';
+    list.textContent = "";
+    var errorEl = document.createElement("div");
+    errorEl.className = "loading";
+    errorEl.style.color = "rgba(220,150,140,.7)";
+    errorEl.textContent = "加载失败: " + e.message;
+    list.appendChild(errorEl);
     loading.style.display = "none";
   });
 }

@@ -102,43 +102,69 @@ async function loadBgmList() {
   try {
     var prefs = await apiGet("prefs");
     currentBgmFile = prefs.bgm_file || "";
+    _mainBgmPlaying = !!currentBgmFile && prefs.bgm_playing !== false;
   } catch(e) {
     currentBgmFile = "";
+    _mainBgmPlaying = false;
   }
   renderBgmList();
 }
 
 function renderBgmList() {
   var container = document.getElementById("bgm-list");
+  container.textContent = "";
   if (!bgmFiles.length) {
-    container.innerHTML = "<div style='color:#777;font-size:13px;padding:8px 0;'>暂无音乐文件</div>";
+    var empty = document.createElement("div");
+    empty.style.cssText = "color:#777;font-size:13px;padding:8px 0;";
+    empty.textContent = "暂无音乐文件";
+    container.appendChild(empty);
     return;
   }
-  var html = "";
   for (var i = 0; i < bgmFiles.length; i++) {
     var f = bgmFiles[i];
     var isSelected = f.name === currentBgmFile;
-    var cls = isSelected ? "audio-item selected" : "audio-item";
     var sizeStr = f.size ? formatSize(f.size) : "";
-    html += "<div class='" + cls + "' id='bgm-" + i + "'>";
-    html += "<span class='name'>" + escHtml(f.name) + "</span>";
-    if (sizeStr) html += "<span class='size'>" + sizeStr + "</span>";
-    if (isSelected) {
-      html += "<span class='current-tag'>当前</span>";
-      html += "<button class='btn-play' onclick='toggleMainBgm()' id='bgm-play-pause-btn'>" + (_mainBgmPlaying ? "\u23F8" : "\u25B6") + "</button>";
+    var row = document.createElement("div");
+    row.className = isSelected ? "audio-item selected" : "audio-item";
+    row.id = "bgm-" + i;
+    var nameEl = document.createElement("span");
+    nameEl.className = "name";
+    nameEl.textContent = f.name;
+    row.appendChild(nameEl);
+    if (sizeStr) {
+      var sizeEl = document.createElement("span");
+      sizeEl.className = "size";
+      sizeEl.textContent = sizeStr;
+      row.appendChild(sizeEl);
     }
-    html += "<button class='btn-sel' onclick='selectBgm(\"" + escJs(f.name) + "\")'>选择</button>";
-    html += "<button class='btn-del-audio' onclick='deleteBgm(\"" + escJs(f.name) + "\")'>删除</button>";
-    html += "</div>";
+    if (isSelected) {
+      var currentTag = document.createElement("span");
+      currentTag.className = "current-tag";
+      currentTag.textContent = "当前";
+      row.appendChild(currentTag);
+      var playBtn = document.createElement("button");
+      playBtn.className = "btn-play";
+      playBtn.id = "bgm-play-pause-btn";
+      playBtn.textContent = _mainBgmPlaying ? "\u23F8" : "\u25B6";
+      playBtn.addEventListener("click", toggleMainBgm);
+      row.appendChild(playBtn);
+    }
+    var selectBtn = document.createElement("button");
+    selectBtn.className = "btn-sel";
+    selectBtn.textContent = "选择";
+    selectBtn.addEventListener("click", (function(name) {
+      return function() { selectBgm(name); };
+    })(f.name));
+    row.appendChild(selectBtn);
+    var deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn-del-audio";
+    deleteBtn.textContent = "删除";
+    deleteBtn.addEventListener("click", (function(name) {
+      return function() { deleteBgm(name); };
+    })(f.name));
+    row.appendChild(deleteBtn);
+    container.appendChild(row);
   }
-  container.innerHTML = html;
-}
-
-function escHtml(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function escJs(s) {
-  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "\\\"");
 }
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + "B";
@@ -214,26 +240,7 @@ async function uploadBgm(input) {
 }
 
 function _proxyApiPost(endpoint, body) {
-  if (window.AstrBotPluginPage && window.AstrBotPluginPage.apiPost) {
-    return apiPost(endpoint, body);
-  }
-  return new Promise(function(resolve, reject) {
-    if (bgmChannel) {
-      var msgId = "proxy-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-      var handler = function(e) {
-        if (e.data && e.data.kind === "api-response" && e.data.msgId === msgId) {
-          bgmChannel.removeEventListener("message", handler);
-          if (e.data.error) reject(new Error(e.data.error));
-          else resolve(e.data.result);
-        }
-      };
-      bgmChannel.addEventListener("message", handler);
-      bgmChannel.postMessage({ kind: "api-proxy", msgId: msgId, endpoint: endpoint, body: body });
-      setTimeout(function() { bgmChannel.removeEventListener("message", handler); reject(new Error("timeout")); }, 30000);
-    } else {
-      apiPost(endpoint, body).then(resolve, reject);
-    }
-  });
+  return apiPost(endpoint, body);
 }
 
 async function deleteBgm(name) {
@@ -310,7 +317,6 @@ async function init() {
   if (rb) rb.onclick = loadFiles;
   await loadFiles();
   await loadBgmList();
-  if (currentBgmFile) _mainBgmPlaying = true;
   loadVolumePrefs();
   await preloadAssets();
 }
@@ -402,8 +408,17 @@ function renderAll() {
 function renderModeIndicator() {
   var mode = config.sprite_mode || "single";
   var labels = { single: "Single 单图", vrm: "VRM 3D" };
+  if (!labels[mode]) mode = "single";
   var el = document.getElementById("mode-indicator");
-  el.innerHTML = '当前渲染模式：<span class="mode-badge ' + mode + '">' + (labels[mode] || "Single 单图") + '</span> &nbsp;<span style="font-size:11px;color:#666;">（在插件配置页切换 sprite_mode）</span>';
+  el.textContent = "当前渲染模式：";
+  var badge = document.createElement("span");
+  badge.className = "mode-badge " + mode;
+  badge.textContent = labels[mode];
+  el.appendChild(badge);
+  var hint = document.createElement("span");
+  hint.style.cssText = "font-size:11px;color:#666;";
+  hint.textContent = " （在插件配置页切换 sprite_mode）";
+  el.appendChild(hint);
 }
 
 function renderSingleSlots() {

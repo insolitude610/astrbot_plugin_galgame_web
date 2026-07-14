@@ -53,9 +53,9 @@ http://localhost:6186
 
 2. **Dashboard 内嵌页**：插件市场 → 点击插件卡片 → 顶部 tab 切换「galgame」/「settings」/「voice-favorites」
 
-> ⚠️ **说明**：**强烈推荐使用独立 WebUI。** Dashboard 内嵌页运行在受限 sandbox 中，存在会话删除白屏、BGM 播放延迟（8s 轮询）、语音输入不可用、无弹窗确认等已知问题。独立 WebUI 功能完整，体验最佳。独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。
+> ⚠️ **说明**：**强烈推荐使用独立 WebUI。** Dashboard 内嵌页运行在受限 sandbox 中，存在会话删除白屏、BGM 播放延迟（8s 轮询）、语音输入不可用、无弹窗确认等已知问题。独立 WebUI 功能完整，体验最佳。
 
-> **说明**：独立端口可通过 `web_enabled` 配置关闭；开启时可设 `web_password` 密码保护。Dashboard 内嵌页不受密码影响（依赖 Dashboard 自身登录）。
+> **安全说明**：`web_password` 是插件独立 WebUI 的密码，不是 AstrBot Dashboard 登录密码。密码为空时 WebUI 只监听 `127.0.0.1`；设置密码后才允许按 `web_host` 对局域网开放。公网访问必须置于 HTTPS 反向代理之后。独立 WebUI 是单用户/共享权限设计，知道同一密码的人可以访问全部 Galgame 会话；Dashboard 内嵌页仍依赖 Dashboard 自身登录。
 
 打开后在输入框输入文字即可对话，点击输入框左侧麦克风按钮可语音输入。
 
@@ -72,8 +72,9 @@ http://localhost:6186
 | `tts_enabled` | 启用 TTS 语音朗读 | 默认 `true`，`false` = 静音对话 |
 | `audio_format` | TTS 音频格式 | `wav`=无损(≈2MB/条)；`mp3`=需 ffmpeg(≈200KB/条)，未安装自动回退 wav |
 | `web_port` | 独立 WebUI 端口 | 默认 `6186`，`0` = 关闭 |
+| `web_host` | 独立 WebUI 监听地址 | 默认 `0.0.0.0`；无密码时自动回退 `127.0.0.1` |
 | `web_enabled` | 启用独立 WebUI | 默认 `true`，`false` = 仅 Dashboard 内嵌页 |
-| `web_password` | 独立 WebUI 密码 | 留空 = 无需密码；设置后需输入才能访问 |
+| `web_password` | 独立 WebUI 专用密码 | 局域网访问必须设置；与 Dashboard 密码无关 |
 | `sprite_mode` | 立绘渲染模式 | **`single`**（推荐，VRM 尚不可用） |
 | `sprite_scale` | 立绘整体缩放倍数 | 默认 `1.0`，建议 0.5 ~ 2.0 |
 | `sprite_bottom` | 立绘距底部距离 (vh) | 默认 `28`，建议 5 ~ 45 |
@@ -121,7 +122,7 @@ http://localhost:6186
 - **复用 AstrBot 人格系统** —— 直接选择已配置的 Persona，无需重复设定角色性格
 - **全管道集成** —— 所有消息经 webchat 管道分发，记忆/感知/安全等插件全栈生效
 - **会话双向同步** —— 对话历史同时保存到磁盘 JSON 文件 + AstrBot 数据库，Dashboard 对话管理可查看/导出
-- **JWT 代理认证** —— API 请求自动携带 JWT Bearer 令牌，与 AstrBot Core 安全通信
+- **受限 JWT 代理认证** —— 仅插件自身 API 可由独立 WebUI 转发，内部令牌短期生成且不会暴露给浏览器
 - **资产迁移机制** —— 插件升级时自动搬迁 `assets/` 至 `data/plugin_data/`，升级不丢素材
 
 ### 素材管理
@@ -298,12 +299,12 @@ Galgame 主页面右上角点击齿轮 ⚙ 图标进入。
 ```
 浏览器 (http://localhost:6186)
   ├─ 静态文件 → 插件内置 HTTP Server (ThreadingHTTPServer)
-  └─ /api/* → JWT 代理至 AstrBot Core (Quart :6185) → webchat 管道
+  └─ 插件 API 白名单 → JWT 代理至 AstrBot Core (:6185) → webchat 管道
 ```
 
 - **前端**: 原生 HTML/CSS/JS；Single 模式 CSS DOM 双图交叉渐变
 - **后端**: Python `http.server` + AstrBot Star API
-- **通信**: `fetch()` 同步请求/响应，JWT Bearer 认证代理
+- **通信**: `fetch()` 同步请求/响应，插件 API 白名单 + 短期 JWT 认证代理
 - **管道**: 所有对话经 webchat 管道分发，接入记忆/感知/安全等全插件栈
 
 ---

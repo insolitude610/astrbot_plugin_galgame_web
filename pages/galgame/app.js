@@ -16,6 +16,7 @@ var historyAvatar = "";
 var voiceVolume = 1.0;
 var bgmVolume = 0.5;
 var bgmStarted = false;
+var bgmStartPending = false;
 var _favAudioPlaying = false;
 var _lastBgmFile = "";
 
@@ -24,20 +25,31 @@ var _memStore = {};
 var _assetCache = {};
 var _favoriteFiles = {};
 
-function _setBgmSrc(file) {
+function _setBgmSrc(file, shouldPlay) {
   var ba = document.getElementById("bgm-audio");
   if (!ba) return;
   if (IS_DASHBOARD()) {
     apiGet("bgm/data", { name: file }).then(function(resp) {
       ba.src = "data:" + resp.mime + ";base64," + resp.audio;
       ba.volume = bgmVolume;
+      if (shouldPlay !== false) _tryPlayBgm(ba);
     }).catch(function(e) { console.warn("BGM data load failed:", e); });
   } else {
     ba.src = "./bgm/" + encodeURIComponent(file);
     ba.volume = bgmVolume;
-    bgmStarted = true;
-    ba.play().catch(function(e) { console.warn("BGM play failed:", e); });
+    if (shouldPlay !== false) _tryPlayBgm(ba);
   }
+}
+
+function _tryPlayBgm(bgmAudio) {
+  if (!bgmAudio || !bgmAudio.src) return;
+  bgmAudio.play().then(function() {
+    bgmStarted = true;
+  }).catch(function(e) {
+    console.warn("BGM play failed:", e);
+    bgmStarted = false;
+    startBgmOnInteraction(bgmAudio);
+  });
 }
 
 function getLocal(key) {
@@ -235,7 +247,7 @@ function assetUrl(filename) {
   if (IS_DASHBOARD() && _assetCache[filename]) return _assetCache[filename];
   return IS_DASHBOARD()
     ? "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(filename)
-    : "./assets/" + filename;
+    : "./assets/" + encodeURIComponent(filename);
 }
 
 /* ---- init ---- */
@@ -284,21 +296,11 @@ function switchToSession(sid) {
   });
 }
 
-function startNewSession() {
-  apiGet("session/list").then(function(data) {
-    var sessions = (data && data.sessions) || [];
-    for (var i = 0; i < sessions.length; i++) {
-      if (sessions[i].message_count === 0) {
-        switchToSession(sessions[i].session_id);
-        return;
-      }
-    }
-    removeLocal("galgame_session_id");
-    location.href = location.pathname;
-  }).catch(function() {
-    removeLocal("galgame_session_id");
-    location.href = location.pathname;
-  });
+async function startNewSession() {
+  var resp = await initSession("", true);
+  if (!resp) return;
+  setLocal("galgame_session_id", resp.session_id);
+  location.reload();
 }
 
 async function loadSessionPanel() {
@@ -335,10 +337,18 @@ async function loadSessionPanel() {
     item.onclick = (function(sid) {
       return function() { switchToSession(sid); };
     })(s.session_id);
-    item.innerHTML =
-      '<div class="session-item-time">' + dateStr + '</div>' +
-      '<div class="session-item-preview">' + preview + '</div>' +
-      '<span class="session-item-count">' + s.message_count + ' 条消息</span>';
+    var timeEl = document.createElement("div");
+    timeEl.className = "session-item-time";
+    timeEl.textContent = dateStr;
+    item.appendChild(timeEl);
+    var previewEl = document.createElement("div");
+    previewEl.className = "session-item-preview";
+    previewEl.textContent = preview;
+    item.appendChild(previewEl);
+    var countEl = document.createElement("span");
+    countEl.className = "session-item-count";
+    countEl.textContent = String(s.message_count) + " 条消息";
+    item.appendChild(countEl);
 
     if (s.message_count > 0) {
       var delBtn = document.createElement("button");
@@ -372,10 +382,13 @@ async function loadSessionPanel() {
   }
 }
 
-async function initSession(resumeId) {
+async function initSession(resumeId, forceNew) {
   var resp;
   try {
-    resp = await apiPost("session/init", { resume_id: resumeId || "" });
+    resp = await apiPost("session/init", {
+      resume_id: resumeId || "",
+      force_new: forceNew === true,
+    });
   } catch (err) {
     console.error("Failed to init session:", err);
     el.dialogText.textContent = "初始化失败(" + (err.message || err) + ")，请刷新页面。";
@@ -492,23 +505,26 @@ function applyBgmAndVolume(cfg) {
   if (bgmAudio) {
     bgmAudio.volume = bgmVol;
     if (bgmFile) {
-      _setBgmSrc(bgmFile);
-      startBgmOnInteraction(bgmAudio);
+      _setBgmSrc(bgmFile, cfg.bgm_playing !== false);
     }
   }
 }
 
 function startBgmOnInteraction(bgmAudio) {
-  if (bgmStarted) return;
-  function tryPlay() {
-    if (bgmStarted) return;
-    bgmStarted = true;
+  if (bgmStarted || bgmStartPending) return;
+  bgmStartPending = true;
+  function cleanup() {
+    bgmStartPending = false;
     document.removeEventListener("click", tryPlay);
     document.removeEventListener("keydown", tryPlay);
-    bgmAudio.play().catch(function(e) { console.warn("BGM autoplay blocked:", e); });
   }
-  document.addEventListener("click", tryPlay, { once: true });
-  document.addEventListener("keydown", tryPlay, { once: true });
+  function tryPlay() {
+    cleanup();
+    if (bgmStarted) return;
+    _tryPlayBgm(bgmAudio);
+  }
+  document.addEventListener("click", tryPlay);
+  document.addEventListener("keydown", tryPlay);
 }
 
 function applyBackground() {
@@ -937,9 +953,9 @@ async function sendMessage(audioData) {
       finishResponse();
     }
   } catch (err) {
-    console.warn("Send failed, restoring from history:", err);
-    restoreLastMessage();
-    enableInput();
+    console.warn("Send failed:", err);
+    el.userInput.value = text;
+    showError("发送失败：" + (err.message || err));
   }
 }
 
@@ -1183,6 +1199,12 @@ window.addEventListener("pageshow", function (event) {
 });
 
 window.addEventListener("message", function (event) {
+  var settingsFrame = document.getElementById("sp-iframe");
+  var favoritesFrame = document.getElementById("fp-iframe");
+  var trustedSource =
+    (settingsFrame && event.source === settingsFrame.contentWindow) ||
+    (favoritesFrame && event.source === favoritesFrame.contentWindow);
+  if (event.origin !== window.location.origin || !trustedSource) return;
   var msg = event.data;
   if (!msg || typeof msg !== "object") return;
   _handleComms(msg);
@@ -1199,7 +1221,7 @@ function _handleComms(msg) {
   if (!msg || typeof msg !== "object") return;
   if (msg.kind === "bgm-change" && msg.file) {
     _lastBgmFile = msg.file;
-    _setBgmSrc(msg.file);
+    _setBgmSrc(msg.file, true);
   } else if (msg.kind === "bgm-pause") {
     var ba = document.getElementById("bgm-audio");
     if (ba) ba.pause();
@@ -1207,11 +1229,7 @@ function _handleComms(msg) {
     var ba = document.getElementById("bgm-audio");
     if (ba) {
       ba.volume = bgmVolume;
-    ba.play().catch(function(e) {
-      console.warn("BGM play failed:", e);
-      bgmStarted = false;
-      startBgmOnInteraction(ba);
-    });
+      _tryPlayBgm(ba);
     }
   } else if (msg.kind === "bgm-volume") {
     bgmVolume = msg.volume != null ? msg.volume : bgmVolume;
@@ -1221,12 +1239,6 @@ function _handleComms(msg) {
     voiceVolume = msg.volume != null ? msg.volume : voiceVolume;
     var ta = document.getElementById("tts-audio");
     if (ta) ta.volume = voiceVolume;
-  } else if (msg.kind === "api-proxy") {
-    apiPost(msg.endpoint, msg.body).then(function(result) {
-      if (_bgmChannel) _bgmChannel.postMessage({ kind: "api-response", msgId: msg.msgId, result: result });
-    }).catch(function(e) {
-      if (_bgmChannel) _bgmChannel.postMessage({ kind: "api-response", msgId: msg.msgId, error: e.message });
-    });
   } else if (msg.kind === "fav-audio-start") {
     _stopVoice(true);
     _favAudioPlaying = true;
@@ -1258,7 +1270,7 @@ function _startBgmPoll() {
       var newBgm = cfg.bgm_file || "";
       if (newBgm && newBgm !== _lastBgmFile) {
         _lastBgmFile = newBgm;
-        _setBgmSrc(newBgm);
+        _setBgmSrc(newBgm, cfg.bgm_playing !== false);
         return;
       }
       var playing = cfg.bgm_playing;

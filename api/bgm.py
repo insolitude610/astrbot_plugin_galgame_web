@@ -1,4 +1,5 @@
 import base64
+import binascii
 import uuid
 
 from quart import Response, request
@@ -6,6 +7,8 @@ from quart import Response, request
 from astrbot.api import logger
 
 _AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".opus"}
+MAX_BGM_BYTES = 30 * 1024 * 1024
+MAX_BGM_BASE64_CHARS = ((MAX_BGM_BYTES + 2) // 3) * 4
 
 
 class BGMAPI:
@@ -45,27 +48,32 @@ class BGMAPI:
         from ..main import BGM_DIR
 
         data = await request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
         b64 = data.get("data", "")
-        name = data.get("name", "").strip()
-        if not b64:
+        raw_name = data.get("name", "")
+        name = raw_name.strip() if isinstance(raw_name, str) else ""
+        if not isinstance(b64, str) or not b64:
             return {"error": "no data"}, 400
         if not name:
             name = f"bgm_{uuid.uuid4().hex[:8]}.mp3"
         if "," in b64:
             b64 = b64.split(",", 1)[1]
-        if len(b64) > 30 * 1024 * 1024:
+        if len(b64) > MAX_BGM_BASE64_CHARS:
             return {"error": "file too large (max 30MB)"}, 400
         sp = safe_path(name, BGM_DIR)
         if not sp or sp.suffix.lower() not in _AUDIO_EXTS:
             return {"error": "unsupported audio format"}, 400
         try:
-            raw = base64.b64decode(b64)
-            if len(raw) > 30 * 1024 * 1024:
+            raw = base64.b64decode(b64, validate=True)
+            if len(raw) > MAX_BGM_BYTES:
                 return {"error": "file too large"}, 400
             BGM_DIR.mkdir(parents=True, exist_ok=True)
             sp.write_bytes(raw)
             logger.info(f"Uploaded BGM: {sp.name} ({len(raw)} bytes)")
             return {"uploaded": sp.name}
+        except (binascii.Error, ValueError) as e:
+            return {"error": f"invalid base64 data: {e}"}, 400
         except Exception as e:
             logger.warning(f"Failed to save BGM {name}: {e}")
             return {"error": str(e)}, 500
@@ -75,7 +83,10 @@ class BGMAPI:
         from ..main import BGM_DIR, _load_prefs, _save_prefs
 
         data = await request.get_json() or {}
-        filename = data.get("filename", "").strip()
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_filename = data.get("filename", "")
+        filename = raw_filename.strip() if isinstance(raw_filename, str) else ""
         if not filename:
             return {"error": "no filename"}, 400
         sp = safe_path(filename, BGM_DIR)
@@ -109,12 +120,11 @@ class BGMAPI:
             ".aac": "audio/aac",
             ".opus": "audio/ogg",
         }
-        origin = request.headers.get("Origin", "")
         resp = Response(
             sp.read_bytes(),
             content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"),
         )
-        resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
         return resp
 
     async def _api_bgm_data(self):

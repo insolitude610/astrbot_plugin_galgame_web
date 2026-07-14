@@ -1,7 +1,10 @@
 import asyncio
 import json
+import os
 import pathlib
+import re
 import time
+import uuid
 
 from astrbot.api import logger
 from astrbot.api.star import StarTools
@@ -13,14 +16,39 @@ AUDIO_DIR = _DATA / "audio"
 FAVORITES_PATH = _DATA / "favorites.json"
 
 PLATFORM_ID = "webchat"
+SESSION_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+
+
+def is_valid_session_id(session_id: str) -> bool:
+    return isinstance(session_id, str) and bool(SESSION_ID_PATTERN.fullmatch(session_id))
 
 
 def build_umo(webchat_username: str, session_id: str) -> str:
+    if not is_valid_session_id(session_id):
+        raise ValueError("invalid session_id")
     return f"{PLATFORM_ID}:FriendMessage:webchat!{webchat_username}!{session_id}"
 
 
 def session_path(session_id: str) -> pathlib.Path:
+    if not is_valid_session_id(session_id):
+        raise ValueError("invalid session_id")
     return SESSIONS_DIR / f"{session_id}.json"
+
+
+def _atomic_write_json(path: pathlib.Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+    finally:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def save_session(sessions: dict[str, dict], session_id: str):
@@ -35,9 +63,8 @@ def save_session(sessions: dict[str, dict], session_id: str):
         "created_at": session["created_at"],
     }
     try:
-        with open(session_path(session_id), "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except OSError as e:
+        _atomic_write_json(session_path(session_id), data)
+    except (OSError, ValueError) as e:
         logger.warning(f"Failed to save session {session_id}: {e}")
 
 
@@ -48,18 +75,29 @@ def load_session(session_id: str) -> dict | None:
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("session root must be an object")
+        history = data.get("history", [])
+        if not isinstance(history, list):
+            raise ValueError("session history must be a list")
+        created_at = data.get("created_at", time.time())
+        if not isinstance(created_at, (int, float)):
+            created_at = time.time()
         return {
-            "umo": data.get("umo", ""),
-            "conv_id": data.get("conv_id", ""),
-            "history": data.get("history", []),
-            "current_emotion": data.get("current_emotion", "neutral"),
+            "umo": data.get("umo", "") if isinstance(data.get("umo", ""), str) else "",
+            "conv_id": data.get("conv_id", "") if isinstance(data.get("conv_id", ""), str) else "",
+            "history": [item for item in history if isinstance(item, dict)],
+            "current_emotion": data.get("current_emotion", "neutral")
+            if isinstance(data.get("current_emotion", "neutral"), str)
+            else "neutral",
             "pending_rapid_clicks": 0,
             "_resp_event": asyncio.Event(),
             "_audio_event": asyncio.Event(),
-            "created_at": data.get("created_at", time.time()),
+            "created_at": created_at,
             "_lock": asyncio.Lock(),
+            "_send_lock": asyncio.Lock(),
         }
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Failed to load session {session_id}: {e}")
         return None
 
@@ -68,7 +106,7 @@ def load_all_sessions(sessions: dict[str, dict]) -> int:
     count = 0
     for path in SESSIONS_DIR.glob("*.json"):
         sid = path.stem
-        if sid in sessions:
+        if not is_valid_session_id(sid) or sid in sessions:
             continue
         session = load_session(sid)
         if session:
@@ -91,16 +129,26 @@ def gc_sessions(
     ttl = retain_days * 86400
     removed = 0
     for path in SESSIONS_DIR.glob("*.json"):
+        if not is_valid_session_id(path.stem):
+            logger.warning(f"Ignoring invalid session filename: {path.name}")
+            continue
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-            if now - data.get("created_at", 0) > ttl:
+            if not isinstance(data, dict):
+                logger.warning(f"Ignoring invalid session file: {path.name}")
+                continue
+            created_at = data.get("created_at", 0)
+            if not isinstance(created_at, (int, float)):
+                logger.warning(f"Ignoring session with invalid timestamp: {path.name}")
+                continue
+            if now - created_at > ttl:
                 path.unlink()
                 removed += 1
                 sid = path.stem
                 cleanup_session_audio(data.get("history", []))
                 asyncio.ensure_future(delete_conv_callback(sid))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     if removed:
         logger.info(f"GC removed {removed} expired sessions")
@@ -203,11 +251,13 @@ async def sync_sessions_to_db(
 
     for path in SESSIONS_DIR.glob("*.json"):
         sid = path.stem
-        if sid in sessions:
+        if not is_valid_session_id(sid) or sid in sessions:
             continue
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
+            if not isinstance(data, dict):
+                continue
             if not data.get("history") and not data.get("umo"):
                 path.unlink()
                 logger.info(f"Cleaned up blank session file: {sid[:8]}")
@@ -221,12 +271,16 @@ def _collect_referenced_audio(
     refs: set[str] = set()
     for s in sessions.values():
         for msg in s.get("history", []):
+            if not isinstance(msg, dict):
+                continue
             f = msg.get("audio_file", "")
-            if f:
+            if _safe_audio_path(f):
                 refs.add(f)
     for fav in favorites:
+        if not isinstance(fav, dict):
+            continue
         f = fav.get("audio_file", "")
-        if f:
+        if _safe_audio_path(f):
             refs.add(f)
     return refs
 
@@ -235,7 +289,8 @@ def gc_audio_files(sessions: dict[str, dict]):
     favs: list[dict] = []
     if FAVORITES_PATH.exists():
         try:
-            favs = json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
+            loaded = json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
+            favs = loaded if isinstance(loaded, list) else []
         except (OSError, json.JSONDecodeError):
             pass
     refs = _collect_referenced_audio(sessions, favs)
@@ -248,10 +303,47 @@ def gc_audio_files(sessions: dict[str, dict]):
         logger.info(f"GC cleaned up {count} orphan audio files")
 
 
+def gc_temp_voice_files():
+    from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+
+    temp_dir = pathlib.Path(get_astrbot_data_path()) / "temp"
+    count = 0
+    for path in temp_dir.glob("galgame_audio_*.wav"):
+        try:
+            if path.is_file() and time.time() - path.stat().st_mtime > 600:
+                path.unlink()
+                count += 1
+        except OSError:
+            pass
+    if count:
+        logger.info(f"GC cleaned up {count} stale voice staging files")
+
+
 def cleanup_session_audio(history: list[dict]):
     for msg in history:
+        if not isinstance(msg, dict):
+            continue
         f = msg.get("audio_file", "")
-        if f:
-            p = AUDIO_DIR / f
-            if p.exists():
-                p.unlink()
+        p = _safe_audio_path(f)
+        if p and p.exists() and p.is_file():
+            p.unlink()
+
+
+def _safe_audio_path(filename: str) -> pathlib.Path | None:
+    if (
+        not isinstance(filename, str)
+        or not filename
+        or "/" in filename
+        or "\\" in filename
+    ):
+        return None
+    candidate = pathlib.Path(filename)
+    if candidate.is_absolute() or candidate.name != filename:
+        return None
+    base = AUDIO_DIR.resolve()
+    resolved = (base / filename).resolve()
+    try:
+        resolved.relative_to(base)
+    except ValueError:
+        return None
+    return resolved

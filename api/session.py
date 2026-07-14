@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import binascii
 import json
 import pathlib
 import re
@@ -19,6 +20,27 @@ _MIME_EXT = {
     "audio/flac": ".flac",
     "audio/mp4": ".m4a",
 }
+MAX_TEXT_CHARS = 20_000
+MAX_VOICE_BYTES = 15 * 1024 * 1024
+MAX_VOICE_BASE64_CHARS = ((MAX_VOICE_BYTES + 2) // 3) * 4
+MAX_SESSIONS = 200
+
+
+def _decode_audio_data(audio_data: str) -> bytes:
+    if not isinstance(audio_data, str):
+        raise ValueError("audio_data must be a base64 string")
+    payload = audio_data.split(",", 1)[1] if "," in audio_data else audio_data
+    if not payload:
+        return b""
+    if len(payload) > MAX_VOICE_BASE64_CHARS:
+        raise ValueError("voice message too large")
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("invalid audio_data") from exc
+    if len(raw) > MAX_VOICE_BYTES:
+        raise ValueError("voice message too large")
+    return raw
 
 
 class SessionAPI:
@@ -62,11 +84,13 @@ class SessionAPI:
 
     @staticmethod
     def _find_latest_session() -> str | None:
-        from ..galgame_web.session_helpers import SESSIONS_DIR
+        from ..galgame_web.session_helpers import SESSIONS_DIR, is_valid_session_id
 
         best_sid = None
         best_mtime = 0
         for path in SESSIONS_DIR.glob("*.json"):
+            if not is_valid_session_id(path.stem):
+                continue
             try:
                 mtime = path.stat().st_mtime
                 if mtime > best_mtime:
@@ -78,15 +102,17 @@ class SessionAPI:
 
     @staticmethod
     def _find_blank_session() -> str | None:
-        from ..galgame_web.session_helpers import SESSIONS_DIR
+        from ..galgame_web.session_helpers import SESSIONS_DIR, is_valid_session_id
 
         best_sid = None
         best_mtime = 0
         for path in SESSIONS_DIR.glob("*.json"):
+            if not is_valid_session_id(path.stem):
+                continue
             try:
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
-                if not data.get("history"):
+                if isinstance(data, dict) and not data.get("history"):
                     mtime = path.stat().st_mtime
                     if mtime > best_mtime:
                         best_mtime = mtime
@@ -96,12 +122,24 @@ class SessionAPI:
         return best_sid
 
     async def _api_session_init(self):
-        from ..galgame_web.session_helpers import load_session, session_path
+        from ..galgame_web.session_helpers import (
+            SESSIONS_DIR,
+            is_valid_session_id,
+            load_session,
+            session_path,
+        )
 
         try:
             data = await request.get_json() or {}
-            resume_id = data.get("resume_id", "").strip()
-            force_new = data.get("force_new", False)
+            if not isinstance(data, dict):
+                return {"error": "invalid request"}, 400
+            raw_resume_id = data.get("resume_id", "")
+            if not isinstance(raw_resume_id, str):
+                return {"error": "invalid resume_id"}, 400
+            resume_id = raw_resume_id.strip()
+            if resume_id and not is_valid_session_id(resume_id):
+                return {"error": "invalid resume_id"}, 400
+            force_new = data.get("force_new", False) is True
 
             in_mem = resume_id in self._sessions if resume_id else False
             on_disk = session_path(resume_id).exists() if resume_id else False
@@ -138,6 +176,8 @@ class SessionAPI:
                             "current_emotion": s.get("current_emotion", "neutral"),
                         }
 
+            # A forced new conversation may reuse an existing empty session. This
+            # avoids accumulating blank, undeletable sessions on repeated clicks.
             blank_sid = self._find_blank_session()
             if blank_sid:
                 s = load_session(blank_sid)
@@ -153,6 +193,12 @@ class SessionAPI:
                         "current_emotion": s.get("current_emotion", "neutral"),
                     }
 
+            session_count = sum(
+                1 for path in SESSIONS_DIR.glob("*.json") if is_valid_session_id(path.stem)
+            )
+            if session_count >= MAX_SESSIONS:
+                return {"error": "session limit reached"}, 429
+
             sid = uuid.uuid4().hex
             session = {
                 "umo": "",
@@ -164,6 +210,7 @@ class SessionAPI:
                 "_audio_event": asyncio.Event(),
                 "created_at": time.time(),
                 "_lock": asyncio.Lock(),
+                "_send_lock": asyncio.Lock(),
             }
             self._sessions[sid] = session
             try:
@@ -181,13 +228,15 @@ class SessionAPI:
             return {"error": "internal error"}, 500
 
     async def _api_history(self):
+        from ..galgame_web.session_helpers import is_valid_session_id
+
         sid = request.args.get("session_id", "")
-        if not sid or sid not in self._sessions:
+        if not is_valid_session_id(sid) or sid not in self._sessions:
             return {"error": "invalid session_id"}, 400
         return {"messages": self._sessions[sid]["history"]}
 
     async def _api_session_list(self):
-        from ..galgame_web.session_helpers import SESSIONS_DIR
+        from ..galgame_web.session_helpers import SESSIONS_DIR, is_valid_session_id
 
         sessions_list = []
         for path in SESSIONS_DIR.glob("*.json"):
@@ -197,16 +246,26 @@ class SessionAPI:
             except (OSError, json.JSONDecodeError):
                 continue
             sid = path.stem
+            if not is_valid_session_id(sid) or not isinstance(data, dict):
+                continue
             history = data.get("history", [])
+            if not isinstance(history, list):
+                continue
             last_msg = ""
             for msg in reversed(history):
-                if msg.get("role") == "assistant" and msg.get("content"):
-                    last_msg = msg["content"]
+                if not isinstance(msg, dict):
+                    continue
+                content = msg.get("content")
+                if msg.get("role") == "assistant" and isinstance(content, str):
+                    last_msg = content
                     break
+            created_at = data.get("created_at", 0)
+            if not isinstance(created_at, (int, float)):
+                created_at = 0
             sessions_list.append(
                 {
                     "session_id": sid,
-                    "created_at": data.get("created_at", 0),
+                    "created_at": created_at,
                     "message_count": len(history),
                     "last_message": last_msg[:80],
                 }
@@ -218,28 +277,44 @@ class SessionAPI:
         from ..galgame_web.session_helpers import (
             cleanup_session_audio,
             delete_astrbot_conv,
+            is_valid_session_id,
             session_path,
         )
 
         data = await request.get_json() or {}
-        sid = data.get("session_id", "").strip()
-        if not sid:
-            return {"error": "session_id required"}, 400
-        if sid in self._sessions:
-            cleanup_session_audio(self._sessions[sid]["history"])
-            del self._sessions[sid]
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_sid = data.get("session_id", "")
+        sid = raw_sid.strip() if isinstance(raw_sid, str) else ""
+        if not is_valid_session_id(sid):
+            return {"error": "invalid session_id"}, 400
         path = session_path(sid)
+        if sid not in self._sessions and not path.exists():
+            return {"error": "session not found"}, 404
+        if sid in self._sessions:
+            session = self._sessions[sid]
+            send_lock = session.setdefault("_send_lock", asyncio.Lock())
+            async with send_lock:
+                cleanup_session_audio(session["history"])
+                del self._sessions[sid]
         if path.exists():
             path.unlink()
         asyncio.ensure_future(delete_astrbot_conv(self.context, self._webchat_username, sid))
         return {"status": "ok"}
 
     async def _api_rapid_action(self):
+        from ..galgame_web.session_helpers import is_valid_session_id
+
         data = await request.get_json()
-        if not data:
+        if not isinstance(data, dict) or not data:
             return {"error": "no data"}, 400
         sid = data.get("session_id", "")
         count = data.get("count", 0)
+        if not is_valid_session_id(sid) or sid not in self._sessions:
+            return {"error": "invalid session_id"}, 400
+        if not isinstance(count, int) or isinstance(count, bool):
+            return {"error": "invalid count"}, 400
+        count = max(0, min(count, 1000))
         if sid in self._sessions:
             async with self._sessions[sid]["_lock"]:
                 self._sessions[sid]["pending_rapid_clicks"] = count
@@ -291,7 +366,8 @@ class SessionAPI:
         msg_id = str(uuid.uuid4())
         wc_sid = f"webchat!{self._webchat_username}!{session_id}"
         logger.info(
-            f"[pipeline] start msg_id={msg_id[:8]} sid={session_id[:8]} text={text[:40]} audio={'yes' if audio_path else 'no'}"
+            f"[pipeline] start msg_id={msg_id[:8]} sid={session_id[:8]} "
+            f"text_len={len(text)} audio={'yes' if audio_path else 'no'}"
         )
         back_queue = webchat_queue_mgr.get_or_create_back_queue(msg_id, wc_sid)
         parts = []
@@ -331,12 +407,14 @@ class SessionAPI:
                 elif mtype == "record":
                     record_file = dtext.replace("[RECORD]", "").strip()
                     if record_file:
-                        record_path = (
+                        from ..galgame_web.assets_helpers import safe_path
+
+                        attachments_dir = (
                             pathlib.Path(get_astrbot_data_path())
                             / "attachments"
-                            / record_file
                         )
-                        if record_path.exists():
+                        record_path = safe_path(record_file, attachments_dir)
+                        if record_path and record_path.is_file():
                             raw = record_path.read_bytes()
                             audio_b64 = base64.b64encode(raw).decode()
                             audio_mime = self._detect_audio_mime(raw)
@@ -366,10 +444,7 @@ class SessionAPI:
             "audio_file": audio_file,
         }
 
-    def _save_audio(self, audio_b64: str) -> str:
-        if "," in audio_b64:
-            audio_b64 = audio_b64.split(",", 1)[1]
-        raw = base64.b64decode(audio_b64)
+    def _save_audio(self, raw: bytes) -> str:
         audio_dir = pathlib.Path(get_astrbot_data_path()) / "temp"
         audio_dir.mkdir(parents=True, exist_ok=True)
         audio_path = audio_dir / f"galgame_audio_{uuid.uuid4().hex}.wav"
@@ -413,48 +488,74 @@ class SessionAPI:
     # ---- _api_send broken into sub-steps ----
 
     async def _api_send(self):
+        from ..galgame_web.session_helpers import is_valid_session_id
+
         data = await request.get_json() or {}
         if not isinstance(data, dict) or not data:
             return {"error": "no data"}, 400
         sid = data.get("session_id", "")
-        text = data.get("text", "").strip()
+        raw_text = data.get("text", "")
         audio_data = data.get("audio_data", "")
+        if not is_valid_session_id(sid) or sid not in self._sessions:
+            return {"error": "invalid session_id"}, 400
+        if not isinstance(raw_text, str):
+            return {"error": "text must be a string"}, 400
+        if not isinstance(audio_data, str):
+            return {"error": "audio_data must be a base64 string"}, 400
+        text = raw_text.strip()
+        if len(text) > MAX_TEXT_CHARS:
+            return {"error": "message too long"}, 400
+        try:
+            audio_raw = _decode_audio_data(audio_data) if audio_data else b""
+        except ValueError as e:
+            return {"error": str(e)}, 400
 
-        return await self._do_send(sid, text, audio_data)
+        session = self._sessions[sid]
+        send_lock = session.setdefault("_send_lock", asyncio.Lock())
+        async with send_lock:
+            return await self._do_send(sid, text, audio_raw)
 
-    async def _do_send(self, sid: str, text: str, audio_data: str):
+    async def _do_send(self, sid: str, text: str, audio_raw: bytes):
         """Core send logic, broken into sub-steps."""
         # Step 1: Parse input
-        session = self._send_parse_input(sid, text, audio_data)
+        session = self._send_parse_input(sid)
         if isinstance(session, dict) and "error" in session:
             return session, 400
+
+        response_event = session.get("_resp_event")
+        if response_event:
+            response_event.clear()
+        session.pop("_last_resp_text", None)
 
         # Step 2: Handle commands
         matched_prefix, cmd = await self._send_handle_command(text, session, sid)
 
         # Step 3: Save audio if present
-        audio_path = self._send_save_audio(audio_data, text)
+        audio_path = self._send_save_audio(audio_raw, text)
         user_audio_file = ""
         user_audio_mime = ""
-        if audio_data:
-            from ..main import AUDIO_DIR
-
-            raw = None
-            b64 = audio_data.split(",", 1)[-1] if "," in audio_data else audio_data
-            try:
-                raw = base64.b64decode(b64)
-            except Exception:
-                pass
-            if raw:
-                user_audio_mime = self._detect_audio_mime(raw)
-                user_audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
-                AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-                (AUDIO_DIR / user_audio_file).write_bytes(raw)
 
         # Step 4: Run pipeline
-        pipeline_result = await self._send_run_pipeline(text, sid, audio_path)
+        try:
+            pipeline_result = await self._send_run_pipeline(text, sid, audio_path)
+        finally:
+            if audio_path:
+                try:
+                    pathlib.Path(audio_path).unlink(missing_ok=True)
+                except OSError:
+                    logger.warning(f"Failed to remove temporary audio: {audio_path}")
         if isinstance(pipeline_result, dict) and "error" in pipeline_result:
             return pipeline_result, 500
+
+        if audio_raw:
+            from ..main import AUDIO_DIR
+
+            user_audio_mime = self._detect_audio_mime(audio_raw)
+            user_audio_file = (
+                f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
+            )
+            AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+            (AUDIO_DIR / user_audio_file).write_bytes(audio_raw)
 
         raw_reply = pipeline_result["text"]
         audio_b64 = pipeline_result.get("audio", "")
@@ -477,7 +578,10 @@ class SessionAPI:
 
         # Step 8: Synthesize TTS (use background result if available)
         _bg_task = session.pop("_bg_tts_task", None)
-        logger.info(f"[tts-debug] step8 bg_task={'yes' if _bg_task else 'no'} clean='{clean_text[:20] if clean_text else 'empty'}' emos={len(emotions_all) if emotions_all else 0}")
+        logger.debug(
+            f"[tts] bg_task={'yes' if _bg_task else 'no'} "
+            f"text_len={len(clean_text)} emotion_count={len(emotions_all)}"
+        )
         if _bg_task:
             await _bg_task
             audio_b64, audio_mime_val, audio_file = session.pop("_bg_tts_result", ("", "", ""))
@@ -501,7 +605,7 @@ class SessionAPI:
             user_audio_mime,
         )
 
-    def _send_parse_input(self, sid, text, audio_data):
+    def _send_parse_input(self, sid):
         if not sid or sid not in self._sessions:
             return {"error": "invalid session_id"}
         session = self._sessions[sid]
@@ -527,11 +631,11 @@ class SessionAPI:
                 save_session(self._sessions, sid)
         return matched_prefix, cmd
 
-    def _send_save_audio(self, audio_data, text):
+    def _send_save_audio(self, audio_raw, text):
         audio_path = ""
-        if audio_data:
+        if audio_raw:
             try:
-                audio_path = self._save_audio(audio_data)
+                audio_path = self._save_audio(audio_raw)
             except Exception as e:
                 logger.warning(f"Failed to save audio: {e}")
                 if not text:
@@ -549,8 +653,10 @@ class SessionAPI:
             return {"error": "回复生成失败"}
 
     async def _send_wait_for_llm(self, session, text):
+        ready_text = session.pop("_last_resp_text", "")
+        if ready_text:
+            return ready_text
         ev = session.get("_resp_event", asyncio.Event())
-        ev.clear()
         try:
             await asyncio.wait_for(ev.wait(), timeout=300)
         except asyncio.TimeoutError:
@@ -645,7 +751,10 @@ class SessionAPI:
             return audio_b64, audio_mime_val, audio_file
 
         if not clean_text or matched_prefix:
-            logger.info(f"[tts-debug] synth early return clean='{clean_text[:20] if clean_text else 'empty'}' match={'yes' if matched_prefix else 'no'}")
+            logger.debug(
+                f"[tts] skipped text_len={len(clean_text)} "
+                f"command={'yes' if matched_prefix else 'no'}"
+            )
             return audio_b64, audio_mime_val, audio_file
 
         tts_emotion_map = {}

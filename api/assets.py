@@ -5,6 +5,11 @@ from quart import Response, request
 
 from astrbot.api import logger
 
+MAX_UPLOAD_ITEMS = 32
+MAX_UPLOAD_TOTAL_BYTES = 40 * 1024 * 1024
+MAX_BATCH_ITEMS = 64
+MAX_BATCH_RESPONSE_BYTES = 30 * 1024 * 1024
+
 
 class AssetAPI:
     def _register_asset_apis(self):
@@ -63,15 +68,22 @@ class AssetAPI:
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
         files_data = data.get("files", [])
+        if not isinstance(files_data, list) or len(files_data) > MAX_UPLOAD_ITEMS:
+            return {"error": f"files must contain at most {MAX_UPLOAD_ITEMS} items"}, 400
         logger.info(f"[assets] upload received {len(files_data)} items")
         if not files_data:
             return {"error": "no files"}, 400
         uploaded = []
+        total_bytes = 0
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         for f in files_data:
+            if not isinstance(f, dict):
+                continue
             name, b64 = f.get("name", ""), f.get("data", "")
-            if not name or not b64:
+            if not isinstance(name, str) or not isinstance(b64, str) or not name or not b64:
                 continue
             if "," in b64:
                 b64 = b64.split(",", 1)[1]
@@ -81,9 +93,12 @@ class AssetAPI:
             if not sp or sp.suffix.lower() not in IMAGE_EXTS:
                 continue
             try:
-                raw = base64.b64decode(b64)
+                raw = base64.b64decode(b64, validate=True)
                 if len(raw) > MAX_UPLOAD_BYTES:
                     continue
+                total_bytes += len(raw)
+                if total_bytes > MAX_UPLOAD_TOTAL_BYTES:
+                    return {"error": "total upload size too large"}, 413
                 sp.write_bytes(raw)
                 uploaded.append(sp.name)
                 logger.info(f"Uploaded asset: {sp.name}")
@@ -97,16 +112,22 @@ class AssetAPI:
         from ..galgame_web.assets_helpers import (
             IMAGE_EXTS,
             MAX_UPLOAD_BYTES,
+            parse_asset_key,
             register_asset,
             safe_path,
         )
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
-        key = data.get("key", "").strip()
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_key = data.get("key", "")
+        key = raw_key.strip() if isinstance(raw_key, str) else ""
         b64 = data.get("data", "")
-        if not key or not b64:
+        if not key or not isinstance(b64, str) or not b64:
             return {"error": "key and data required"}, 400
+        if not parse_asset_key(key):
+            return {"error": "invalid asset key"}, 400
         if "," in b64:
             prefix, b64 = b64.split(",", 1)
             ext_map = {
@@ -130,7 +151,7 @@ class AssetAPI:
         if not sp or sp.suffix.lower() not in IMAGE_EXTS:
             return {"error": "unsupported extension"}, 400
         try:
-            raw = base64.b64decode(b64)
+            raw = base64.b64decode(b64, validate=True)
             if len(raw) > MAX_UPLOAD_BYTES:
                 return {"error": "file too large"}, 400
             ASSETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -138,6 +159,8 @@ class AssetAPI:
             logger.info(f"Uploaded key asset: {sp.name}")
             register_asset(self.config, key, sp.name, ASSETS_DIR)
             return {"uploaded": sp.name}
+        except (ValueError, TypeError) as e:
+            return {"error": str(e)}, 400
         except Exception as e:
             return {"error": str(e)}, 500
 
@@ -146,6 +169,8 @@ class AssetAPI:
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
         filename = data.get("filename", "")
         if not filename:
             return {"error": "no filename"}, 400
@@ -179,12 +204,11 @@ class AssetAPI:
             ".flac": "audio/flac",
             ".m4a": "audio/mp4",
         }
-        origin = request.headers.get("Origin", "")
         resp = Response(
             sp.read_bytes(),
             content_type=mime_map.get(sp.suffix.lower(), "application/octet-stream"),
         )
-        resp.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
         return resp
 
     async def _api_assets_batch(self):
@@ -192,9 +216,14 @@ class AssetAPI:
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
         names = data.get("names", [])
-        if not names:
+        if not isinstance(names, list) or not names:
             return {"error": "no names"}, 400
+        names = list(dict.fromkeys(name for name in names if isinstance(name, str)))
+        if len(names) > MAX_BATCH_ITEMS:
+            return {"error": f"too many names (max {MAX_BATCH_ITEMS})"}, 400
         mime_map = {
             ".png": "image/png",
             ".jpg": "image/jpeg",
@@ -204,6 +233,7 @@ class AssetAPI:
             ".gif": "image/gif",
         }
         result = []
+        total_bytes = 0
         for name in names:
             sp = safe_path(name, ASSETS_DIR)
             if not sp or not sp.exists() or not sp.is_file():
@@ -212,6 +242,9 @@ class AssetAPI:
                 if sp.stat().st_size > MAX_UPLOAD_BYTES:
                     continue
                 raw = sp.read_bytes()
+                total_bytes += len(raw)
+                if total_bytes > MAX_BATCH_RESPONSE_BYTES:
+                    return {"error": "asset batch response too large"}, 413
                 b64 = base64.b64encode(raw).decode()
                 mt = mime_map.get(sp.suffix.lower(), "image/png")
                 result.append({"name": sp.name, "data": f"data:{mt};base64,{b64}"})
@@ -220,14 +253,25 @@ class AssetAPI:
         return {"files": result}
 
     async def _api_assets_copy(self):
-        from ..galgame_web.assets_helpers import IMAGE_EXTS, register_asset, safe_path
+        from ..galgame_web.assets_helpers import (
+            IMAGE_EXTS,
+            parse_asset_key,
+            register_asset,
+            safe_path,
+        )
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
-        source = data.get("source", "").strip()
-        dest_key = data.get("key", "").strip()
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_source = data.get("source", "")
+        raw_dest_key = data.get("key", "")
+        source = raw_source.strip() if isinstance(raw_source, str) else ""
+        dest_key = raw_dest_key.strip() if isinstance(raw_dest_key, str) else ""
         if not source or not dest_key:
             return {"error": "source and key required"}, 400
+        if not parse_asset_key(dest_key):
+            return {"error": "invalid asset key"}, 400
         sp = safe_path(source, ASSETS_DIR)
         if not sp or not sp.is_file():
             return {"error": "source not found"}, 404
@@ -251,9 +295,13 @@ class AssetAPI:
         from ..main import ASSETS_DIR
 
         data = await request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
         filenames = data.get("filenames", [])
-        if not filenames:
+        if not isinstance(filenames, list) or not filenames:
             return {"error": "no filenames"}, 400
+        if len(filenames) > MAX_BATCH_ITEMS:
+            return {"error": f"too many filenames (max {MAX_BATCH_ITEMS})"}, 400
         deleted = []
         for name in filenames:
             sp = safe_path(name, ASSETS_DIR)

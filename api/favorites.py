@@ -4,6 +4,16 @@ import uuid
 
 from quart import request
 
+MAX_FAVORITES = 500
+MAX_FAVORITE_TEXT_CHARS = 20_000
+ALLOWED_AUDIO_MIMES = {
+    "audio/wav",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/flac",
+    "audio/mp4",
+}
+
 
 class FavoritesAPI:
     def _register_favorites_apis(self):
@@ -29,12 +39,30 @@ class FavoritesAPI:
 
     async def _api_favorites_add(self):
         data = await request.get_json() or {}
-        text = data.get("text", "").strip()
-        audio_file = data.get("audio_file", "").strip()
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_text = data.get("text", "")
+        raw_audio_file = data.get("audio_file", "")
+        text = raw_text.strip() if isinstance(raw_text, str) else ""
+        audio_file = (
+            raw_audio_file.strip() if isinstance(raw_audio_file, str) else ""
+        )
         audio_mime = data.get("audio_mime", "")
         if not text or not audio_file:
             return {"error": "text and audio_file required"}, 400
+        if len(text) > MAX_FAVORITE_TEXT_CHARS:
+            return {"error": "favorite text too long"}, 400
+        if audio_mime not in ALLOWED_AUDIO_MIMES:
+            return {"error": "unsupported audio type"}, 400
+        from ..galgame_web.assets_helpers import safe_path
+        from ..main import AUDIO_DIR
+
+        audio_path = safe_path(audio_file, AUDIO_DIR)
+        if not audio_path or not audio_path.is_file():
+            return {"error": "audio file not found"}, 404
         favs = self._load_favorites()
+        if len(favs) >= MAX_FAVORITES:
+            return {"error": "favorite limit reached"}, 429
         favs.insert(
             0,
             {
@@ -50,7 +78,10 @@ class FavoritesAPI:
 
     async def _api_favorites_delete(self):
         data = await request.get_json() or {}
-        fid = data.get("id", "").strip()
+        if not isinstance(data, dict):
+            return {"error": "invalid request"}, 400
+        raw_fid = data.get("id", "")
+        fid = raw_fid.strip() if isinstance(raw_fid, str) else ""
         if not fid:
             return {"error": "id required"}, 400
         favs = self._load_favorites()
@@ -62,6 +93,7 @@ class FavoritesAPI:
         return {"status": "ok"}
 
     def _load_favorites(self) -> list[dict]:
+        from ..galgame_web.assets_helpers import safe_path
         from ..main import AUDIO_DIR, FAVORITES_PATH
 
         if not FAVORITES_PATH.exists():
@@ -70,7 +102,15 @@ class FavoritesAPI:
             favs = json.loads(FAVORITES_PATH.read_text(encoding="utf-8")) or []
         except (OSError, json.JSONDecodeError):
             return []
-        cleaned = [f for f in favs if (AUDIO_DIR / f.get("audio_file", "")).is_file()]
+        if not isinstance(favs, list):
+            return []
+        cleaned = []
+        for favorite in favs:
+            if not isinstance(favorite, dict):
+                continue
+            audio_path = safe_path(favorite.get("audio_file", ""), AUDIO_DIR)
+            if audio_path and audio_path.is_file():
+                cleaned.append(favorite)
         if len(cleaned) != len(favs):
             self._save_favorites(cleaned)
         return cleaned
