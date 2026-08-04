@@ -99,9 +99,11 @@
 
 | 位置 | 改动 |
 |------|------|
-| `_api_send` 新子步骤 `_send_switch_persona` | 发送前：multi 会话且有 `persona_id` → `update_conversation(umo, conv_id, persona_id=...)` |
+| `_api_send` 新子步骤 `_send_switch_persona` | 发送前：multi 会话且有 `persona_id` → `update_conversation(umo, conv_id, persona_id=...)`；首次无对话时 `init_astrbot_conv` 带 persona 建对话（不得覆盖其写入的 conv_id）。仅持 `_send_lock` 时调用 |
 | `_inject_galgame_rules`（现有钩子） | multi 会话额外注入当前角色 `custom_prompt` + 角色名定位语 |
-| `_do_send` 保存步骤 | history 条目带 `character`；推进 `next_char_idx` |
+| `_do_send` 保存步骤 | history 条目带 `character`（append 时未推进，直接记 `chars[next_char_idx]`）；推进 `next_char_idx = (idx+1) % len` |
+| 轮转一致性 `_send_recalc_next_char` | 编辑/删除截断后从剩余 history 最后一条 assistant 的 `character` 重算 next_char_idx（无 assistant 则重置 0），保证轮转不与历史脱节 |
+| 重生成 `_api_regenerate` | 截断前记录被删 assistant 消息的 `character`，截断后设 `next_char_idx` 为该角色 → **由同一角色重新回答** |
 | `_api_send` 响应 | 新增 `next_character: {name, expressions, background, bgm} \| null`（single 为 null，前端零改动） |
 
 ### 4.3 TTS
@@ -121,7 +123,7 @@
 
 | API | 行为 |
 |-----|------|
-| `POST session/regenerate` `{session_id}` | 仅当"最后一条是 assistant 且其前一条是 user"（否则 400）。删最后一条 assistant（插件 JSON + DB 同步截断）→ 重放用户输入走管道 → 新回复 + TTS |
+| `POST session/regenerate` `{session_id}` | 仅当"最后一条是 assistant 且其前一条是 user"（否则 400）。**由被删消息的同一角色重新回答**（截断前记录其 character）：删最后一条 assistant（插件 JSON + DB 同步截断）→ 重放用户输入走管道 → 新回复 + TTS |
 | `POST session/edit` `{session_id, message_id, new_text}` | 目标可为 user 或 assistant 消息。改文本 → 截断其后所有 → 同步 DB → 若目标是 user 消息则自动重走管道生成新回复；assistant 消息不自动重生成（改写历史，可继续对话或手动重生成） |
 | `POST session/message-delete` `{session_id, message_id}` | 删该条及其后所有 → 同步 DB → 不自动重生成（酒馆行为） |
 

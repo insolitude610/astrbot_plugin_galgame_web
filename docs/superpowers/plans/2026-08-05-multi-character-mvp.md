@@ -594,6 +594,8 @@ if mode == "multi":
                 "character": first["id"],
                 "content": opening,
             })
+            # 开场白由角色 0 说出；首轮用户消息应由下一角色回应（否则角色 0 连说两次）
+            session["next_char_idx"] = 1 % len(session["characters"])
             save_session(self._sessions, sid)
     from ..galgame_web.characters_helpers import load_characters as _lc
     return {
@@ -613,7 +615,7 @@ if mode == "multi":
     }
 ```
 
-同时在已有的 resume/auto-resume 分支的返回 dict 中增加 `"mode"` 与 `"characters"` 字段（single 会话为 `"mode": "single"`、`"characters": []`），并在 resume 时若磁盘会话是 multi 则返回其 characters 摘要（从 load_characters 匹配 id）。空白复用分支返回也加 `"mode"`。
+同时在 `_api_session_init_serialized` 的**全部 5 个返回路径**（①内存 resume、②磁盘 load resume、③auto-resume latest、④空白会话复用、⑤新建会话）的返回 dict 中增加 `"mode"` 与 `"characters"` 字段（single 会话为 `"mode": "single"`、`"characters": []`）。multi 会话 resume 时 `"characters"` 为其角色摘要列表（从 `load_characters` 按 `session["characters"]` 的 id 顺序匹配）。5 个路径结构必须一致，前端 `initSession` 才能正确识别多角色会话并渲染场景。
 
 - [ ] **Step 3: session_helpers.init_astrbot_conv 支持指定 persona_id**
 
@@ -679,6 +681,62 @@ def test_single_session_advance_is_noop():
     assert api._send_advance_character("s" * 32) == 0
 
 
+def test_recalc_next_char_from_history():
+    api = SessionAPI()
+    api._sessions = {"s" * 32: {
+        "mode": "multi",
+        "characters": ["alice", "bob", "carol"],
+        "next_char_idx": 0,
+        "history": [
+            {"id": "a", "role": "assistant", "character": "alice", "content": "开场"},
+            {"id": "b", "role": "user", "content": "hi"},
+            {"id": "c", "role": "assistant", "character": "bob", "content": "yo"},
+        ],
+    }}
+    assert api._send_recalc_next_char("s" * 32) == 2  # bob 的下一顺位 = carol
+
+
+def test_recalc_next_char_empty_history_resets_to_zero():
+    api = SessionAPI()
+    api._sessions = {"s" * 32: {
+        "mode": "multi", "characters": ["alice", "bob"], "next_char_idx": 1,
+        "history": [{"id": "a", "role": "user", "content": "hi"}],
+    }}
+    assert api._send_recalc_next_char("s" * 32) == 0
+
+
+def test_regenerate_speaker_restored_from_deleted_message():
+    """reviewer 反例：重生成必须由被删消息的同一角色回答。"""
+    api = SessionAPI()
+    api._sessions = {"s" * 32: {
+        "mode": "multi",
+        "characters": ["alice", "bob"],
+        "next_char_idx": 0,  # Alice 刚回复完已推进到 0（指向 Alice）
+        "history": [
+            {"id": "a", "role": "assistant", "character": "alice", "content": "开场"},
+            {"id": "b", "role": "user", "content": "hi"},
+            {"id": "c", "role": "assistant", "character": "bob", "content": "yo"},
+        ],
+    }}
+    # 模拟 _api_regenerate 的截断前记录：被删消息 c 的 character = bob
+    last_speaker = api._sessions["s" * 32]["history"][-1]["character"]
+    api._sessions["s" * 32]["history"] = api._sessions["s" * 32]["history"][:-1]
+    if last_speaker in api._sessions["s" * 32]["characters"]:
+        api._sessions["s" * 32]["next_char_idx"] = api._sessions["s" * 32]["characters"].index(last_speaker)
+    assert api._sessions["s" * 32]["next_char_idx"] == 1  # bob
+
+
+def test_opening_line_advances_next_char():
+    """reviewer 反例：开场白后 next_char_idx 必须推进，首轮用户消息由角色 1 回应。"""
+    api = SessionAPI()
+    chars = ["alice", "bob"]
+    api._sessions = {"s" * 32: {"mode": "multi", "characters": chars, "next_char_idx": 0,
+                                "history": [{"id": "a", "role": "assistant", "character": "alice", "content": "开场"}]}}
+    # 模拟 Task 4 开场白写入后的推进
+    api._sessions["s" * 32]["next_char_idx"] = 1 % len(chars)
+    assert api._sessions["s" * 32]["next_char_idx"] == 1
+
+
 def test_build_next_character_payload_single_returns_none():
     api = SessionAPI()
     api._sessions = {"s" * 32: {"mode": "single"}}
@@ -724,13 +782,45 @@ def _send_build_next_character(self, sid):
                 "bgm": card.get("bgm", ""),
             }
     return None
+
+
+def _send_recalc_next_char(self, sid) -> int:
+    """编辑/删除/重生成截断后，从剩余 history 恢复轮转一致性。
+
+    规则：扫描剩余 history 中最后一条 assistant 消息的 character 字段，
+    下一位发言者 = 该角色在 characters 中的下一顺位（循环）；剩余 history
+    无 assistant 消息时重置为 0（开场角色）。返回计算后的 next_char_idx。
+    """
+    session = self._sessions.get(sid)
+    if not session or session.get("mode") != "multi":
+        return 0
+    chars = session.get("characters", [])
+    if not chars:
+        return 0
+    for msg in reversed(session.get("history", [])):
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "assistant":
+            cid = msg.get("character", "")
+            if cid in chars:
+                next_idx = (chars.index(cid) + 1) % len(chars)
+                session["next_char_idx"] = next_idx
+                return next_idx
+            # 该条 assistant 的 character 无效（理论上 multi 会话不会出现，
+            # 防御性处理）：继续往前找更早的 assistant，而不是重置
+            continue
+    session["next_char_idx"] = 0
+    return 0
 ```
 
 - [ ] **Step 4: 实现 persona 切换（_send_switch_persona）**
 
 ```python
 async def _send_switch_persona(self, sid):
-    """multi 会话发送前切换 AstrBot 人格。首次无对话时带 persona 建对话。"""
+    """multi 会话发送前切换 AstrBot 人格。首次无对话时带 persona 建对话。
+
+    契约：仅在持有 session._send_lock 时调用（_do_send 与 _do_regenerate 均在锁内）。
+    """
     session = self._sessions.get(sid)
     if not session or session.get("mode") != "multi":
         return
@@ -754,8 +844,11 @@ async def _send_switch_persona(self, sid):
                 self.context, self._webchat_username, self.config, sid, session,
                 persona_id=persona_id,
             )
-            async with session["_lock"]:
-                session["conv_id"] = conv_id  # init 内部会写 session["conv_id"]
+            # 注意：init_astrbot_conv 内部已写入 session["conv_id"]（新建对话 id），
+            # 此处禁止再用旧值覆盖 session["conv_id"]。
+            # 幂等性：init_astrbot_conv 内部先 get_curr_conversation_id 查重，
+            # 与插件启动时 sync_sessions_to_db 后台任务并发调用时不会重复建对话
+            # （最坏情况是重复查询一次，最终一致）。
             return
         if conv_id and umo:
             await self.context.conversation_manager.update_conversation(
@@ -764,10 +857,12 @@ async def _send_switch_persona(self, sid):
                 persona_id=persona_id,
             )
     except Exception as e:
-        logger.warning(f"[multi] persona switch failed for {cid}: {e}")
+        # persona_id 可能已被用户在 AstrBot 中删除：AstrBot 会静默回退默认人格，
+        # 插件无法强制，但必须 error 级日志便于排查。
+        logger.error(f"[multi] persona switch failed for {cid} (persona={persona_id}): {e}")
 ```
 
-在 `_do_send` 的 Step 2（`_send_handle_command`）之前调用 `await self._send_switch_persona(sid)`。
+在 `_do_send` 的 Step 2（`_send_handle_command`）之前调用 `await self._send_switch_persona(sid)`（`_do_send` 本身在 `_send_lock` 内）。
 
 - [ ] **Step 5: main.py _inject_galgame_rules 注入 custom_prompt + 角色定位语**
 
@@ -809,7 +904,9 @@ next_character = self._send_build_next_character(sid)
 char_id = ""
 if session.get("mode") == "multi":
     chars = session.get("characters", [])
-    char_id = chars[(session.get("next_char_idx", 0) - 1) % len(chars)] if chars else ""
+    # append 时 next_char_idx 尚未推进，直接指向当前发言者（不得用 -1 偏移，
+    # 否则会记录到"下一角色"）
+    char_id = chars[session.get("next_char_idx", 0) % len(chars)] if chars else ""
 session["history"].append(
     {
         "id": uuid.uuid4().hex,
@@ -935,8 +1032,9 @@ def _edit_truncate(self, sid, keep_n):
         except Exception:
             pass
         cleanup_unreferenced_audio(removed, self._sessions)
-    # 同步版本：由调用方在事件循环中执行
-    return removed, _do
+    # 返回 (removed, coroutine)：调用方 await 该协程执行截断+同步。
+    # 注意必须调用 _do() 返回协程对象（返回 _do 本身会让调用方 await 一个函数而 TypeError）。
+    return removed, _do()
 ```
 
 注意：为配合 async 环境，`_edit_truncate` 返回 `(removed, coroutine)`，调用方 `await coroutine`。若测试直接断言 history，可在 run 中执行协程。
@@ -1031,14 +1129,26 @@ async def _api_regenerate(self):
     session = self._sessions[sid]
     async with session.setdefault("_send_lock", asyncio.Lock()):
         history = session.get("history", [])
+        # 记录被删 assistant 消息的发言角色：重生成必须由同一角色回答，
+        # 否则 _send_switch_persona 会切到 next_char_idx 指向的"下一角色"（换人答）。
+        last_speaker = ""
+        if history and isinstance(history[-1], dict):
+            last_speaker = history[-1].get("character", "")
         user_text = history[-2].get("content", "")
         removed, trunc_coro = self._edit_truncate(sid, len(history) - 1)
         await trunc_coro
+        if session.get("mode") == "multi" and last_speaker in session.get("characters", []):
+            session["next_char_idx"] = session["characters"].index(last_speaker)
         return await self._do_regenerate(sid, user_text)
 
 
 async def _do_regenerate(self, sid, user_text):
-    """截断后重放用户输入走管道，仅追加 assistant 消息。"""
+    """截断后重放用户输入走管道，仅追加 assistant 消息。
+
+    前置条件：调用方已在 _send_lock 内，且已把 next_char_idx 指向
+    被重生成消息的发言角色（_api_regenerate 负责），_send_switch_persona
+    据此切到正确人格。
+    """
     session = self._sessions[sid]
     await self._send_switch_persona(sid)
     response_event = session.get("_resp_event")
@@ -1065,15 +1175,34 @@ async def _do_regenerate(self, sid, user_text):
         session, user_text, clean_text, emotions, emotions_all,
         audio_b64, audio_mime_val, audio_file, sid,
         skip_user_append=True,
+        await_sync=True,
     )
 ```
 
-修改 `_send_save_and_return` 签名加 `skip_user_append: bool = False`，在 append user 消息处：
+修改 `_send_save_and_return` 签名加 `skip_user_append: bool = False` 与 `await_sync: bool = False`，在 append user 消息处：
 
 ```python
 if not skip_user_append:
     session["history"].append({...user 消息...})
 session["history"].append({...assistant 消息...})
+```
+
+同步调用处（`_sync` 任务）改为受 `await_sync` 控制，避免管道 `_save_to_history` 与插件 `sync_conv_to_db` 在 DB 上竞态（regenerate/edit 路径必须 await 同步，普通发送保持后台任务）：
+
+```python
+        try:
+
+            async def _sync():
+                await sync_conv_to_db(self.context, session)
+
+            import asyncio
+
+            if await_sync:
+                await _sync()
+            else:
+                self._track_task(_sync())
+        except Exception as e:
+            logger.warning(f"Failed to sync conversation to DB: {e}")
 ```
 
 （`_api_regenerate` 内 `is_valid_session_id` 需从 `..galgame_web.session_helpers` 导入——文件顶部已有局部导入模式）
@@ -1194,8 +1323,11 @@ async def _api_edit(self):
         removed, trunc_coro = self._edit_truncate(sid, plan["index"] + 1)
         await trunc_coro
         if plan["regenerate"]:
+            # 编辑用户消息：截断后先恢复轮转一致性，再重生成
+            self._send_recalc_next_char(sid)
             return await self._do_regenerate(sid, plan["new_text"])
-        await self._send_advance_character(sid)
+        # 编辑 AI 消息：改写历史后下一位发言者 = 剩余 history 最后 assistant 的下一顺位
+        self._send_recalc_next_char(sid)
         return {
             "reply": plan["new_text"],
             "emotion": session.get("current_emotion", "neutral"),
@@ -1232,7 +1364,8 @@ async def _api_message_delete(self):
     async with session.setdefault("_send_lock", asyncio.Lock()):
         removed, trunc_coro = self._edit_truncate(sid, plan["keep_n"])
         await trunc_coro
-        self._send_advance_character(sid)
+        # 深度截断后 next_char_idx 必须从剩余 history 重算（盲推进会与轮转脱节）
+        self._send_recalc_next_char(sid)
     return {"status": "ok", "next_character": self._send_build_next_character(sid)}
 ```
 
@@ -1867,5 +2000,24 @@ git commit -m "chore: bump to 0.8.0 with docs"
 
 **待实现时确认的点：**
 1. `session/init` 返回结构改动后，现有前端 `initSession` 仅用 `resp.session_id`/`current_emotion`，新增字段向后兼容。
-2. `_send_save_and_return` 加 `skip_user_append` 参数时需核对现有调用点（仅 `_do_send` 一处调用）。
+2. `_send_save_and_return` 加 `skip_user_append`/`await_sync` 参数时需核对现有调用点（仅 `_do_send` 一处调用，默认值不变）。
 3. `_edit_truncate` 返回 `(removed, coroutine)` 结构为计划内契约，实现时保持。
+
+**solution-reviewer-pro 审查修订记录（2026-08-05，首轮 VERDICT: FAIL → 已修订）：**
+
+| 发现 | 级别 | 修订 |
+|------|------|------|
+| regenerate 换人答：截断后 `_send_switch_persona` 读已推进的 next_char_idx | P0 | `_api_regenerate` 截断前记录被删消息的 `character`，截断后 `next_char_idx = chars.index(该角色)`（Task 7 修订） |
+| 开场白后 next_char_idx 未推进 → 角色 0 连说两次 | P0 | 开场白写入后 `next_char_idx = 1 % len`（Task 4 修订） |
+| `session["conv_id"] = conv_id`（旧空值）覆盖 `init_astrbot_conv` 写入的新 conv_id | P1 | 删除覆盖行（Task 5 修订） |
+| assistant `character` 字段 `(next_char_idx - 1) % len` 在 append 时记错发言人 | P1 | append 时直接用 `chars[next_char_idx]`（未推进时即当前发言者）（Task 5 修订） |
+| 深度截断后 next_char_idx 与剩余 history 脱节 | P2 | 新增 `_send_recalc_next_char`（剩余 history 最后 assistant 的下一顺位，无则重置 0），edit/delete 截断后调用（Task 5/8 修订） |
+| 管道 `_save_to_history` 与插件 `sync_conv_to_db` DB 竞态 | P2 | `_send_save_and_return` 加 `await_sync` 参数，regenerate/edit 路径 await 同步（Task 5/7 修订） |
+| resume 返回 dict 缺 mode/characters | P3 | 明确全部 5 个返回路径补齐字段（Task 4 修订） |
+| persona 被删除静默回退默认人格 | P3 | `_send_switch_persona` 异常升级为 error 级日志（Task 5 修订） |
+| `_send_switch_persona` 锁契约未文档化 | P3 | docstring 注明仅在 `_send_lock` 内调用（Task 5 修订） |
+
+**第二轮 solution-reviewer-pro 审查（2026-08-05）：VERDICT: PASS**
+
+- 场景追踪全部通过：3 角色全轮转、删除中间消息 recalc、重生成同角色回答、编辑 user/assistant、开场白推进、append 时序、锁串行化、single 零改动、await_sync
+- 修订补充（PASS 后按 reviewer 建议）：`_edit_truncate` 返回 `_do()` 协程对象（否则 `await` 函数抛 TypeError，F1）；`_send_recalc_next_char` 无效 character 时 `continue` 而非 `break`（F2）；`init_astrbot_conv` 幂等性注释（F3）
