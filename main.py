@@ -37,9 +37,9 @@ from .galgame_web.session_helpers import (
     sync_sessions_to_db,
 )
 from .galgame_web.utils import (
+    _EMOTION_TYPO_PATTERN,
     EMOTION_PATTERN,
     PLUGIN_NAME,
-    _EMOTION_TYPO_PATTERN,
     extract_all_emotions,
     get_emotion_tags,
 )
@@ -425,13 +425,17 @@ class GalgamePlugin(
 
             tts_emotion_map: dict = {}
             try:
-                tts_emotion_map = json.loads(self.config.get("tts_emotion_map", "{}") or "{}")
+                tts_emotion_map = json.loads(
+                    self.config.get("tts_emotion_map", "{}") or "{}"
+                )
             except (json.JSONDecodeError, TypeError):
                 pass
 
             tts_provider_id = self.config.get("tts_provider", "").strip()
             if tts_provider_id:
-                tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
+                tts_provider = self.context.provider_manager.inst_map.get(
+                    tts_provider_id
+                )
             else:
                 tts_provider = self.context.get_using_tts_provider()
 
@@ -444,8 +448,12 @@ class GalgamePlugin(
                 f"[bg-tts] calling parallel TTS clean_len={len(clean_text)} "
                 f"emotion_count={len(emotions_all)}"
             )
-            audio_path = await self._parallel_tts(clean_text, emotions_all, tts_emotion_map, tts_provider)
-            logger.info(f"[bg-tts-debug] _parallel_tts returned {'path' if audio_path else 'None'}")
+            audio_path = await self._parallel_tts(
+                clean_text, emotions_all, tts_emotion_map, tts_provider
+            )
+            logger.info(
+                f"[bg-tts-debug] _parallel_tts returned {'path' if audio_path else 'None'}"
+            )
             if audio_path:
                 raw = audio_path.read_bytes()
                 mime = self._detect_audio_mime(raw)
@@ -463,7 +471,9 @@ class GalgamePlugin(
                         raw = converted.read_bytes()
                         audio_b64 = base64.b64encode(raw).decode()
                         audio_mime_val = "audio/mpeg"
-                logger.info(f"[bg-tts] synthesized {len(raw)} bytes {mime} in {time.time() - t0:.1f}s (parallel)")
+                logger.info(
+                    f"[bg-tts] synthesized {len(raw)} bytes {mime} in {time.time() - t0:.1f}s (parallel)"
+                )
                 session["_bg_tts_result"] = (audio_b64, audio_mime_val, audio_file)
             else:
                 session["_bg_tts_result"] = ("", "", "")
@@ -472,7 +482,7 @@ class GalgamePlugin(
             session["_bg_tts_result"] = ("", "", "")
 
     def _split_sentences(self, text: str):
-        parts = re.split(r'(?<=[。！？…~])\s*|(?<=[\.!\?])\s+', text)
+        parts = re.split(r"(?<=[。！？…~])\s*|(?<=[\.!\?])\s+", text)
         return [p for p in parts if p.strip()]
 
     def _build_sentence_tagged_texts(self, clean_text, emotions_all, emotion_map):
@@ -487,8 +497,11 @@ class GalgamePlugin(
             sent_start = clean_text.index(sent, cursor)
             if emotions_all:
                 sent_end_field = sent_start + len(sent)
-                sent_emotions = [(tag, pos) for tag, pos in emotions_all
-                                if sent_start <= pos < sent_end_field]
+                sent_emotions = [
+                    (tag, pos)
+                    for tag, pos in emotions_all
+                    if sent_start <= pos < sent_end_field
+                ]
             else:
                 sent_emotions = []
             if sent_emotions:
@@ -581,14 +594,26 @@ class GalgamePlugin(
         output = _register_tts_temp_output(
             paths[0].parent / f"{uuid.uuid4().hex}{suffix}"
         )
-        with open(concat_file, 'w', encoding='utf-8') as f:
+        with open(concat_file, "w", encoding="utf-8") as f:
             for p in paths:
                 f.write(f"file '{p}'\n")
         try:
             result = subprocess.run(
-                ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
-                 '-i', str(concat_file), '-c', 'copy', str(output)],
-                capture_output=True, timeout=30
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-f",
+                    "concat",
+                    "-safe",
+                    "0",
+                    "-i",
+                    str(concat_file),
+                    "-c",
+                    "copy",
+                    str(output),
+                ],
+                capture_output=True,
+                timeout=30,
             )
             if result.returncode == 0 and output.exists():
                 for p in paths:

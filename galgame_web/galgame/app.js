@@ -88,6 +88,7 @@ function scheduleExpressionTimers(emotionList, totalChars, audioDuration) {
     var emo = emotionList[i][0];
     var pos = emotionList[i][1];
     var delay = (pos / totalChars) * audioDuration * 1000;
+    if (!isFinite(delay) || delay < 0) delay = 0;
     expressionTimers.push(setTimeout((function(e) {
       return function() { switchExpression(e); };
     })(emo), delay));
@@ -707,6 +708,9 @@ function loadExpressionToSingle(emotion) {
     hiddenFace.classList.remove("hidden");
     visibleFace.classList.add("hidden");
     activeFace = activeFace === "a" ? "b" : "a";
+  };
+  img.onerror = function () {
+    console.warn("expression image failed to load: " + src);
   };
   img.src = src;
 }

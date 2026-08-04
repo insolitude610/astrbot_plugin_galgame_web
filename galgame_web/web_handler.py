@@ -67,6 +67,7 @@ def resolve_web_bind_host(configured_host: str, password: str) -> str:
         return "127.0.0.1"
     return host
 
+
 LOGIN_HTML = """\
 <!doctype html>
 <html lang="zh-CN">
@@ -188,7 +189,11 @@ def _canonical_plugin_api_path(raw_path: str, method: str) -> tuple[str, str] | 
         decoded = urllib.parse.unquote(parsed.path, errors="strict")
     except (UnicodeDecodeError, ValueError):
         return None
-    if "\\" in decoded or "\x00" in decoded or not decoded.startswith(PLUGIN_API_PREFIX):
+    if (
+        "\\" in decoded
+        or "\x00" in decoded
+        or not decoded.startswith(PLUGIN_API_PREFIX)
+    ):
         return None
     if any(segment in ("", ".", "..") for segment in decoded.split("/")[1:]):
         return None
@@ -255,7 +260,7 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
         super().end_headers()
 
     def _send_json_error(self, status: int, message: str):
-        data = (f'{{"error":"{message}"}}').encode("utf-8")
+        data = (f'{{"error":"{message}"}}').encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))

@@ -72,7 +72,9 @@ class AssetAPI:
             return {"error": "invalid request"}, 400
         files_data = data.get("files", [])
         if not isinstance(files_data, list) or len(files_data) > MAX_UPLOAD_ITEMS:
-            return {"error": f"files must contain at most {MAX_UPLOAD_ITEMS} items"}, 400
+            return {
+                "error": f"files must contain at most {MAX_UPLOAD_ITEMS} items"
+            }, 400
         logger.info(f"[assets] upload received {len(files_data)} items")
         if not files_data:
             return {"error": "no files"}, 400
@@ -83,7 +85,12 @@ class AssetAPI:
             if not isinstance(f, dict):
                 continue
             name, b64 = f.get("name", ""), f.get("data", "")
-            if not isinstance(name, str) or not isinstance(b64, str) or not name or not b64:
+            if (
+                not isinstance(name, str)
+                or not isinstance(b64, str)
+                or not name
+                or not b64
+            ):
                 continue
             if "," in b64:
                 b64 = b64.split(",", 1)[1]

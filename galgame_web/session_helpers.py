@@ -21,7 +21,9 @@ SESSION_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 
 
 def is_valid_session_id(session_id: str) -> bool:
-    return isinstance(session_id, str) and bool(SESSION_ID_PATTERN.fullmatch(session_id))
+    return isinstance(session_id, str) and bool(
+        SESSION_ID_PATTERN.fullmatch(session_id)
+    )
 
 
 def build_umo(webchat_username: str, session_id: str) -> str:
@@ -123,7 +125,9 @@ def load_session(session_id: str) -> dict | None:
             created_at = time.time()
         return {
             "umo": data.get("umo", "") if isinstance(data.get("umo", ""), str) else "",
-            "conv_id": data.get("conv_id", "") if isinstance(data.get("conv_id", ""), str) else "",
+            "conv_id": data.get("conv_id", "")
+            if isinstance(data.get("conv_id", ""), str)
+            else "",
             "history": [item for item in history if isinstance(item, dict)],
             "current_emotion": data.get("current_emotion", "neutral")
             if isinstance(data.get("current_emotion", "neutral"), str)
@@ -375,7 +379,9 @@ def _collect_complete_audio_references(
         refs.update(_collect_referenced_audio({}, _load_favorites_for_audio_gc()))
         return refs
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
-        logger.warning(f"Skipping audio GC because reference metadata is incomplete: {exc}")
+        logger.warning(
+            f"Skipping audio GC because reference metadata is incomplete: {exc}"
+        )
         return None
 
 
@@ -390,7 +396,9 @@ def cleanup_unreferenced_audio(
             if (path := _safe_audio_path(msg.get("audio_file", "")))
         }
     except (OSError, RuntimeError) as exc:
-        logger.warning(f"Skipping audio cleanup because candidates are unreadable: {exc}")
+        logger.warning(
+            f"Skipping audio cleanup because candidates are unreadable: {exc}"
+        )
         return 0
     if not candidates:
         return 0

@@ -6,7 +6,11 @@ class ConfigAPI:
         )
 
     async def _api_config(self):
-        from ..galgame_web.assets_helpers import find_asset_for, list_asset_files, resolve_assets
+        from ..galgame_web.assets_helpers import (
+            find_asset_for,
+            list_asset_files,
+            resolve_assets,
+        )
         from ..galgame_web.utils import get_emotion_tags
         from ..main import ASSETS_DIR, _load_prefs
 
@@ -14,11 +18,12 @@ class ConfigAPI:
         resolved = resolve_assets(self.config, files)
         emotion_keys = get_emotion_tags(self.config)
         prefs = _load_prefs()
-        history_avatar = self.config.get("history_avatar", "") \
-            or find_asset_for("history_avatar", files, "avatar") \
+        history_avatar = (
+            self.config.get("history_avatar", "")
+            or find_asset_for("history_avatar", files, "avatar")
             or find_asset_for("avatar", files)
-        vrm_model = self.config.get("vrm_model", "") \
-            or resolved.get("vrm_model", "")
+        )
+        vrm_model = self.config.get("vrm_model", "") or resolved.get("vrm_model", "")
         return {
             "sprite_mode": self.config.get("sprite_mode", "single"),
             "rapid_click_threshold": self.config.get("rapid_click_threshold", 5),

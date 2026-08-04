@@ -225,7 +225,9 @@ class SessionAPI:
                     }
 
             session_count = sum(
-                1 for path in SESSIONS_DIR.glob("*.json") if is_valid_session_id(path.stem)
+                1
+                for path in SESSIONS_DIR.glob("*.json")
+                if is_valid_session_id(path.stem)
             )
             if session_count >= MAX_SESSIONS:
                 return {"error": "session limit reached"}, 429
@@ -337,9 +339,7 @@ class SessionAPI:
         if path.exists():
             path.unlink()
         cleanup_unreferenced_audio(removed_history, self._sessions)
-        self._track_task(
-            delete_astrbot_conv(self.context, self._webchat_username, sid)
-        )
+        self._track_task(delete_astrbot_conv(self.context, self._webchat_username, sid))
         return {"status": "ok"}
 
     async def _api_rapid_action(self):
@@ -462,8 +462,7 @@ class SessionAPI:
                         from ..galgame_web.assets_helpers import safe_path
 
                         attachments_dir = (
-                            pathlib.Path(get_astrbot_data_path())
-                            / "attachments"
+                            pathlib.Path(get_astrbot_data_path()) / "attachments"
                         )
                         record_path = safe_path(record_file, attachments_dir)
                         if record_path and record_path.is_file():
@@ -482,7 +481,7 @@ class SessionAPI:
                     if dtext and not self._is_pure_json(dtext):
                         collected.append(dtext)
         except asyncio.TimeoutError:
-            logger.warning("[pipeline] TIMEOUT after 120s")
+            logger.warning("[pipeline] TIMEOUT after 300s")
         finally:
             webchat_queue_mgr.remove_back_queue(msg_id)
         result_text = "".join(collected).strip()
@@ -633,9 +632,7 @@ class SessionAPI:
             from ..main import AUDIO_DIR
 
             user_audio_mime = self._detect_audio_mime(audio_raw)
-            user_audio_file = (
-                f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
-            )
+            user_audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
             AUDIO_DIR.mkdir(parents=True, exist_ok=True)
             (AUDIO_DIR / user_audio_file).write_bytes(audio_raw)
 
@@ -666,7 +663,9 @@ class SessionAPI:
         )
         if _bg_task:
             await _bg_task
-            audio_b64, audio_mime_val, audio_file = session.pop("_bg_tts_result", ("", "", ""))
+            audio_b64, audio_mime_val, audio_file = session.pop(
+                "_bg_tts_result", ("", "", "")
+            )
         else:
             audio_b64, audio_mime_val, audio_file = await self._send_synthesize_tts(
                 clean_text, emotions_all, text, matched_prefix, audio_b64
@@ -755,10 +754,8 @@ class SessionAPI:
         self, cmd, session, sid, raw_reply, pipeline_result
     ):
         if cmd == "new":
-            new_cid = (
-                await self.context.conversation_manager.get_curr_conversation_id(
-                    session["umo"]
-                )
+            new_cid = await self.context.conversation_manager.get_curr_conversation_id(
+                session["umo"]
             )
             if new_cid:
                 async with session["_lock"]:
@@ -799,8 +796,10 @@ class SessionAPI:
 
         if need_sync:
             try:
-                new_cid = await self.context.conversation_manager.get_curr_conversation_id(
-                    session["umo"]
+                new_cid = (
+                    await self.context.conversation_manager.get_curr_conversation_id(
+                        session["umo"]
+                    )
                 )
                 if new_cid:
                     async with session["_lock"]:
@@ -861,7 +860,9 @@ class SessionAPI:
 
         try:
             t0_tts = time.time()
-            audio_path = await self._parallel_tts(clean_text, emotions_all, tts_emotion_map, tts_provider)
+            audio_path = await self._parallel_tts(
+                clean_text, emotions_all, tts_emotion_map, tts_provider
+            )
             if audio_path:
                 raw = pathlib.Path(audio_path).read_bytes()
                 mime = self._detect_audio_mime(raw)
@@ -917,7 +918,12 @@ class SessionAPI:
         async with session["_lock"]:
             user_content = text if text else "(语音消息)"
             session["history"].append(
-                {"role": "user", "content": user_content, "audio_file": user_audio_file, "audio_mime": user_audio_mime}
+                {
+                    "role": "user",
+                    "content": user_content,
+                    "audio_file": user_audio_file,
+                    "audio_mime": user_audio_mime,
+                }
             )
             session["history"].append(
                 {
@@ -961,8 +967,6 @@ class SessionAPI:
                     sender_name=character_name,
                 )
 
-            import asyncio
-
             self._track_task(_save_history())
         except Exception as e:
             logger.warning(f"Failed to save user message to history: {e}")
@@ -971,8 +975,6 @@ class SessionAPI:
 
             async def _sync():
                 await sync_conv_to_db(self.context, session)
-
-            import asyncio
 
             self._track_task(_sync())
         except Exception as e:

@@ -45,9 +45,7 @@ class FavoritesAPI:
         raw_text = data.get("text", "")
         raw_audio_file = data.get("audio_file", "")
         text = raw_text.strip() if isinstance(raw_text, str) else ""
-        audio_file = (
-            raw_audio_file.strip() if isinstance(raw_audio_file, str) else ""
-        )
+        audio_file = raw_audio_file.strip() if isinstance(raw_audio_file, str) else ""
         audio_mime = data.get("audio_mime", "")
         if not text or not audio_file:
             return {"error": "text and audio_file required"}, 400
