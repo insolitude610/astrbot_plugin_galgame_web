@@ -138,11 +138,17 @@ html, body {
   margin: 0 5vw;
   min-height: 24vh;
   max-height: 34vh;
-  background: rgba(15, 23, 42, 0.82);
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  border: 1px solid rgba(140, 170, 210, 0.22);
-  border-radius: 10px 10px 0 0;
+  /* ATRI window@base: top 15% solid black header band, then vertical
+     gradient from deep navy to cyan-blue; no border, square corners */
+  background: linear-gradient(180deg,
+    rgba(9, 11, 19, 0.95) 0%,
+    rgba(9, 11, 19, 0.95) 16%,
+    rgba(17, 45, 78, 0.92) 18%,
+    rgba(25, 92, 124, 0.88) 100%);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  border: none;
+  border-radius: 0;
   padding: 26px 30px 22px;
   box-shadow: 0 -8px 40px rgba(6, 12, 26, 0.35);
   display: flex;
@@ -151,15 +157,33 @@ html, body {
   animation: dialog-rise 0.5s ease-out;
 }
 
+/* 1px top highlight line (mirrors ATRI frame layer's gloss line) */
 #dialog-box::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: 15%;
   left: 0;
   right: 0;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(90deg, transparent, rgba(140, 180, 230, 0.55) 20%, rgba(160, 200, 245, 0.75) 50%, rgba(140, 180, 230, 0.55) 80%, transparent);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(120, 190, 240, 0.45) 25%, rgba(160, 220, 255, 0.65) 50%, rgba(120, 190, 240, 0.45) 75%, transparent);
+}
+
+/* subtle wave decoration on the right side (ATRI water-wave motif) */
+#dialog-box::after {
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 3%;
+  width: 30%;
+  height: 60%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 78% 30%, rgba(150, 220, 255, 0.10) 0 2px, transparent 3px),
+    radial-gradient(circle at 88% 60%, rgba(150, 220, 255, 0.08) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 72%, rgba(150, 220, 255, 0.06) 0 2px, transparent 3px),
+    radial-gradient(circle at 92% 42%, rgba(150, 220, 255, 0.05) 0 2px, transparent 3px),
+    repeating-radial-gradient(ellipse 90% 60% at 100% 50%, transparent 0 38%, rgba(120, 190, 235, 0.10) 39% 40%, transparent 41% 80%);
+  opacity: 0.8;
 }
 
 @keyframes dialog-rise {
@@ -173,18 +197,17 @@ html, body {
   position: absolute;
   top: -16px;
   left: 20px;
-  background: rgba(23, 34, 58, 0.92);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(140, 170, 210, 0.30);
-  border-radius: 6px;
+  /* ATRI namebase: saturated blue fill + nameframe: cyan-blue 2px border */
+  background: rgba(12, 12, 190, 0.92);
+  border: 2px solid rgba(18, 90, 175, 0.85);
+  border-radius: 0;
   padding: 5px 18px 4px;
   z-index: 1;
-  box-shadow: 0 2px 10px rgba(6, 12, 26, 0.3);
+  box-shadow: 0 2px 10px rgba(6, 12, 26, 0.35);
 }
 
 #character-name {
-  color: #cfe2f5;
+  color: #f0f8ff;
   font-size: 14px;
   font-weight: 600;
   font-family: var(--font-title);
@@ -194,7 +217,7 @@ html, body {
 
 #character-name:empty::after {
   content: "???";
-  color: rgba(160, 185, 215, 0.5);
+  color: rgba(190, 220, 250, 0.6);
 }
 
 /* ---- Replay Button ---- */
@@ -212,7 +235,7 @@ html, body {
   border-radius: 50%;
   background: rgba(23, 34, 58, 0.9);
   border: 1px solid rgba(150, 180, 215, 0.30);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   padding: 0;
   transition: color .2s, background .2s, transform .15s;
@@ -223,7 +246,7 @@ html, body {
 }
 
 #replay-btn:hover {
-  color: rgba(170, 205, 245, 0.95);
+  color: #f0f8ff;
   background: rgba(255, 255, 255, 0.10);
 }
 
@@ -246,7 +269,7 @@ html, body {
   border-radius: 50%;
   background: rgba(23, 34, 58, 0.9);
   border: 1px solid rgba(150, 180, 215, 0.30);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   padding: 0;
   transition: color .2s, background .2s, transform .15s;
@@ -284,12 +307,12 @@ html, body {
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(140, 170, 210, 0.25);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   transition: color .2s, background .2s;
 }
 #favorites-link:hover {
-  background: rgba(91, 140, 196, 0.35);
+  background: rgba(30, 160, 240, 0.88);
   color: rgba(255,130,150,.85);
 }
 
@@ -308,13 +331,13 @@ html, body {
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(140, 170, 210, 0.25);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   transition: color .2s, background .2s;
 }
 #session-btn:hover {
-  background: rgba(91, 140, 196, 0.35);
-  color: rgba(170, 205, 245, 0.95);
+  background: rgba(30, 160, 240, 0.88);
+  color: #f0f8ff;
 }
 
 /* ---- Dialog Text ---- */
@@ -370,10 +393,10 @@ html, body {
   gap: 12px;
   margin: 0 5vw;
   padding: 12px 26px;
-  background: rgba(13, 20, 38, 0.88);
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  border-top: 1px solid rgba(140, 170, 210, 0.16);
+  background: rgba(8, 12, 22, 0.92);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  border-top: 1px solid rgba(120, 190, 240, 0.14);
 }
 
 #user-input {
@@ -424,13 +447,13 @@ html, body {
   justify-content: center;
   flex-shrink: 0;
 }
-#expand-btn:hover { color: rgba(170, 205, 245, 0.95); background: rgba(150, 180, 215, 0.15); }
+#expand-btn:hover { color: #f0f8ff; background: rgba(150, 180, 215, 0.15); }
 .text-expanded #expand-btn { color: rgba(160, 200, 255, 0.85); }
 
 #send-btn {
   background: none;
   border: none;
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
@@ -442,7 +465,7 @@ html, body {
 }
 
 #send-btn:hover {
-  color: rgba(170, 205, 245, 0.95);
+  color: #f0f8ff;
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -460,7 +483,7 @@ html, body {
 #mic-btn {
   background: none;
   border: none;
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
@@ -472,7 +495,7 @@ html, body {
 }
 
 #mic-btn:hover {
-  color: rgba(170, 205, 245, 0.95);
+  color: #f0f8ff;
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -504,13 +527,13 @@ html, body {
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(140, 170, 210, 0.25);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   transition: color .2s, background .2s;
 }
 #settings-link:hover {
-  background: rgba(91, 140, 196, 0.35);
-  color: rgba(170, 205, 245, 0.95);
+  background: rgba(30, 160, 240, 0.88);
+  color: #f0f8ff;
 }
 
 /* ---- History Button ---- */
@@ -528,13 +551,13 @@ html, body {
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(140, 170, 210, 0.25);
-  color: rgba(190, 215, 245, 0.9);
+  color: rgba(150, 210, 250, 0.95);
   cursor: pointer;
   transition: color .2s, background .2s;
 }
 #history-btn:hover {
-  background: rgba(91, 140, 196, 0.35);
-  color: rgba(170, 205, 245, 0.95);
+  background: rgba(30, 160, 240, 0.88);
+  color: #f0f8ff;
 }
 
 /* ---- History Panel ---- */
@@ -756,8 +779,8 @@ html, body {
   inset: 60px 80px;
   max-width: 520px;
   margin: 0 auto;
-  background: rgba(20, 30, 48, 0.90);
-  border: 1px solid rgba(140, 170, 210, 0.28);
+  background: rgba(8, 12, 22, 0.94);
+  border: 1px solid rgba(30, 90, 150, 0.40);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
@@ -867,7 +890,7 @@ html, body {
   margin: 8px 16px 16px;
   padding: 12px 0;
   background: none;
-  border: 1px solid rgba(140, 170, 210, 0.30);
+  border: 1px solid rgba(30, 90, 150, 0.45);
   border-radius: 10px;
   color: rgba(170, 195, 225, 0.70);
   font-size: 14px;
@@ -945,8 +968,8 @@ html, body {
 .confirm-overlay.active { display: flex; }
 .confirm-card {
   width: min(360px, 86vw);
-  background: linear-gradient(160deg, rgba(30, 42, 60, 0.96), rgba(20, 30, 48, 0.96));
-  border: 1px solid rgba(140, 170, 210, 0.30);
+  background: linear-gradient(160deg, rgba(14, 20, 36, 0.96), rgba(9, 14, 26, 0.96));
+  border: 1px solid rgba(30, 90, 150, 0.45);
   border-radius: 14px;
   padding: 22px 20px 18px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
@@ -1005,7 +1028,7 @@ html, body {
   border-radius: 10px;
   font-size: 13.5px;
   line-height: 1.5;
-  background: rgba(20, 30, 48, 0.94);
+  background: rgba(8, 12, 22, 0.94);
   border: 1px solid rgba(140, 170, 210, 0.35);
   color: #dbe7f5;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
