@@ -463,6 +463,43 @@ function onBgmVolume() {
   if (bgmChannel) bgmChannel.postMessage({ kind: "bgm-volume", volume: parseFloat(bv.value) });
 }
 
+/* ---- font ---- */
+
+function applyFontStyleLocal(style) {
+  var root = document.documentElement.style;
+  if (style === "sans") {
+    root.setProperty("--font-title", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  } else if (style === "") {
+    root.removeProperty("--font-title");
+    root.removeProperty("--font-body");
+  } else {
+    root.setProperty("--font-title", '"Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  }
+}
+
+function notifyFontChange(style) {
+  if (bgmChannel) bgmChannel.postMessage({ kind: "font-change", style: style });
+  applyFontStyleLocal(style);
+}
+
+function loadFontPrefs() {
+  var style = config.font_style || "serif";
+  var inputs = document.querySelectorAll('input[name="font-style"]');
+  for (var i = 0; i < inputs.length; i++) {
+    if (inputs[i].value === style) inputs[i].checked = true;
+  }
+  Array.prototype.forEach.call(inputs, function(input) {
+    input.addEventListener("change", function() {
+      apiPost("prefs", { font_style: this.value }).then(function() {
+        notifyFontChange(this.value);
+      }.bind(this)).catch(function(e) { setStatus("字体保存失败: " + e.message, "error"); });
+    });
+  });
+  applyFontStyleLocal(style);
+}
+
 async function init() {
   try {
     config = await apiGet("config");
@@ -478,6 +515,7 @@ async function init() {
   await loadFiles();
   await loadBgmList();
   loadVolumePrefs();
+  loadFontPrefs();
   await preloadAssets();
 }
 

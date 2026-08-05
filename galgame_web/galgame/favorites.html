@@ -32,7 +32,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(rgba(50, 40, 30, 0.68), rgba(35, 28, 20, 0.65));
+  background: linear-gradient(rgba(14, 22, 38, 0.72), rgba(12, 18, 32, 0.70));
 }
 
 /* content container (matches history-content card) */
@@ -41,12 +41,12 @@ body {
   z-index: 1;
   margin: 40px 60px;
   height: calc(100vh - 80px);
-  background: rgba(55, 42, 32, 0.92);
-  border: 1px solid rgba(200, 160, 120, 0.12);
+  background: rgba(20, 30, 48, 0.92);
+  border: 1px solid rgba(140, 170, 210, 0.20);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.35), 0 0 60px rgba(180, 130, 80, 0.05);
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.35), 0 0 60px rgba(90, 140, 200, 0.05);
 }
 
 /* header */
@@ -55,17 +55,17 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid rgba(200, 160, 120, 0.08);
+  border-bottom: 1px solid rgba(140, 170, 210, 0.12);
   flex-shrink: 0;
 }
 #fav-title {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(250, 230, 200, 0.88);
+  color: rgba(219, 231, 245, 0.92);
 }
 #fav-sub {
   font-size: 12px;
-  color: rgba(200, 160, 120, 0.45);
+  color: rgba(160, 185, 215, 0.5);
   margin-left: 10px;
 }
 
@@ -74,16 +74,16 @@ body {
   align-items: center;
   gap: 4px;
   background: none;
-  border: 1px solid rgba(200, 160, 120, 0.18);
+  border: 1px solid rgba(140, 170, 210, 0.30);
   border-radius: 6px;
-  color: rgba(210, 190, 160, 0.55);
+  color: rgba(160, 185, 215, 0.6);
   cursor: pointer;
   padding: 4px 10px;
   font-size: 12px;
   text-decoration: none;
   transition: color .2s, border-color .2s;
 }
-.back-btn:hover { color: rgba(250, 230, 200, 0.9); border-color: rgba(200, 160, 120, 0.35); }
+.back-btn:hover { color: rgba(180, 210, 240, 0.92); border-color: rgba(160, 185, 215, 0.35); }
 
 /* scrollable list */
 #fav-list {
@@ -93,7 +93,7 @@ body {
 }
 #fav-list::-webkit-scrollbar { width: 4px; }
 #fav-list::-webkit-scrollbar-thumb {
-  background: rgba(200, 160, 120, 0.12);
+  background: rgba(140, 170, 210, 0.22);
   border-radius: 2px;
 }
 
@@ -102,21 +102,21 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(160, 120, 80, 0.10);
-  border: 1px solid rgba(200, 160, 120, 0.08);
+  background: rgba(140, 170, 210, 0.08);
+  border: 1px solid rgba(140, 170, 210, 0.12);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 10px;
   transition: background .2s, border-color .2s;
 }
 .fav-card:hover {
-  background: rgba(180, 140, 100, 0.14);
-  border-color: rgba(200, 160, 120, 0.18);
+  background: rgba(150, 180, 215, 0.12);
+  border-color: rgba(140, 170, 210, 0.22);
 }
 
 .fav-date {
   font-size: 11px;
-  color: rgba(200, 160, 120, 0.4);
+  color: rgba(160, 185, 215, 0.45);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -124,7 +124,7 @@ body {
 .fav-text {
   flex: 1;
   font-size: 14px;
-  color: rgba(230, 210, 180, 0.85);
+  color: rgba(219, 231, 245, 0.9);
   line-height: 1.6;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -145,13 +145,13 @@ body {
   flex-shrink: 0;
 }
 .btn:hover { opacity: 0.88; }
-.btn-play { background: rgba(139, 92, 246, 0.35); color: rgba(200, 170, 255, 0.9); }
-.btn-play:hover { background: rgba(139, 92, 246, 0.50); }
-.btn-delete { background: rgba(180, 120, 110, 0.15); color: rgba(220, 150, 140, 0.7); border: 1px solid rgba(200, 130, 120, 0.15); }
-.btn-delete:hover { background: rgba(200, 130, 120, 0.25); color: rgba(230, 160, 150, 0.85); }
+.btn-play { background: rgba(91, 140, 196, 0.3); color: rgba(180, 210, 240, 0.92); }
+.btn-play:hover { background: rgba(91, 140, 196, 0.45); }
+.btn-delete { background: rgba(180, 90, 100, 0.15); color: rgba(230, 150, 160, 0.75); border: 1px solid rgba(200, 110, 120, 0.18); }
+.btn-delete:hover { background: rgba(200, 100, 110, 0.25); color: rgba(235, 160, 170, 0.88); }
 
-.loading { text-align: center; padding: 60px 20px; color: rgba(200, 160, 120, 0.35); font-size: 14px; }
-.empty { text-align: center; padding: 80px 20px; color: rgba(200, 160, 120, 0.28); font-size: 14px; }
+.loading { text-align: center; padding: 60px 20px; color: rgba(160, 185, 215, 0.4); font-size: 14px; }
+.empty { text-align: center; padding: 80px 20px; color: rgba(160, 185, 215, 0.32); font-size: 14px; }
 @media (max-width: 640px) {
   html, body { min-height: 100%; height: auto; overflow: auto; }
   #fav-container { margin: 12px; height: calc(100vh - 24px); }
@@ -175,9 +175,9 @@ body {
   border-radius: 10px;
   font-size: 13.5px;
   line-height: 1.5;
-  background: rgba(30, 22, 14, 0.94);
-  border: 1px solid rgba(220, 180, 140, 0.22);
-  color: rgba(240, 225, 200, 0.94);
+  background: rgba(20, 30, 48, 0.94);
+  border: 1px solid rgba(140, 170, 210, 0.35);
+  color: #dbe7f5;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
@@ -188,6 +188,61 @@ body {
 .app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 .app-toast.toast-error { border-color: rgba(230, 90, 100, 0.4); color: #ffd9dc; }
 .app-toast.toast-success { border-color: rgba(110, 210, 150, 0.4); color: #d4f7e2; }
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 14, 26, 0.62);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.confirm-overlay.active { display: flex; }
+.confirm-card {
+  width: min(360px, 86vw);
+  background: linear-gradient(160deg, rgba(30, 42, 60, 0.96), rgba(20, 30, 48, 0.96));
+  border: 1px solid rgba(140, 170, 210, 0.30);
+  border-radius: 10px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  color: #dbe7f5;
+  font-size: 14px;
+}
+.confirm-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #eaf2fb;
+  margin-bottom: 10px;
+}
+.confirm-msg { line-height: 1.55; word-break: break-word; }
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.confirm-btns button {
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s;
+}
+.confirm-btn-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(190, 212, 238, 0.85);
+  border-color: rgba(140, 170, 210, 0.35);
+}
+.confirm-btn-cancel:hover { background: rgba(255, 255, 255, 0.11); }
+.confirm-btn-ok {
+  background: rgba(210, 70, 80, 0.28);
+  color: #ffd9dc;
+  border-color: rgba(230, 90, 100, 0.35);
+}
+.confirm-btn-ok:hover { background: rgba(210, 70, 80, 0.4); }
+.confirm-btn-ok:disabled { opacity: 0.55; cursor: default; }
 </style>
 </head>
 <body>
@@ -207,6 +262,18 @@ body {
 </div>
 
 <div id="app-toast" class="app-toast" role="status"></div>
+
+<div id="confirm-overlay" class="confirm-overlay">
+  <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-title" id="confirm-title">确认操作</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-detail" id="confirm-detail"></div>
+    <div class="confirm-btns">
+      <button id="confirm-cancel" class="confirm-btn-cancel" aria-label="取消">取消</button>
+      <button id="confirm-ok" class="confirm-btn-ok" aria-label="确认删除">确认删除</button>
+    </div>
+  </div>
+</div>
 
 <script>
 var PLUGIN = "astrbot_plugin_galgame_web";
@@ -303,16 +370,17 @@ async function loadFavorites() {
       delBtn.className = "btn btn-delete";
       delBtn.textContent = "取消收藏";
       delBtn.onclick = (function(id) {
-        return async function() {
-          try {
-            await apiPost("favorites/delete", { id: id });
-            document.getElementById("fav-" + id).remove();
-            if (!document.querySelector(".fav-card")) {
-              empty.style.display = "block";
-            }
-          } catch(e) {
-            showToast("删除失败: " + e.message, "error");
-          }
+        return function() {
+          showConfirm("取消收藏这条语音？", null, function() {
+            return apiPost("favorites/delete", { id: id }).then(function() {
+              document.getElementById("fav-" + id).remove();
+              if (!document.querySelector(".fav-card")) {
+                empty.style.display = "block";
+              }
+            }).catch(function(e) {
+              showToast("删除失败: " + e.message, "error");
+            });
+          });
         };
       })(f.id);
       card.appendChild(delBtn);
@@ -355,6 +423,57 @@ function showToast(msg, type) {
   el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
   _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
 }
+
+/* ---- confirm overlay ---- */
+
+var _confirmCb = null;
+
+function showConfirm(message, detail, onConfirm) {
+  _confirmCb = onConfirm;
+  var msgEl = document.getElementById("confirm-msg");
+  var detEl = document.getElementById("confirm-detail");
+  var okBtn = document.getElementById("confirm-ok");
+  if (msgEl) msgEl.textContent = message;
+  if (detEl) {
+    detEl.textContent = detail || "";
+    detEl.style.display = detail ? "" : "none";
+  }
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.add("active");
+  if (okBtn) {
+    okBtn.disabled = false;
+    setTimeout(function() { okBtn.focus(); }, 50);
+  }
+}
+
+function closeConfirm() {
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.remove("active");
+  _confirmCb = null;
+}
+
+function _confirmOk() {
+  var okBtn = document.getElementById("confirm-ok");
+  if (okBtn) okBtn.disabled = true;
+  var cb = _confirmCb;
+  if (typeof cb !== "function") { closeConfirm(); return; }
+  Promise.resolve().then(function() { return cb(); }).finally(closeConfirm);
+}
+
+(function() {
+  var cancelBtn = document.getElementById("confirm-cancel");
+  var okBtn = document.getElementById("confirm-ok");
+  var ov = document.getElementById("confirm-overlay");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+  if (okBtn) okBtn.addEventListener("click", _confirmOk);
+  if (ov) ov.addEventListener("click", function(e) { if (e.target === ov) closeConfirm(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ov && ov.classList.contains("active")) {
+      e.stopPropagation();
+      closeConfirm();
+    }
+  });
+})();
 
 window.addEventListener("message", function (event) {
   if (event.data && event.data.kind === "stop-audio") {

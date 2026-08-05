@@ -97,13 +97,15 @@ function loadFavorites() {
       delBtn.textContent = "取消收藏";
       delBtn.onclick = (function(id) {
         return function() {
-          apiPost("favorites/delete", { id: id }).then(function() {
-            document.getElementById("fav-" + id).remove();
-            if (!document.querySelector(".fav-card")) {
-              empty.style.display = "block";
-            }
-          }).catch(function(e) {
-            showToast("删除失败: " + e.message, "error");
+          showConfirm("取消收藏这条语音？", null, function() {
+            return apiPost("favorites/delete", { id: id }).then(function() {
+              document.getElementById("fav-" + id).remove();
+              if (!document.querySelector(".fav-card")) {
+                empty.style.display = "block";
+              }
+            }).catch(function(e) {
+              showToast("删除失败: " + e.message, "error");
+            });
           });
         };
       })(f.id);
@@ -158,3 +160,54 @@ function showToast(msg, type) {
   el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
   _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
 }
+
+/* ---- confirm overlay ---- */
+
+var _confirmCb = null;
+
+function showConfirm(message, detail, onConfirm) {
+  _confirmCb = onConfirm;
+  var msgEl = document.getElementById("confirm-msg");
+  var detEl = document.getElementById("confirm-detail");
+  var okBtn = document.getElementById("confirm-ok");
+  if (msgEl) msgEl.textContent = message;
+  if (detEl) {
+    detEl.textContent = detail || "";
+    detEl.style.display = detail ? "" : "none";
+  }
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.add("active");
+  if (okBtn) {
+    okBtn.disabled = false;
+    setTimeout(function() { okBtn.focus(); }, 50);
+  }
+}
+
+function closeConfirm() {
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.remove("active");
+  _confirmCb = null;
+}
+
+function _confirmOk() {
+  var okBtn = document.getElementById("confirm-ok");
+  if (okBtn) okBtn.disabled = true;
+  var cb = _confirmCb;
+  if (typeof cb !== "function") { closeConfirm(); return; }
+  Promise.resolve().then(function() { return cb(); }).finally(closeConfirm);
+}
+
+(function() {
+  var cancelBtn = document.getElementById("confirm-cancel");
+  var okBtn = document.getElementById("confirm-ok");
+  var ov = document.getElementById("confirm-overlay");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+  if (okBtn) okBtn.addEventListener("click", _confirmOk);
+  if (ov) ov.addEventListener("click", function(e) { if (e.target === ov) closeConfirm(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ov && ov.classList.contains("active")) {
+      e.stopPropagation();
+      closeConfirm();
+    }
+  });
+})();

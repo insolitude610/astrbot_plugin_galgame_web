@@ -584,7 +584,22 @@ function applyConfig(cfg) {
   var fs = cfg.font_size || 17;
   el.dialogText.style.fontSize = fs + "px";
 
+  applyFontStyle(cfg.font_style);
   applyBgmAndVolume(cfg);
+}
+
+function applyFontStyle(style) {
+  var root = document.documentElement.style;
+  if (style === "sans") {
+    root.setProperty("--font-title", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  } else if (style === "") {
+    root.removeProperty("--font-title");
+    root.removeProperty("--font-body");
+  } else {
+    root.setProperty("--font-title", '"Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  }
 }
 
 function preloadAssets(cfg) {
@@ -667,12 +682,11 @@ function analyzeBgColor() {
     g = Math.round(g / count);
     b = Math.round(b / count);
 
-    // Convert to HSL, shift hue towards warm if too cool
+    // Convert to HSL; keep the background's hue (cool-leaning palette).
+    // Saturation is capped low so the dark blue-gray panel dominates.
     var hsl = rgbToHsl(r, g, b);
     var hue = hsl[0];
-    // Push cool blues/greens towards warm amber/gold
-    if (hue > 180 && hue < 300) hue = (hue + 80) % 360;
-    var sat = Math.min(hsl[1] * 1.3, 0.55);
+    var sat = Math.min(hsl[1] * 1.3, 0.35);
     applyHistoryPalette(hue, sat);
   };
   img.src = assetUrl(backgroundFile);
@@ -1371,6 +1385,8 @@ function _handleComms(msg) {
     if (fpOv && !fpOv.classList.contains("active") && fpIf) {
       fpIf.src = "";
     }
+  } else if (msg.kind === "font-change") {
+    applyFontStyle(msg.style);
   }
 }
 

@@ -7,8 +7,8 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #1a1a2e;
+  font-family: var(--font-body, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif);
+  background: #141c2c;
   color: #e0e0e0;
   min-height: 100vh;
   padding: 24px;
@@ -40,7 +40,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   border: 1px solid #333;
   transition: color .2s, background .2s;
 }
-.back-btn:hover { color: #c4b5fd; background: #1e293b; }
+.back-btn:hover { color: #cfe2f5; background: rgba(91, 140, 196, 0.15); }
 .mode-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -48,7 +48,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   font-size: 12px;
   font-weight: 600;
 }
-.mode-badge.single { background: #8b5cf633; color: #a78bfa; }
+.mode-badge.single { background: rgba(91, 140, 196, 0.2); color: #9cc4ea; }
 .mode-badge.layered { background: #4ade8033; color: #4ade80; }
 .mode-desc {
   margin: 6px 0 16px;
@@ -63,9 +63,9 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   padding: 16px;
   border-radius: 12px;
   border: 1px solid #333;
-  background: #16213e;
+  background: rgba(20, 30, 48, 0.85);
 }
-.section.active { border-color: #8b5cf6; }
+.section.active { border-color: #5b8cc4; }
 .section.inactive { opacity: 0.55; }
 .section h2 {
   font-size: 16px;
@@ -148,7 +148,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   transition: opacity .2s;
 }
 .btn:hover { opacity: 0.85; }
-.btn-primary { background: #8b5cf6; color: #fff; }
+.btn-primary { background: #5b8cc4; color: #fff; }
 .btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
 .btn-danger { background: #ef4444; color: #fff; }
 
@@ -186,7 +186,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .card-actions .btn { padding: 3px 8px; font-size: 11px; }
 .card-check {
   position: absolute; top: 4px; left: 4px;
-  width: 18px; height: 18px; accent-color: #8b5cf6;
+  width: 18px; height: 18px; accent-color: #5b8cc4;
   cursor: pointer; z-index: 1;
 }
 .card-check:not(:checked) { opacity: 0.35; }
@@ -196,7 +196,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   transition: border-color .2s, background .2s, color .2s;
 }
 .drag-zone:hover, .drag-zone.drag-active {
-  border-color: #8b5cf6; background: rgba(139,92,246,.08); color: #c4b5fd;
+  border-color: #5b8cc4; background: rgba(91,140,196,.12); color: #cfe2f5;
 }
 @media (max-width: 640px) {
   body { padding: 14px; }
@@ -209,19 +209,19 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .vol-group { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .vol-label { width: 90px; font-size: 13px; color: #aaa; flex-shrink: 0; }
 .vol-slider { flex: 0 1 260px; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #333; outline: none; }
-.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; }
-.vol-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #8b5cf6; cursor: pointer; border: none; }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #5b8cc4; cursor: pointer; }
+.vol-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #5b8cc4; cursor: pointer; border: none; }
 .vol-val { width: 40px; text-align: right; font-size: 13px; color: #ccc; flex-shrink: 0; }
 /* ---- BGM list ---- */
 .audio-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #2a2a3e; border-radius: 8px; margin-bottom: 8px; }
 .audio-item .name { flex: 1; font-size: 13px; word-break: break-all; color: #ddd; }
 .audio-item .size { font-size: 11px; color: #777; margin-right: 4px; }
-.audio-item.selected { border: 2px solid #8b5cf6; background: #2d2a3e; }
-.audio-item .current-tag { font-size: 11px; color: #8b5cf6; font-weight: bold; }
+.audio-item.selected { border: 2px solid #5b8cc4; background: #1d2b40; }
+.audio-item .current-tag { font-size: 11px; color: #5b8cc4; font-weight: bold; }
 .audio-item button { padding: 5px 10px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer; }
 .btn-play { background: #3b82f6; color: #fff; }
 .btn-play.playing { background: #f59e0b; }
-.btn-sel { background: #8b5cf6; color: #fff; }
+.btn-sel { background: #5b8cc4; color: #fff; }
 .btn-del-audio { background: #ef4444; color: #fff; }
 .bgm-upload-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .bgm-upload-row input[type="file"] { display: none; }
@@ -241,12 +241,12 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .confirm-overlay.active { display: flex; }
 .confirm-card {
   width: min(360px, 86vw);
-  background: linear-gradient(160deg, rgba(34, 24, 58, 0.96), rgba(18, 12, 34, 0.96));
-  border: 1px solid rgba(180, 140, 240, 0.18);
+  background: linear-gradient(160deg, rgba(30, 42, 60, 0.96), rgba(20, 30, 48, 0.96));
+  border: 1px solid rgba(140, 170, 210, 0.30);
   border-radius: 14px;
   padding: 22px 20px 18px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-  color: rgba(230, 215, 250, 0.92);
+  color: #dbe7f5;
   font-size: 14px;
 }
 .confirm-title {
@@ -279,8 +279,8 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 }
 .confirm-btn-cancel {
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(215, 200, 235, 0.85);
-  border-color: rgba(180, 150, 220, 0.18);
+  color: rgba(190, 212, 238, 0.85);
+  border-color: rgba(140, 170, 210, 0.35);
 }
 .confirm-btn-cancel:hover { background: rgba(255, 255, 255, 0.11); }
 .confirm-btn-ok {
@@ -301,9 +301,9 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   border-radius: 10px;
   font-size: 13.5px;
   line-height: 1.5;
-  background: rgba(20, 14, 38, 0.94);
-  border: 1px solid rgba(180, 150, 220, 0.22);
-  color: rgba(235, 222, 250, 0.94);
+  background: rgba(20, 30, 48, 0.94);
+  border: 1px solid rgba(140, 170, 210, 0.35);
+  color: #dbe7f5;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
@@ -388,6 +388,14 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   </div>
 </div>
 
+<div class="section" style="margin-bottom:28px;padding:16px;border-radius:10px;border:1px solid rgba(140,170,210,.22);background:rgba(20,30,48,.85);">
+  <h3 style="margin-bottom:8px;">字体</h3>
+  <div class="hint" style="margin-bottom:12px;">标题使用衬线体（宋体类）、正文使用黑体，更接近日系视觉小说风格</div>
+  <label style="display:block;margin:8px 0;font-size:13.5px;color:#bcd3ea;cursor:pointer;"><input type="radio" name="font-style" value="serif" style="margin-right:8px;accent-color:#5b8cc4;"> 默认（衬线标题 + 黑体正文）</label>
+  <label style="display:block;margin:8px 0;font-size:13.5px;color:#bcd3ea;cursor:pointer;"><input type="radio" name="font-style" value="sans" style="margin-right:8px;accent-color:#5b8cc4;"> 全部黑体</label>
+  <label style="display:block;margin:8px 0;font-size:13.5px;color:#bcd3ea;cursor:pointer;"><input type="radio" name="font-style" value="" style="margin-right:8px;accent-color:#5b8cc4;"> 系统默认</label>
+</div>
+
 <div id="confirm-overlay" class="confirm-overlay">
   <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
     <div class="confirm-title" id="confirm-title">确认操作</div>
@@ -408,7 +416,7 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 <input type="file" id="bulk-file-input" accept="image/*" multiple hidden>
 <div id="batch-bar" style="display:none; margin-bottom:8px; align-items:center; gap:12px;">
   <label style="font-size:12px;color:#aaa;cursor:pointer;user-select:none;">
-    <input type="checkbox" id="select-all" onchange="toggleSelectAll()" style="margin-right:4px;accent-color:#8b5cf6;">
+    <input type="checkbox" id="select-all" onchange="toggleSelectAll()" style="margin-right:4px;accent-color:#5b8cc4;">
     全选
   </label>
   <button class="btn btn-danger" id="batch-delete-btn" onclick="batchDeleteSelected()" disabled>删除已选 (0)</button>
@@ -774,6 +782,45 @@ function onBgmVolume() {
   }
 }
 
+/* ---- font ---- */
+
+function applyFontStyleLocal(style) {
+  var root = document.documentElement.style;
+  if (style === "sans") {
+    root.setProperty("--font-title", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  } else if (style === "") {
+    root.removeProperty("--font-title");
+    root.removeProperty("--font-body");
+  } else {
+    root.setProperty("--font-title", '"Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+  }
+}
+
+function notifyFontChange(style) {
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: "font-change", style: style }, "*");
+  }
+  applyFontStyleLocal(style);
+}
+
+function loadFontPrefs() {
+  var style = config.font_style || "serif";
+  var inputs = document.querySelectorAll('input[name="font-style"]');
+  for (var i = 0; i < inputs.length; i++) {
+    if (inputs[i].value === style) inputs[i].checked = true;
+  }
+  Array.prototype.forEach.call(inputs, function(input) {
+    input.addEventListener("change", function() {
+      apiPost("prefs", { font_style: this.value }).then(function() {
+        notifyFontChange(this.value);
+      }.bind(this)).catch(function(e) { setBgmStatus("字体保存失败: " + e.message, "error"); });
+    });
+  });
+  applyFontStyleLocal(style);
+}
+
 async function init() {
   try {
     config = await apiGet("config");
@@ -787,6 +834,7 @@ async function init() {
   await loadFiles();
   await loadBgmList();
   loadVolumePrefs();
+  loadFontPrefs();
 }
 
 function applyBackground() {

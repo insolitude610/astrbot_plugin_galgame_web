@@ -52,4 +52,5 @@ class ConfigAPI:
             "web_port": self.config.get("web_port", 6186),
             "web_host": self.config.get("web_host", "0.0.0.0"),
             "web_enabled": self.config.get("web_enabled", True),
+            "font_style": prefs.get("font_style", "serif"),
         }

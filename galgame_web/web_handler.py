@@ -76,18 +76,18 @@ LOGIN_HTML = """\
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{display:flex;align-items:center;justify-content:center;min-height:100vh;
-background:radial-gradient(ellipse at center,#1a1330 0%,#0a0618 100%);font-family:system-ui,-apple-system,sans-serif}
-.login-box{width:min(360px,90vw);background:rgba(20,14,40,.85);border:1px solid rgba(180,140,240,.12);
-border-radius:14px;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.4)}
-.login-box h1{font-size:18px;font-weight:700;color:rgba(230,200,255,.88);text-align:center;margin-bottom:6px}
-.login-box p{font-size:13px;color:rgba(180,150,210,.45);text-align:center;margin-bottom:24px}
-.login-box label{display:block;font-size:13px;color:rgba(200,170,230,.55);margin-bottom:6px}
-.login-box input{width:100%;padding:10px 14px;font-size:15px;color:#e0d8f0;
-background:rgba(255,255,255,.06);border:1px solid rgba(180,140,240,.15);border-radius:8px;outline:none;transition:border .2s}
-.login-box input:focus{border-color:rgba(200,160,255,.35)}
-.login-box button{width:100%;margin-top:18px;padding:12px;font-size:15px;font-weight:600;color:#f0e8ff;
-background:rgba(140,100,220,.35);border:1px solid rgba(180,140,240,.25);border-radius:8px;cursor:pointer;transition:background .2s}
-.login-box button:hover{background:rgba(160,120,240,.45)}
+background:radial-gradient(ellipse at center,#141c2c 0%,#0a101c 100%);font-family:system-ui,-apple-system,sans-serif}
+.login-box{width:min(360px,90vw);background:rgba(20,30,48,.85);border:1px solid rgba(140,170,210,.12);
+border-radius:10px;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.4)}
+.login-box h1{font-size:18px;font-weight:700;color:rgba(219,231,245,.92);text-align:center;margin-bottom:6px}
+.login-box p{font-size:13px;color:rgba(160,185,215,.5);text-align:center;margin-bottom:24px}
+.login-box label{display:block;font-size:13px;color:rgba(170,195,225,.6);margin-bottom:6px}
+.login-box input{width:100%;padding:10px 14px;font-size:15px;color:#dbe7f5;
+background:rgba(255,255,255,.06);border:1px solid rgba(140,170,210,.15);border-radius:8px;outline:none;transition:border .2s}
+.login-box input:focus{border-color:rgba(91,140,196,.45)}
+.login-box button{width:100%;margin-top:18px;padding:12px;font-size:15px;font-weight:600;color:#eaf2fb;
+background:rgba(91,140,196,.35);border:1px solid rgba(140,170,210,.25);border-radius:8px;cursor:pointer;transition:background .2s}
+.login-box button:hover{background:rgba(120,165,215,.45)}
 .login-box .err{color:rgba(255,130,130,.7);font-size:13px;text-align:center;margin-top:12px;display:none}
 </style>
 </head>
