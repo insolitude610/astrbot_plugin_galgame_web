@@ -682,11 +682,13 @@ function analyzeBgColor() {
     g = Math.round(g / count);
     b = Math.round(b / count);
 
-    // Convert to HSL; keep the background's hue (cool-leaning palette).
-    // Saturation is capped low so the dark blue-gray panel dominates.
+    // Deep-sea blue theme: fix hue to the navy/cyan family regardless of
+    // the uploaded background's tone (warm scenes previously turned the
+    // history panel brown). Brightness nudges the hue slightly.
     var hsl = rgbToHsl(r, g, b);
-    var hue = hsl[0];
-    var sat = Math.min(hsl[1] * 1.3, 0.35);
+    var hue = 202 + Math.round((hsl[2] - 0.5) * 16);
+    hue = Math.max(188, Math.min(216, hue));
+    var sat = Math.min(hsl[1] * 1.2, 0.30);
     applyHistoryPalette(hue, sat);
   };
   img.src = assetUrl(backgroundFile);
@@ -745,13 +747,15 @@ function applyHistoryPalette(hue, sat) {
   root.setProperty("--history-ai-tag", hslToRgba(hue, sat * 0.45, 0.78, 1));
   root.setProperty("--history-user-tag", hslToRgba(hue, sat * 0.18, 0.72, 1));
 
-  root.setProperty("--history-ai-bubble-bg", hslToRgba(hue, sat * 0.35, 0.28, 0.22));
-  root.setProperty("--history-ai-bubble-border", hslToRgba(hue, sat * 0.4, 0.34, 0.35));
-  root.setProperty("--history-ai-bubble-text", hslToRgba(hue, sat * 0.1, 0.90, 1));
+  // Fixed deep-sea blue / cyan bubble tones (independent of the
+  // background's computed palette, so user/AI bubbles stay distinct)
+  root.setProperty("--history-ai-bubble-bg", "rgba(18, 42, 70, 0.55)");
+  root.setProperty("--history-ai-bubble-border", "rgba(80, 150, 220, 0.35)");
+  root.setProperty("--history-ai-bubble-text", "#e8f2fc");
 
-  root.setProperty("--history-user-bubble-bg", hslToRgba(hue, sat * 0.22, 0.24, 0.18));
-  root.setProperty("--history-user-bubble-border", hslToRgba(hue, sat * 0.28, 0.30, 0.30));
-  root.setProperty("--history-user-bubble-text", hslToRgba(hue, sat * 0.08, 0.85, 1));
+  root.setProperty("--history-user-bubble-bg", "rgba(28, 108, 170, 0.45)");
+  root.setProperty("--history-user-bubble-border", "rgba(110, 190, 250, 0.45)");
+  root.setProperty("--history-user-bubble-text", "#eef7ff");
 
   root.setProperty("--history-overlay", hslToRgba(hue, sat * 0.15, 0.18, 0.65));
   root.setProperty("--history-overlay-bg", "linear-gradient(" + hslToRgba(hue, sat * 0.18, 0.22, 0.68) + "," + hslToRgba(hue, sat * 0.15, 0.16, 0.65) + "), var(--history-bg-img)");
