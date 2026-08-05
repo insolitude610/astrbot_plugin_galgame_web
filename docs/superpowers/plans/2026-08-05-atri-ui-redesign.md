@@ -47,7 +47,7 @@ if "font_style" in data:
 | `.confirm-card`/`.app-toast` | 紫 | 深蓝灰面板 + 浅色文字；`.confirm-btn-ok` 保持红系 |
 | `:root` | — | 新增 `--font-title`/`--font-body` 变量（默认衬线/黑体栈）并应用到 `#character-name`、`.dialog-text`、面板标题 |
 
-- [ ] 2. `app.js` `applyConfig` 末尾加字体应用：
+- [ ] 2. `app.js` `applyConfig` 末尾加字体应用（`:root` 不定义默认变量，仅 JS 设置；`""` 回退浏览器默认）：
 
 ```javascript
 function applyFontStyle(style) {
@@ -73,7 +73,8 @@ function applyFontStyle(style) {
 }
 ```
 
-- [ ] 3. 镜像复制 + MD5 校验（app.js/style.css 必须一致；index.html 无改动）
+- [ ] 3. 视觉细节（审查修订）：`#dialog-text` text-shadow 改 none；`applyHistoryPalette` 移除暖偏移逻辑并冷化 fallback；对话框/角色名/按钮/输入行/面板移除 backdrop-filter；`.cursor`/`#user-input:focus`/`#background::after` 改冷色
+- [ ] 4. 镜像复制 + MD5 校验（app.js/style.css 必须一致；index.html 无改动）
 
 ### Task 3: 设置页双端（字体选择 UI + 配色）
 
@@ -91,7 +92,7 @@ function applyFontStyle(style) {
 </div>
 ```
 
-- [ ] 2. `app.js`：`loadVolumePrefs`（或新 `loadFontPrefs`）读取 config.font_style 勾选对应 radio；change 事件保存：
+- [ ] 2. `app.js`：`loadVolumePrefs`（或新 `loadFontPrefs`）读取 config.font_style 勾选对应 radio；change 事件保存。**通知链路（审查修订）**：Dashboard 版仅用 BroadcastChannel（复用现有 bgmChannel 长连接）；独立版仅用 `window.parent.postMessage`（现有 BGM 模式）；**不使用** `AstrBotPluginPage.postMessage`（API 不存在）；独立版**不加** BroadcastChannel（避免双投递）：
 
 ```javascript
 var fontInputs = document.querySelectorAll('input[name="font-style"]');
@@ -102,23 +103,29 @@ fontInputs.forEach(function(input) {
     }.bind(this)).catch(function(e) { setStatus("字体保存失败: " + e.message, "error"); });
   });
 });
+```
 
+Dashboard 版 `notifyFontChange`（沿用 BGM 模式）:
+
+```javascript
 function notifyFontChange(style) {
-  if (window.AstrBotPluginPage && window.AstrBotPluginPage.postMessage) {
-    window.AstrBotPluginPage.postMessage({ kind: "font-change", style: style });
-  }
-  if (window.BroadcastChannel) {
-    try {
-      var ch = new BroadcastChannel("galgame-comms");
-      ch.postMessage({ kind: "font-change", style: style });
-      ch.close();
-    } catch(e) {}
+  if (bgmChannel) { bgmChannel.postMessage({ kind: "font-change", style: style }); }
+  applyFontStyleLocal(style);
+}
+```
+
+独立版 `settings.html` 内 `notifyFontChange`（沿用 BGM 模式）:
+
+```javascript
+function notifyFontChange(style) {
+  if (window.parent !== window) {
+    window.parent.postMessage({ kind: "font-change", style: style }, "*");
   }
   applyFontStyleLocal(style);
 }
 ```
 
-（设置页自身应用字体：`applyFontStyleLocal` 同 Task 2 的 CSS 变量逻辑——页面内嵌时通过 `window.parent` 的 BroadcastChannel 或独立 WebUI 的 BroadcastChannel 通知主页面；独立 WebUI 设置页为 iframe，其字体选择同时影响自身与父页面）
+（设置页自身应用字体：`applyFontStyleLocal` 同 Task 2 的 CSS 变量逻辑）
 
 - [ ] 3. `style.css` / `settings.html` 内联 style：紫系 → 深蓝灰/浅色中性（`.section` 卡片、按钮、滑块、状态条）
 - [ ] 4. 设置页自身字体：页面 `<style>` 中 body 使用 `--font-body` 变量，标题使用 `--font-title`；独立版 settings.html 相同

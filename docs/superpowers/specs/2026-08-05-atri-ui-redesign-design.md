@@ -84,7 +84,21 @@
 
 - 收藏页取消收藏：**双端均弹确认**（本次从"一键"改为确认——用户新需求）
 - 主页面 ❤ toggle：保持一键（快速收藏操作不加确认）
-- 字体偏好：双端共享同一 prefs（存服务端），设置页保存后主页面即时生效（postMessage，BroadcastChannel 兜底轮询同 BGM 机制）
+- 字体偏好：双端共享同一 prefs（存服务端）
+- **字体通知链路（审查修订）**：
+  - Dashboard 设置页（兄弟 iframe）：复用现有 `BroadcastChannel("galgame-comms")` 长连接发送 `{kind:"font-change"}`（与 BGM 模式一致，见 pages/settings/app.js 现有 bgmChannel）。**不使用** `window.AstrBotPluginPage.postMessage`（该 API 不存在，仅有 apiGet/apiPost）
+  - 独立 WebUI 设置页（sp-iframe）：沿用现有 `window.parent.postMessage({kind:"bgm-change"...})` 模式发送 `{kind:"font-change"}`（信任源检查已存在）。**不加** BroadcastChannel（避免双投递）
+  - 主页面 `_handleComms` 统一响应 `font-change`
+
+## 6.1 视觉细节修订（审查发现）
+
+| 问题 | 修订 |
+|------|------|
+| `#dialog-text` 现有 `text-shadow: 0 1px 3px rgba(0,0,0,.5)` 在深色文字+浅底上发糊 | 改为 `text-shadow: none` |
+| 历史面板子元素沿用暖色 `--history-*` 变量 → 冷底暖字冲突 | `applyHistoryPalette` 移除暖偏移逻辑（`if (hue > 180 && hue < 300) hue = (hue + 80) % 360`），改为保持背景图色相、饱和度向蓝灰收敛；CSS 中 `var(--history-*, warm-fallback)` 的 fallback 值同步改为冷色 |
+| `backdrop-filter: blur()` 玻璃感与 ATRI"克制"冲突 | 对话框/角色名/按钮/输入行/面板全部移除 `backdrop-filter`（深蓝灰面板 0.90 不透明度已足够） |
+| `font_style ""` 与 `"serif"` 视觉相同（:root 默认变量） | `:root` **不定义** `--font-title`/`--font-body` 默认值；仅由 JS `applyFontStyle` 设置；`""` 时 `removeProperty` 回退浏览器默认字体 |
+| 颜色替换清单遗漏 | 补：`.cursor`（→`rgba(150,180,215,.7)`）、`#user-input:focus` 下划线（→`rgba(91,140,196,.65)`）、`#background::after` 暖色渐变（→冷色）、设置页 `accent-color: #8b5cf6` 4 处（→`#5b8cc4`）、收藏页 toast 暖色（→冷调） |
 
 ## 7. 验证
 
