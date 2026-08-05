@@ -45,7 +45,7 @@ if "font_style" in data:
 | `#history-panel`/`#session-panel` 内容区 | 深紫毛玻璃 | `background: rgba(20,30,48,.90); border-color: rgba(140,170,210,.28)`；文字 `#dbe7f5` |
 | `.history-msg` 气泡 | 紫系 | 面板深蓝灰系（浅蓝文字） |
 | `.confirm-card`/`.app-toast` | 紫 | 深蓝灰面板 + 浅色文字；`.confirm-btn-ok` 保持红系 |
-| `:root` | — | 新增 `--font-title`/`--font-body` 变量（默认衬线/黑体栈）并应用到 `#character-name`、`.dialog-text`、面板标题 |
+| `:root` | — | **不定义** `--font-title`/`--font-body` 默认值（纯由 JS `applyFontStyle` 设置，避免 "" 与 "serif" 同效）。CSS 规则中用 `var(--font-title)`/`var(--font-body)` 应用到 `#character-name`、`#dialog-text`、面板标题等全部文本承载元素（body、`.msg-bubble`、`.hint`/`.sub`、`.fav-text`、toast、confirm 卡片） |
 
 - [ ] 2. `app.js` `applyConfig` 末尾加字体应用（`:root` 不定义默认变量，仅 JS 设置；`""` 回退浏览器默认）：
 
@@ -53,8 +53,8 @@ if "font_style" in data:
 function applyFontStyle(style) {
   var root = document.documentElement.style;
   if (style === "sans") {
-    root.setProperty("--font-title", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif');
-    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif');
+    root.setProperty("--font-title", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
+    root.setProperty("--font-body", '"PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif');
   } else if (style === "") {
     root.removeProperty("--font-title");
     root.removeProperty("--font-body");
