@@ -1,4 +1,4 @@
-﻿
+
 var PLUGIN = "astrbot_plugin_galgame_web";
 var API_BASE = "/api/plug/" + PLUGIN;
 var BG_KEYS = ["background"];
@@ -7,7 +7,6 @@ var allFiles = [];
 var config = {};
 var selectedFiles = {};
 var _assetCache = {};
-var _assetWaiters = {};
 var _assetQueue = {};
 var _assetQueueTimer = null;
 var _assetObserver = null;
@@ -179,10 +178,8 @@ async function fetchAssetChunk(chunk) {
     var response = await apiPost("assets/batch", { names: chunk });
     (response.files || []).forEach(function(file) {
       _assetCache[file.name] = file.data;
-      var waiters = _assetWaiters[file.name] || [];
-      waiters.forEach(function(img) { img.src = file.data; });
-      delete _assetWaiters[file.name];
     });
+    updatePreviewImages();
   } catch (error) {
     if (chunk.length <= 1) throw error;
     var middle = Math.ceil(chunk.length / 2);
@@ -191,13 +188,25 @@ async function fetchAssetChunk(chunk) {
   }
 }
 
+/* After a fallback batch fills the cache, repoint any lazy preview <img>
+   elements that still carry the failed URL. */
+function updatePreviewImages() {
+  var imgs = document.querySelectorAll("img[data-asset-name]");
+  Array.prototype.forEach.call(imgs, function(img) {
+    var name = img.dataset.assetName;
+    if (name && _assetCache[name] && img.src.indexOf("data:") !== 0) {
+      img.src = _assetCache[name];
+    }
+  });
+}
+
 async function fetchAssetNames(names) {
   var unique = [];
   names.forEach(function(name) {
     if (name && !_assetCache[name] && unique.indexOf(name) < 0) unique.push(name);
   });
-  for (var offset = 0; offset < unique.length; offset += 24) {
-    await fetchAssetChunk(unique.slice(offset, offset + 24));
+  for (var offset = 0; offset < unique.length; offset += 8) {
+    await fetchAssetChunk(unique.slice(offset, offset + 8));
   }
 }
 
@@ -221,14 +230,23 @@ function queueAssetPreview(name) {
   if (!_assetQueueTimer) _assetQueueTimer = setTimeout(flushAssetQueue, 0);
 }
 
+function assetUrl(name) {
+  if (!name) return "";
+  if (window.AstrBotPluginPage) {
+    return "/api/plug/astrbot_plugin_galgame_web/assets/file?name=" + encodeURIComponent(name);
+  }
+  return "./assets/" + encodeURIComponent(name);
+}
+
 function attachAssetPreview(img, name) {
+  if (!name) return;
   if (_assetCache[name]) {
     img.src = _assetCache[name];
     return;
   }
-  (_assetWaiters[name] || (_assetWaiters[name] = [])).push(img);
+  img.dataset.assetName = name;
   if (!("IntersectionObserver" in window)) {
-    queueAssetPreview(name);
+    loadPreviewUrl(img, name);
     return;
   }
   if (!_assetObserver) {
@@ -236,12 +254,23 @@ function attachAssetPreview(img, name) {
       entries.forEach(function(entry) {
         if (!entry.isIntersecting) return;
         _assetObserver.unobserve(entry.target);
-        queueAssetPreview(entry.target.dataset.assetName);
+        loadPreviewUrl(entry.target, entry.target.dataset.assetName);
       });
     }, { rootMargin: "200px" });
   }
-  img.dataset.assetName = name;
   _assetObserver.observe(img);
+}
+
+function loadPreviewUrl(img, name) {
+  if (_assetCache[name]) {
+    img.src = _assetCache[name];
+    return;
+  }
+  img.onerror = function() {
+    img.onerror = null;
+    queueAssetPreview(name);
+  };
+  img.src = assetUrl(name);
 }
 
 function readFileAsDataUrl(file) {
@@ -521,25 +550,44 @@ async function init() {
 
 function applyBackground() {
   var bg = config.background;
-  if (bg && _assetCache[bg]) {
-    document.body.style.backgroundImage = "url(" + _assetCache[bg] + ")";
-    document.body.classList.add("bg-loaded");
-  }
+  if (!bg) return;
+  var src = _assetCache[bg] || assetUrl(bg);
+  document.body.style.backgroundImage = "url(" + src + ")";
+  document.body.classList.add("bg-loaded");
+  if (_assetCache[bg]) return;
+  // probe: if the direct URL fails (Dashboard CSP etc.), fall back to
+  // base64 through the authenticated bridge (mirrors main page)
+  var probe = new Image();
+  probe.onerror = function() {
+    apiPost("assets/batch", { names: [bg] }).then(function(resp) {
+      var files = resp.files || [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name === bg) {
+          _assetCache[bg] = files[i].data;
+          document.body.style.backgroundImage = "url(" + files[i].data + ")";
+          break;
+        }
+      }
+    }).catch(function(e) { console.warn("bg fallback failed:", e); });
+  };
+  probe.src = src;
 }
 
 function preloadAssets() {
+  // URL-based preload: warm the browser cache for configured slot images;
+  // grid previews lazy-load via attachAssetPreview. Avoids transferring
+  // every asset as base64 (was ~24MB JSON per settings open).
   var names = [];
   var exps = config.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
   if (config.background) names.push(config.background);
   if (config.history_avatar) names.push(config.history_avatar);
-  return fetchAssetNames(names).then(function() {
-    applyBackground();
-    renderAll();
-  }).catch(function(e) {
-    console.warn("preloadAssets failed:", e);
-    renderAll();
+  names.forEach(function(n) {
+    if (n && !_assetCache[n]) { var im = new Image(); im.src = assetUrl(n); }
   });
+  applyBackground();
+  renderAll();
+  return Promise.resolve();
 }
 
 /* ---- data ---- */
@@ -591,7 +639,6 @@ function getMatchedFile(key, prefix) {
 function renderAll() {
   if (_assetObserver) _assetObserver.disconnect();
   _assetObserver = null;
-  _assetWaiters = {};
   renderModeIndicator();
   renderSingleSlots();
   renderVRMSlot();

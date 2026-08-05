@@ -257,6 +257,27 @@ function assetUrl(filename) {
     : "./assets/" + encodeURIComponent(filename);
 }
 
+/* Fallback when a direct asset URL fails (e.g. restrictive Dashboard
+   CSP): fetch that single file as base64 through the authenticated bridge. */
+function _assetFallback(filename, onDone) {
+  if (!filename || _assetCache[filename]) {
+    if (onDone) onDone(_assetCache[filename] || "");
+    return;
+  }
+  apiPost("assets/batch", { names: [filename] }).then(function(resp) {
+    var files = resp.files || [];
+    var hit = null;
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].name === filename) { hit = files[i].data; break; }
+    }
+    if (hit) _assetCache[filename] = hit;
+    if (onDone) onDone(hit || "");
+  }).catch(function(e) {
+    console.warn("asset fallback failed:", filename, e);
+    if (onDone) onDone("");
+  });
+}
+
 /* ---- init ---- */
 
 function restoreLastMessage() {
@@ -603,16 +624,17 @@ function applyFontStyle(style) {
 }
 
 function preloadAssets(cfg) {
-  if (!IS_DASHBOARD()) return Promise.resolve();
+  // URL-based prewarm (browser cache); assetUrl already falls back to the
+  // API endpoint for the Dashboard. No bulk base64 transfer.
   var names = [];
   var exps = cfg.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
   if (cfg.background) names.push(cfg.background);
   if (cfg.history_avatar) names.push(cfg.history_avatar);
-  if (!names.length) return Promise.resolve();
-  return apiPost("assets/batch", { names: names }).then(function(resp) {
-    (resp.files || []).forEach(function(f) { _assetCache[f.name] = f.data; });
-  }).catch(function(e) { console.warn("preloadAssets failed:", e); });
+  names.forEach(function(n) {
+    if (n) { var im = new Image(); im.src = assetUrl(n); }
+  });
+  return Promise.resolve();
 }
 
 function applyBgmAndVolume(cfg) {
@@ -653,10 +675,18 @@ function startBgmOnInteraction(bgmAudio) {
 }
 
 function applyBackground() {
-  if (backgroundFile) {
-    el.bg.style.backgroundImage = "url(" + assetUrl(backgroundFile) + ")";
-    analyzeBgColor();
-  }
+  if (!backgroundFile) return;
+  el.bg.style.backgroundImage = "url(" + assetUrl(backgroundFile) + ")";
+  // probe: if the direct URL fails (Dashboard CSP etc.), fall back to
+  // base64 through the authenticated bridge
+  var probe = new Image();
+  probe.onerror = function() {
+    _assetFallback(backgroundFile, function(dataUrl) {
+      if (dataUrl) el.bg.style.backgroundImage = "url(" + dataUrl + ")";
+    });
+  };
+  probe.src = assetUrl(backgroundFile);
+  analyzeBgColor();
 }
 
 function analyzeBgColor() {
@@ -786,7 +816,8 @@ function applySprites() {
 /* ---- expression ---- */
 
 function loadExpressionToSingle(emotion) {
-  var src = assetUrl(expressions[emotion] || expressions["neutral"]);
+  var fname = expressions[emotion] || expressions["neutral"];
+  var src = assetUrl(fname);
   if (!src) return;
   var hiddenFace = activeFace === "a" ? el.spriteFaceB : el.spriteFaceA;
   var visibleFace = activeFace === "a" ? el.spriteFaceA : el.spriteFaceB;
@@ -799,6 +830,14 @@ function loadExpressionToSingle(emotion) {
   };
   img.onerror = function () {
     console.warn("expression image failed to load: " + src);
+    _assetFallback(fname, function(dataUrl) {
+      if (dataUrl) {
+        hiddenFace.src = dataUrl;
+        hiddenFace.classList.remove("hidden");
+        visibleFace.classList.add("hidden");
+        activeFace = activeFace === "a" ? "b" : "a";
+      }
+    });
   };
   img.src = src;
 }
@@ -1137,6 +1176,12 @@ async function toggleHistory() {
       if (!isUser && historyAvatar) {
         var avatar = document.createElement("img");
         avatar.className = "history-avatar";
+        avatar.onerror = function() {
+          avatar.onerror = null;
+          _assetFallback(historyAvatar, function(dataUrl) {
+            if (dataUrl) avatar.src = dataUrl;
+          });
+        };
         avatar.src = assetUrl(historyAvatar);
         msgRow.appendChild(avatar);
       }
