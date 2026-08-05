@@ -103,7 +103,7 @@ function loadFavorites() {
               empty.style.display = "block";
             }
           }).catch(function(e) {
-            alert("删除失败: " + e.message);
+            showToast("删除失败: " + e.message, "error");
           });
         };
       })(f.id);
@@ -144,4 +144,17 @@ if (window.AstrBotPluginPage) {
     }
   }, 100);
   setTimeout(function() { clearInterval(_vPoll); }, 10000);
+}
+
+/* ---- toast ---- */
+
+var _toastTimer = null;
+
+function showToast(msg, type) {
+  var el = document.getElementById("app-toast");
+  if (!el) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
+  _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
 }

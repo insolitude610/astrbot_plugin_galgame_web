@@ -135,6 +135,20 @@
   <audio id="tts-audio" preload="auto"></audio>
   <audio id="bgm-audio" loop preload="auto"></audio>
 
+  <div id="confirm-overlay" class="confirm-overlay">
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="confirm-title" id="confirm-title">确认操作</div>
+      <div class="confirm-msg" id="confirm-msg"></div>
+      <div class="confirm-detail" id="confirm-detail"></div>
+      <div class="confirm-btns">
+        <button id="confirm-cancel" class="confirm-btn-cancel" aria-label="取消">取消</button>
+        <button id="confirm-ok" class="confirm-btn-ok" aria-label="确认删除">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-toast" class="app-toast" role="status"></div>
+
   <script type="importmap">
   {
     "imports": {

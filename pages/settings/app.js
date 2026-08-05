@@ -47,20 +47,22 @@ function toggleFileSelect(name) {
 async function batchDeleteSelected() {
   var names = Object.keys(selectedFiles);
   if (names.length === 0) return;
-  setStatus("批量删除中...");
-  try {
-    var data = await apiPost("assets/batch-delete", { filenames: names });
-    if (data.deleted && data.deleted.length > 0) {
-      data.deleted.forEach(function(name) { delete _assetCache[name]; });
-      setStatus("已删除 " + data.deleted.length + " 个文件", "success");
-      selectedFiles = {};
-      await loadFiles();
-    } else {
-      setStatus(data.error || "批量删除失败", "error");
+  showConfirm("确定删除 " + names.length + " 个文件？", null, async function() {
+    setStatus("批量删除中...");
+    try {
+      var data = await apiPost("assets/batch-delete", { filenames: names });
+      if (data.deleted && data.deleted.length > 0) {
+        data.deleted.forEach(function(name) { delete _assetCache[name]; });
+        setStatus("已删除 " + data.deleted.length + " 个文件", "success");
+        selectedFiles = {};
+        await loadFiles();
+      } else {
+        setStatus(data.error || "批量删除失败", "error");
+      }
+    } catch(e) {
+      setStatus("批量删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    setStatus("批量删除失败: " + e.message, "error");
-  }
+  });
 }
 
 function apiGet(endpoint, params) {
@@ -397,16 +399,19 @@ function _proxyApiPost(endpoint, body) {
   return apiPost(endpoint, body);
 }
 
-async function deleteBgm(name) {
-  try {
-    var data = await apiPost("bgm/delete", { filename: name });
-    if (data.deleted) {
-      if (currentBgmFile === name) currentBgmFile = "";
-      await loadBgmList();
+function deleteBgm(name) {
+  showConfirm("确定删除 " + name + "？", null, async function() {
+    try {
+      var data = await apiPost("bgm/delete", { filename: name });
+      if (data.deleted) {
+        if (currentBgmFile === name) currentBgmFile = "";
+        showToast("已删除: " + name, "success");
+        await loadBgmList();
+      }
+    } catch(e) {
+      showToast("删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    alert("删除失败: " + e.message);
-  }
+  });
 }
 
 function setBgmStatus(msg, type) {
@@ -787,20 +792,22 @@ async function loadFiles() {
   loading.style.display = "none";
 }
 
-async function deleteFile(filename) {
-  setStatus("删除中...");
-  try {
-    var data = await apiPost("assets/delete", { filename: filename });
-    if (data.deleted) {
-      delete _assetCache[filename];
-      setStatus("已删除: " + data.deleted, "success");
-      await loadFiles();
-    } else {
-      setStatus(data.error || "删除失败", "error");
+function deleteFile(filename) {
+  showConfirm("确定删除 " + filename + "？", null, async function() {
+    setStatus("删除中...");
+    try {
+      var data = await apiPost("assets/delete", { filename: filename });
+      if (data.deleted) {
+        delete _assetCache[filename];
+        setStatus("已删除: " + data.deleted, "success");
+        await loadFiles();
+      } else {
+        setStatus(data.error || "删除失败", "error");
+      }
+    } catch(e) {
+      setStatus("删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    setStatus("删除失败: " + e.message, "error");
-  }
+  });
 }
 
 function setStatus(msg, type) {
@@ -810,6 +817,67 @@ function setStatus(msg, type) {
   el.className = "status" + (type ? " " + type : "");
   if (msg) setTimeout(function() { if (el.textContent === msg) { el.textContent = ""; el.className = "status"; } }, 5000);
 }
+
+/* ---- confirm overlay & toast ---- */
+
+var _confirmCb = null;
+var _toastTimer = null;
+
+function showConfirm(message, detail, onConfirm) {
+  _confirmCb = onConfirm;
+  var msgEl = document.getElementById("confirm-msg");
+  var detEl = document.getElementById("confirm-detail");
+  var okBtn = document.getElementById("confirm-ok");
+  if (msgEl) msgEl.textContent = message;
+  if (detEl) {
+    detEl.textContent = detail || "";
+    detEl.style.display = detail ? "" : "none";
+  }
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.add("active");
+  if (okBtn) {
+    okBtn.disabled = false;
+    setTimeout(function() { okBtn.focus(); }, 50);
+  }
+}
+
+function closeConfirm() {
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.remove("active");
+  _confirmCb = null;
+}
+
+function _confirmOk() {
+  var okBtn = document.getElementById("confirm-ok");
+  if (okBtn) okBtn.disabled = true;
+  var cb = _confirmCb;
+  if (typeof cb !== "function") { closeConfirm(); return; }
+  Promise.resolve().then(function() { return cb(); }).finally(closeConfirm);
+}
+
+function showToast(msg, type) {
+  var el = document.getElementById("app-toast");
+  if (!el) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
+  _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  var cancelBtn = document.getElementById("confirm-cancel");
+  var okBtn = document.getElementById("confirm-ok");
+  var ov = document.getElementById("confirm-overlay");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+  if (okBtn) okBtn.addEventListener("click", _confirmOk);
+  if (ov) ov.addEventListener("click", function(e) { if (e.target === ov) closeConfirm(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ov && ov.classList.contains("active")) {
+      e.stopPropagation();
+      closeConfirm();
+    }
+  });
+});
 
 if (window.AstrBotPluginPage) {
   init();

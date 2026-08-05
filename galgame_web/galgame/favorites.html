@@ -162,6 +162,32 @@ body {
   .fav-text { flex-basis: calc(100% - 90px); }
   .fav-date { order: 3; flex: 1; }
 }
+
+/* ---- toast ---- */
+
+.app-toast {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  max-width: 82vw;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  background: rgba(30, 22, 14, 0.94);
+  border: 1px solid rgba(220, 180, 140, 0.22);
+  color: rgba(240, 225, 200, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 1300;
+  word-break: break-word;
+}
+.app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.app-toast.toast-error { border-color: rgba(230, 90, 100, 0.4); color: #ffd9dc; }
+.app-toast.toast-success { border-color: rgba(110, 210, 150, 0.4); color: #d4f7e2; }
 </style>
 </head>
 <body>
@@ -179,6 +205,8 @@ body {
   <div class="loading" id="loading">加载中...</div>
   <div class="empty" id="empty" style="display:none;">还没有收藏任何语音，对话时点击对话框右侧的 ❤ 按钮即可收藏。</div>
 </div>
+
+<div id="app-toast" class="app-toast" role="status"></div>
 
 <script>
 var PLUGIN = "astrbot_plugin_galgame_web";
@@ -276,7 +304,6 @@ async function loadFavorites() {
       delBtn.textContent = "取消收藏";
       delBtn.onclick = (function(id) {
         return async function() {
-          if (!confirm("确定取消收藏这条语音？")) return;
           try {
             await apiPost("favorites/delete", { id: id });
             document.getElementById("fav-" + id).remove();
@@ -284,7 +311,7 @@ async function loadFavorites() {
               empty.style.display = "block";
             }
           } catch(e) {
-            alert("删除失败: " + e.message);
+            showToast("删除失败: " + e.message, "error");
           }
         };
       })(f.id);
@@ -315,6 +342,19 @@ async function loadBackground() {
 
 loadBackground();
 loadFavorites();
+
+/* ---- toast ---- */
+
+var _toastTimer = null;
+
+function showToast(msg, type) {
+  var el = document.getElementById("app-toast");
+  if (!el) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
+  _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
+}
 
 window.addEventListener("message", function (event) {
   if (event.data && event.data.kind === "stop-audio") {

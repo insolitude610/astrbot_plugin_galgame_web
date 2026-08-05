@@ -232,3 +232,91 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   .audio-item .name { flex-basis: 100%; }
 }
 
+
+/* ---- confirm overlay & toast ---- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 3, 12, 0.62);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.confirm-overlay.active { display: flex; }
+.confirm-card {
+  width: min(360px, 86vw);
+  background: linear-gradient(160deg, rgba(34, 24, 58, 0.96), rgba(18, 12, 34, 0.96));
+  border: 1px solid rgba(180, 140, 240, 0.18);
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  color: rgba(230, 215, 250, 0.92);
+  font-size: 14px;
+}
+.confirm-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(240, 225, 255, 0.95);
+  margin-bottom: 10px;
+}
+.confirm-msg { line-height: 1.55; word-break: break-word; }
+.confirm-detail {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(220, 190, 250, 0.55);
+  word-break: break-word;
+}
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.confirm-btns button {
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s;
+}
+.confirm-btn-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(215, 200, 235, 0.85);
+  border-color: rgba(180, 150, 220, 0.18);
+}
+.confirm-btn-cancel:hover { background: rgba(255, 255, 255, 0.11); }
+.confirm-btn-ok {
+  background: rgba(210, 70, 80, 0.28);
+  color: #ffd9dc;
+  border-color: rgba(230, 90, 100, 0.35);
+}
+.confirm-btn-ok:hover { background: rgba(210, 70, 80, 0.4); }
+.confirm-btn-ok:disabled { opacity: 0.55; cursor: default; }
+
+.app-toast {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  max-width: 82vw;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  background: rgba(20, 14, 38, 0.94);
+  border: 1px solid rgba(180, 150, 220, 0.22);
+  color: rgba(235, 222, 250, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 1300;
+  word-break: break-word;
+}
+.app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.app-toast.toast-error { border-color: rgba(230, 90, 100, 0.4); color: #ffd9dc; }
+.app-toast.toast-success { border-color: rgba(110, 210, 150, 0.4); color: #d4f7e2; }

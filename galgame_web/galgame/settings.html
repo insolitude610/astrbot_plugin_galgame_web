@@ -226,6 +226,94 @@ h1 { font-size: 22px; margin-bottom: 4px; }
 .bgm-upload-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .bgm-upload-row input[type="file"] { display: none; }
 .bgm-upload-row .btn { padding: 8px 16px; }
+
+/* ---- confirm overlay & toast ---- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 3, 12, 0.62);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+.confirm-overlay.active { display: flex; }
+.confirm-card {
+  width: min(360px, 86vw);
+  background: linear-gradient(160deg, rgba(34, 24, 58, 0.96), rgba(18, 12, 34, 0.96));
+  border: 1px solid rgba(180, 140, 240, 0.18);
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  color: rgba(230, 215, 250, 0.92);
+  font-size: 14px;
+}
+.confirm-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(240, 225, 255, 0.95);
+  margin-bottom: 10px;
+}
+.confirm-msg { line-height: 1.55; word-break: break-word; }
+.confirm-detail {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(220, 190, 250, 0.55);
+  word-break: break-word;
+}
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.confirm-btns button {
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.2s;
+}
+.confirm-btn-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(215, 200, 235, 0.85);
+  border-color: rgba(180, 150, 220, 0.18);
+}
+.confirm-btn-cancel:hover { background: rgba(255, 255, 255, 0.11); }
+.confirm-btn-ok {
+  background: rgba(210, 70, 80, 0.28);
+  color: #ffd9dc;
+  border-color: rgba(230, 90, 100, 0.35);
+}
+.confirm-btn-ok:hover { background: rgba(210, 70, 80, 0.4); }
+.confirm-btn-ok:disabled { opacity: 0.55; cursor: default; }
+
+.app-toast {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  max-width: 82vw;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  background: rgba(20, 14, 38, 0.94);
+  border: 1px solid rgba(180, 150, 220, 0.22);
+  color: rgba(235, 222, 250, 0.94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 1300;
+  word-break: break-word;
+}
+.app-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.app-toast.toast-error { border-color: rgba(230, 90, 100, 0.4); color: #ffd9dc; }
+.app-toast.toast-success { border-color: rgba(110, 210, 150, 0.4); color: #d4f7e2; }
 </style>
 </head>
 <body>
@@ -300,6 +388,20 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   </div>
 </div>
 
+<div id="confirm-overlay" class="confirm-overlay">
+  <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-title" id="confirm-title">确认操作</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-detail" id="confirm-detail"></div>
+    <div class="confirm-btns">
+      <button id="confirm-cancel" class="confirm-btn-cancel" aria-label="取消">取消</button>
+      <button id="confirm-ok" class="confirm-btn-ok" aria-label="确认删除">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-toast" class="app-toast" role="status"></div>
+
 <!-- All files grid -->
 <h3 style="margin-top: 28px;">所有已上传文件</h3>
 <div class="drag-zone" id="drag-zone" role="button" tabindex="0">拖拽图片到此处上传</div>
@@ -354,23 +456,24 @@ function toggleFileSelect(name) {
   updateBatchBar();
 }
 
-async function batchDeleteSelected() {
+function batchDeleteSelected() {
   var names = Object.keys(selectedFiles);
   if (names.length === 0) return;
-  if (!confirm("确定删除 " + names.length + " 个文件？")) return;
-  setStatus("批量删除中...");
-  try {
-    var data = await apiPost("assets/batch-delete", { filenames: names });
-    if (data.deleted && data.deleted.length > 0) {
-      setStatus("已删除 " + data.deleted.length + " 个文件", "success");
-      selectedFiles = {};
-      await loadFiles();
-    } else {
-      setStatus(data.error || "批量删除失败", "error");
+  showConfirm("确定删除 " + names.length + " 个文件？", null, async function() {
+    setStatus("批量删除中...");
+    try {
+      var data = await apiPost("assets/batch-delete", { filenames: names });
+      if (data.deleted && data.deleted.length > 0) {
+        setStatus("已删除 " + data.deleted.length + " 个文件", "success");
+        selectedFiles = {};
+        await loadFiles();
+      } else {
+        setStatus(data.error || "批量删除失败", "error");
+      }
+    } catch(e) {
+      setStatus("批量删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    setStatus("批量删除失败: " + e.message, "error");
-  }
+  });
 }
 
 async function apiGet(endpoint) {
@@ -608,17 +711,19 @@ async function uploadBgm(input) {
   input.value = "";
 }
 
-async function deleteBgm(name) {
-  if (!confirm("确定删除 " + name + "？")) return;
-  try {
-    var data = await apiPost("bgm/delete", { filename: name });
-    if (data.deleted) {
-      if (currentBgmFile === name) currentBgmFile = "";
-      await loadBgmList();
+function deleteBgm(name) {
+  showConfirm("确定删除 " + name + "？", null, async function() {
+    try {
+      var data = await apiPost("bgm/delete", { filename: name });
+      if (data.deleted) {
+        if (currentBgmFile === name) currentBgmFile = "";
+        showToast("已删除: " + name, "success");
+        await loadBgmList();
+      }
+    } catch(e) {
+      showToast("删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    alert("删除失败: " + e.message);
-  }
+  });
 }
 
 function setBgmStatus(msg, type) {
@@ -975,20 +1080,21 @@ async function loadFiles() {
   loading.style.display = "none";
 }
 
-async function deleteFile(filename) {
-  if (!confirm("确定删除 " + filename + "？")) return;
-  setStatus("删除中...");
-  try {
-    var data = await apiPost("assets/delete", { filename: filename });
-    if (data.deleted) {
-      setStatus("已删除: " + data.deleted, "success");
-      await loadFiles();
-    } else {
-      setStatus(data.error || "删除失败", "error");
+function deleteFile(filename) {
+  showConfirm("确定删除 " + filename + "？", null, async function() {
+    setStatus("删除中...");
+    try {
+      var data = await apiPost("assets/delete", { filename: filename });
+      if (data.deleted) {
+        setStatus("已删除: " + data.deleted, "success");
+        await loadFiles();
+      } else {
+        setStatus(data.error || "删除失败", "error");
+      }
+    } catch(e) {
+      setStatus("删除失败: " + e.message, "error");
     }
-  } catch(e) {
-    setStatus("删除失败: " + e.message, "error");
-  }
+  });
 }
 
 function setStatus(msg, type) {
@@ -1009,6 +1115,67 @@ if (window.parent !== window) {
     });
   }
 }
+
+/* ---- confirm overlay & toast ---- */
+
+var _confirmCb = null;
+var _toastTimer = null;
+
+function showConfirm(message, detail, onConfirm) {
+  _confirmCb = onConfirm;
+  var msgEl = document.getElementById("confirm-msg");
+  var detEl = document.getElementById("confirm-detail");
+  var okBtn = document.getElementById("confirm-ok");
+  if (msgEl) msgEl.textContent = message;
+  if (detEl) {
+    detEl.textContent = detail || "";
+    detEl.style.display = detail ? "" : "none";
+  }
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.add("active");
+  if (okBtn) {
+    okBtn.disabled = false;
+    setTimeout(function() { okBtn.focus(); }, 50);
+  }
+}
+
+function closeConfirm() {
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.remove("active");
+  _confirmCb = null;
+}
+
+function _confirmOk() {
+  var okBtn = document.getElementById("confirm-ok");
+  if (okBtn) okBtn.disabled = true;
+  var cb = _confirmCb;
+  if (typeof cb !== "function") { closeConfirm(); return; }
+  Promise.resolve().then(function() { return cb(); }).finally(closeConfirm);
+}
+
+function showToast(msg, type) {
+  var el = document.getElementById("app-toast");
+  if (!el) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
+  _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
+}
+
+(function() {
+  var cancelBtn = document.getElementById("confirm-cancel");
+  var okBtn = document.getElementById("confirm-ok");
+  var ov = document.getElementById("confirm-overlay");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+  if (okBtn) okBtn.addEventListener("click", _confirmOk);
+  if (ov) ov.addEventListener("click", function(e) { if (e.target === ov) closeConfirm(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ov && ov.classList.contains("active")) {
+      e.stopPropagation();
+      closeConfirm();
+    }
+  });
+})();
 </script>
 </body>
 </html>

@@ -393,23 +393,11 @@ async function loadSessionPanel() {
       delBtn.title = "删除此对话";
       delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
       delBtn.onclick = (function(sid, el) {
-        return async function(e) {
+        return function(e) {
           e.stopPropagation();
-          var btn = e.currentTarget;
-          if (btn.disabled) return;
-          btn.disabled = true;
-          try {
-            await apiPost("session/delete", { session_id: sid });
-            if (sid === sessionId) {
-              removeLocal("galgame_session_id");
-              location.href = location.pathname;
-            } else {
-              el.remove();
-            }
-          } catch(e2) {
-            console.warn("Delete session failed:", e2);
-            btn.disabled = false;
-          }
+          showConfirm("删除该会话？", "AstrBot 对话记录与关联语音将一并清除，且无法恢复。", function() {
+            return deleteSession(sid, el);
+          });
         };
       })(s.session_id, item);
       item.appendChild(delBtn);
@@ -418,6 +406,88 @@ async function loadSessionPanel() {
     listEl.appendChild(item);
   }
 }
+
+/* ---- session delete ---- */
+
+async function deleteSession(sid, itemEl) {
+  var btn = itemEl ? itemEl.querySelector(".session-item-del") : null;
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
+    await apiPost("session/delete", { session_id: sid });
+    if (sid === sessionId) {
+      removeLocal("galgame_session_id");
+      location.href = location.pathname;
+    } else if (itemEl && itemEl.parentNode) {
+      itemEl.remove();
+    }
+  } catch(e2) {
+    console.warn("Delete session failed:", e2);
+    showToast("删除失败：" + (e2.message || e2), "error");
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ---- confirm overlay & toast ---- */
+
+var _confirmCb = null;
+var _toastTimer = null;
+
+function showConfirm(message, detail, onConfirm) {
+  _confirmCb = onConfirm;
+  var msgEl = document.getElementById("confirm-msg");
+  var detEl = document.getElementById("confirm-detail");
+  var okBtn = document.getElementById("confirm-ok");
+  if (msgEl) msgEl.textContent = message;
+  if (detEl) {
+    detEl.textContent = detail || "";
+    detEl.style.display = detail ? "" : "none";
+  }
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.add("active");
+  if (okBtn) {
+    okBtn.disabled = false;
+    setTimeout(function() { okBtn.focus(); }, 50);
+  }
+}
+
+function closeConfirm() {
+  var ov = document.getElementById("confirm-overlay");
+  if (ov) ov.classList.remove("active");
+  _confirmCb = null;
+}
+
+function _confirmOk() {
+  var okBtn = document.getElementById("confirm-ok");
+  if (okBtn) okBtn.disabled = true;
+  var cb = _confirmCb;
+  if (typeof cb !== "function") { closeConfirm(); return; }
+  Promise.resolve().then(function() { return cb(); }).finally(closeConfirm);
+}
+
+function showToast(msg, type) {
+  var el = document.getElementById("app-toast");
+  if (!el) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = "app-toast visible " + (type === "error" ? "toast-error" : "toast-success");
+  _toastTimer = setTimeout(function() { el.classList.remove("visible"); }, 3000);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  var cancelBtn = document.getElementById("confirm-cancel");
+  var okBtn = document.getElementById("confirm-ok");
+  var ov = document.getElementById("confirm-overlay");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+  if (okBtn) okBtn.addEventListener("click", _confirmOk);
+  if (ov) ov.addEventListener("click", function(e) { if (e.target === ov) closeConfirm(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ov && ov.classList.contains("active")) {
+      e.stopPropagation();
+      closeConfirm();
+    }
+  });
+});
 
 async function initSession(resumeId, forceNew) {
   var resp;
@@ -1152,7 +1222,7 @@ function setupRapidDetection() {
   var keyTimestamps = [];
 
   document.addEventListener("click", function (e) {
-    if (e.target.closest && e.target.closest("#sp-overlay, #fp-overlay, #history-panel, #session-panel, #expand-btn")) return;
+    if (e.target.closest && e.target.closest("#sp-overlay, #fp-overlay, #history-panel, #session-panel, #expand-btn, #confirm-overlay")) return;
     if (el.sendBtn.contains(e.target) || e.target === el.userInput) return;
     if (document.getElementById("dialog-box").contains(e.target)) return;
     clickTimestamps = trackTimestamps(clickTimestamps);
@@ -1161,6 +1231,7 @@ function setupRapidDetection() {
 
   document.addEventListener("keydown", function (e) {
     if (e.target === el.userInput) return;
+    if (e.target.closest && e.target.closest("#confirm-overlay")) return;
     keyTimestamps = trackTimestamps(keyTimestamps);
     clickTimestamps = [];
   });
