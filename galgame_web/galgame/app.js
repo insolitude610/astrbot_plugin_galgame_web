@@ -257,6 +257,30 @@ function assetUrl(filename) {
     : "./assets/" + encodeURIComponent(filename);
 }
 
+/* Load a sprite/avatar image into <img>. Dashboard mode always uses the
+   authenticated bridge (sandboxed iframe has no cookies for direct URLs);
+   standalone mode uses direct URLs with base64 fallback. */
+function loadSpriteImage(img, fname) {
+  if (!img || !fname) return;
+  if (_assetCache[fname]) {
+    img.src = _assetCache[fname];
+    return;
+  }
+  if (IS_DASHBOARD()) {
+    _assetFallback(fname, function(dataUrl) {
+      if (dataUrl) img.src = dataUrl;
+    });
+    return;
+  }
+  img.onerror = function() {
+    img.onerror = null;
+    _assetFallback(fname, function(dataUrl) {
+      if (dataUrl) img.src = dataUrl;
+    });
+  };
+  img.src = assetUrl(fname);
+}
+
 /* Fallback when a direct asset URL fails (e.g. restrictive Dashboard
    CSP): fetch that single file as base64 through the authenticated bridge. */
 function _assetFallback(filename, onDone) {
@@ -549,7 +573,7 @@ function finishInit(isResuming) {
 
 async function init() {
   var cachedBg = getLocal("galgame_bg") || "";
-  if (cachedBg) {
+  if (cachedBg && !IS_DASHBOARD()) {
     el.bg.style.backgroundImage = "url(" + assetUrl(cachedBg) + ")";
   }
 
@@ -624,8 +648,9 @@ function applyFontStyle(style) {
 }
 
 function preloadAssets(cfg) {
-  // URL-based prewarm (browser cache); assetUrl already falls back to the
-  // API endpoint for the Dashboard. No bulk base64 transfer.
+  // Prewarm browser cache for standalone mode. Dashboard loads via the
+  // authenticated bridge on demand (loadSpriteImage/applyBackground).
+  if (IS_DASHBOARD()) return Promise.resolve();
   var names = [];
   var exps = cfg.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
@@ -676,9 +701,17 @@ function startBgmOnInteraction(bgmAudio) {
 
 function applyBackground() {
   if (!backgroundFile) return;
+  if (IS_DASHBOARD()) {
+    _assetFallback(backgroundFile, function(dataUrl) {
+      if (dataUrl) {
+        el.bg.style.backgroundImage = "url(" + dataUrl + ")";
+        analyzeBgColor();
+      }
+    });
+    return;
+  }
   el.bg.style.backgroundImage = "url(" + assetUrl(backgroundFile) + ")";
-  // probe: if the direct URL fails (Dashboard CSP etc.), fall back to
-  // base64 through the authenticated bridge
+  // probe: if the direct URL fails (CSP etc.), fall back to base64
   var probe = new Image();
   probe.onerror = function() {
     _assetFallback(backgroundFile, function(dataUrl) {
@@ -721,7 +754,9 @@ function analyzeBgColor() {
     var sat = Math.min(hsl[1] * 1.2, 0.30);
     applyHistoryPalette(hue, sat);
   };
-  img.src = assetUrl(backgroundFile);
+  img.src = IS_DASHBOARD()
+    ? (_assetCache[backgroundFile] || assetUrl(backgroundFile))
+    : assetUrl(backgroundFile);
 }
 
 function rgbToHsl(r, g, b) {
@@ -807,8 +842,7 @@ function applySprites() {
     el.spriteSingle.classList.add("active");
     activeFace = "a";
     el.spriteFaceB.classList.add("hidden");
-    var initSrc = assetUrl(expressions[currentEmotion] || expressions["neutral"]);
-    if (initSrc) el.spriteFaceA.src = initSrc;
+    loadSpriteImage(el.spriteFaceA, expressions[currentEmotion] || expressions["neutral"]);
     el.spriteFaceA.classList.remove("hidden");
   }
 }
@@ -817,19 +851,31 @@ function applySprites() {
 
 function loadExpressionToSingle(emotion) {
   var fname = expressions[emotion] || expressions["neutral"];
-  var src = assetUrl(fname);
-  if (!src) return;
   var hiddenFace = activeFace === "a" ? el.spriteFaceB : el.spriteFaceA;
   var visibleFace = activeFace === "a" ? el.spriteFaceA : el.spriteFaceB;
   var img = new Image();
   img.onload = function () {
-    hiddenFace.src = src;
+    hiddenFace.src = img.src;
     hiddenFace.classList.remove("hidden");
     visibleFace.classList.add("hidden");
     activeFace = activeFace === "a" ? "b" : "a";
   };
+  if (_assetCache[fname]) {
+    img.src = _assetCache[fname];
+    return;
+  }
+  if (IS_DASHBOARD()) {
+    _assetFallback(fname, function(dataUrl) {
+      if (!dataUrl) return;
+      hiddenFace.src = dataUrl;
+      hiddenFace.classList.remove("hidden");
+      visibleFace.classList.add("hidden");
+      activeFace = activeFace === "a" ? "b" : "a";
+    });
+    return;
+  }
   img.onerror = function () {
-    console.warn("expression image failed to load: " + src);
+    console.warn("expression image failed to load: " + fname);
     _assetFallback(fname, function(dataUrl) {
       if (dataUrl) {
         hiddenFace.src = dataUrl;
@@ -839,7 +885,7 @@ function loadExpressionToSingle(emotion) {
       }
     });
   };
-  img.src = src;
+  img.src = assetUrl(fname);
 }
 
 function switchExpression(emotion) {
@@ -1142,7 +1188,8 @@ async function toggleHistory() {
 
   var overlay = document.getElementById("history-overlay");
   if (backgroundFile) {
-    overlay.style.setProperty("--history-bg-img", "url(" + assetUrl(backgroundFile) + ")");
+    var bgUrl = IS_DASHBOARD() ? (_assetCache[backgroundFile] || assetUrl(backgroundFile)) : assetUrl(backgroundFile);
+    overlay.style.setProperty("--history-bg-img", "url(" + bgUrl + ")");
     overlay.classList.add("has-bg");
   } else {
     overlay.style.removeProperty("--history-bg-img");
@@ -1176,13 +1223,7 @@ async function toggleHistory() {
       if (!isUser && historyAvatar) {
         var avatar = document.createElement("img");
         avatar.className = "history-avatar";
-        avatar.onerror = function() {
-          avatar.onerror = null;
-          _assetFallback(historyAvatar, function(dataUrl) {
-            if (dataUrl) avatar.src = dataUrl;
-          });
-        };
-        avatar.src = assetUrl(historyAvatar);
+        loadSpriteImage(avatar, historyAvatar);
         msgRow.appendChild(avatar);
       }
       msgRow.appendChild(bubble);

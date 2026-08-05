@@ -266,6 +266,11 @@ function loadPreviewUrl(img, name) {
     img.src = _assetCache[name];
     return;
   }
+  if (window.AstrBotPluginPage) {
+    // Dashboard sandbox: no cookies for direct URLs, load via bridge batch
+    queueAssetPreview(name);
+    return;
+  }
   img.onerror = function() {
     img.onerror = null;
     queueAssetPreview(name);
@@ -551,12 +556,29 @@ async function init() {
 function applyBackground() {
   var bg = config.background;
   if (!bg) return;
-  var src = _assetCache[bg] || assetUrl(bg);
+  if (_assetCache[bg]) {
+    document.body.style.backgroundImage = "url(" + _assetCache[bg] + ")";
+    document.body.classList.add("bg-loaded");
+    return;
+  }
+  if (window.AstrBotPluginPage) {
+    apiPost("assets/batch", { names: [bg] }).then(function(resp) {
+      var files = resp.files || [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name === bg) {
+          _assetCache[bg] = files[i].data;
+          document.body.style.backgroundImage = "url(" + files[i].data + ")";
+          document.body.classList.add("bg-loaded");
+          break;
+        }
+      }
+    }).catch(function(e) { console.warn("bg load failed:", e); });
+    return;
+  }
+  var src = assetUrl(bg);
   document.body.style.backgroundImage = "url(" + src + ")";
   document.body.classList.add("bg-loaded");
-  if (_assetCache[bg]) return;
-  // probe: if the direct URL fails (Dashboard CSP etc.), fall back to
-  // base64 through the authenticated bridge (mirrors main page)
+  // probe: if the direct URL fails, fall back to base64 via bridge
   var probe = new Image();
   probe.onerror = function() {
     apiPost("assets/batch", { names: [bg] }).then(function(resp) {
@@ -574,16 +596,21 @@ function applyBackground() {
 }
 
 function preloadAssets() {
-  // URL-based preload: warm the browser cache for configured slot images;
-  // grid previews lazy-load via attachAssetPreview. Avoids transferring
-  // every asset as base64 (was ~24MB JSON per settings open).
+  // Prewarm slot images. Standalone: warm the browser cache via URLs.
+  // Dashboard: queue a lazy bridge batch (sandbox iframe cannot load
+  // direct URLs). No bulk base64 transfer either way.
   var names = [];
   var exps = config.expressions || {};
   for (var k in exps) { if (exps[k]) names.push(exps[k]); }
   if (config.background) names.push(config.background);
   if (config.history_avatar) names.push(config.history_avatar);
   names.forEach(function(n) {
-    if (n && !_assetCache[n]) { var im = new Image(); im.src = assetUrl(n); }
+    if (!n || _assetCache[n]) return;
+    if (window.AstrBotPluginPage) {
+      queueAssetPreview(n);
+    } else {
+      var im = new Image(); im.src = assetUrl(n);
+    }
   });
   applyBackground();
   renderAll();
