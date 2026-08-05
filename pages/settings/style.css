@@ -53,7 +53,7 @@ h1 { font-size: 22px; margin-bottom: 4px; font-family: var(--font-title, "PingFa
 
 /* sections */
 .section {
-  margin-bottom: 28px;
+  margin-bottom: 20px;
   padding: 16px;
   border-radius: 10px;
   border: 1px solid rgba(140, 170, 210, 0.22);
