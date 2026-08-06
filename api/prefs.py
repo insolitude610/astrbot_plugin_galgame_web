@@ -45,7 +45,11 @@ class PrefsAPI:
             prefs["bgm_playing"] = data["bgm_playing"]
         if "font_style" in data:
             font_style = data["font_style"]
-            if not isinstance(font_style, str) or font_style not in ("serif", "sans", ""):
+            if not isinstance(font_style, str) or font_style not in (
+                "serif",
+                "sans",
+                "",
+            ):
                 return {"error": "invalid font_style"}, 400
             prefs["font_style"] = font_style
         _save_prefs(prefs)
