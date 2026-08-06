@@ -370,6 +370,45 @@ class SessionAPI:
                 )
         return {"status": "ok"}
 
+    # ---- message editing helpers ----
+
+    def _edit_find_index(self, sid, message_id):
+        session = self._sessions.get(sid)
+        if not session:
+            return None
+        history = session.get("history", [])
+        for i, msg in enumerate(history):
+            if isinstance(msg, dict) and msg.get("id") == message_id:
+                return i
+        return None
+
+    def _edit_truncate(self, sid, keep_n):
+        """截断 history 到 keep_n 条，返回 (removed, coroutine)。
+
+        调用方必须 await 返回的协程完成截断、落盘、DB 同步与音频回收。
+        """
+        from ..galgame_web.session_helpers import (
+            cleanup_unreferenced_audio,
+            save_session,
+            sync_conv_to_db,
+        )
+
+        session = self._sessions[sid]
+        removed = []
+
+        async def _do():
+            async with session["_lock"]:
+                removed.extend(session["history"][keep_n:])
+                session["history"] = session["history"][:keep_n]
+            save_session(self._sessions, sid)
+            try:
+                await sync_conv_to_db(self.context, session)
+            except Exception:
+                pass
+            cleanup_unreferenced_audio(removed, self._sessions)
+
+        return removed, _do()
+
     # ---- pipeline ----
 
     def _ext_for_mime(self, mime: str) -> str:
