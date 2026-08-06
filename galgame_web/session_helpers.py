@@ -99,6 +99,9 @@ def save_session(sessions: dict[str, dict], session_id: str):
         "history": session["history"],
         "current_emotion": session["current_emotion"],
         "created_at": session["created_at"],
+        "mode": session.get("mode", "single"),
+        "characters": session.get("characters", []),
+        "next_char_idx": session.get("next_char_idx", 0),
     }
     try:
         atomic_write_json(session_path(session_id), data)
@@ -123,12 +126,20 @@ def load_session(session_id: str) -> dict | None:
         created_at = data.get("created_at", time.time())
         if not isinstance(created_at, (int, float)):
             created_at = time.time()
+        raw_characters = data.get("characters", [])
+        if not isinstance(raw_characters, list):
+            raw_characters = []
+        raw_next = data.get("next_char_idx", 0)
         return {
             "umo": data.get("umo", "") if isinstance(data.get("umo", ""), str) else "",
             "conv_id": data.get("conv_id", "")
             if isinstance(data.get("conv_id", ""), str)
             else "",
-            "history": [item for item in history if isinstance(item, dict)],
+            "history": [
+                {**item, "id": item.get("id") or uuid.uuid4().hex}
+                for item in history
+                if isinstance(item, dict)
+            ],
             "current_emotion": data.get("current_emotion", "neutral")
             if isinstance(data.get("current_emotion", "neutral"), str)
             else "neutral",
@@ -138,6 +149,17 @@ def load_session(session_id: str) -> dict | None:
             "created_at": created_at,
             "_lock": asyncio.Lock(),
             "_send_lock": asyncio.Lock(),
+            "mode": (
+                data.get("mode", "single")
+                if isinstance(data.get("mode", "single"), str)
+                else "single"
+            ),
+            "characters": [c for c in raw_characters if isinstance(c, str)],
+            "next_char_idx": (
+                raw_next
+                if isinstance(raw_next, int) and not isinstance(raw_next, bool)
+                else 0
+            ),
         }
     except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Failed to load session {session_id}: {e}")
