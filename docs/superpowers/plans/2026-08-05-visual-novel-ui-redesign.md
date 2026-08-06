@@ -1,8 +1,8 @@
-# ATRI 蓝白冷调 UI 重设计实施计划
+# 视觉小说冷色调 UI 重设计实施计划
 
-> **For agentic workers:** 设计文档：`docs/superpowers/specs/2026-08-05-atri-ui-redesign-design.md`。实施前需 solution-reviewer-pro 审查，实施后需 quality-reviewer-pro 终审。
+> **For agentic workers:** 设计文档：`docs/superpowers/specs/2026-08-05-visual-novel-ui-redesign-design.md`。实施前需 solution-reviewer-pro 审查，实施后需 quality-reviewer-pro 终审。
 
-**Goal:** 将 WebUI 从紫色系改为 ATRI 蓝白冷调（浅色对话框 + 深蓝灰面板 + 衬线标题），支持设置页自定义字体，收藏页取消收藏加确认弹层。布局零改动，双端全量生效。
+**Goal:** 将 WebUI 从紫色系改为 视觉小说冷色调（浅色对话框 + 深蓝灰面板 + 衬线标题），支持设置页自定义字体，收藏页取消收藏加确认弹层。布局零改动，双端全量生效。
 
 **Architecture:** 仅皮肤层替换：style.css 配色 + CSS 变量字体系统 + prefs 新键 `font_style`。孪生文件同步（app.js/style.css），settings/favorites 双实现逐项同步。
 
