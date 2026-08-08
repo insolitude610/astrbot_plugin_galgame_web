@@ -15,7 +15,7 @@ class AudioAPI:
 
     async def _api_audio_data(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import AUDIO_DIR
+        from ..galgame_web.session_helpers import AUDIO_DIR
 
         filename = request.args.get("name", "")
         sp = safe_path(filename, AUDIO_DIR)

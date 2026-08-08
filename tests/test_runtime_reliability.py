@@ -14,6 +14,9 @@ session_module = importlib.import_module(f"{PACKAGE_NAME}.api.session")
 session_helpers = importlib.import_module(
     f"{PACKAGE_NAME}.galgame_web.session_helpers"
 )
+tts_module = importlib.import_module(f"{PACKAGE_NAME}.galgame_web.tts")
+audio_utils = importlib.import_module(f"{PACKAGE_NAME}.galgame_web.audio_utils")
+async_utils = importlib.import_module(f"{PACKAGE_NAME}.galgame_web.async_utils")
 
 
 class _Request:
@@ -96,11 +99,10 @@ def test_rapid_click_is_consumed_once_as_poke(monkeypatch):
 
 
 def test_aac_audio_is_detected_and_uses_matching_extension():
-    api = object.__new__(session_module.SessionAPI)
     raw = b"\xff\xf1\x50\x80" + b"\x00" * 16
 
-    assert api._detect_audio_mime(raw) == "audio/aac"
-    assert api._ext_for_mime("audio/aac") == ".aac"
+    assert audio_utils.detect_audio_mime(raw) == "audio/aac"
+    assert audio_utils.ext_for_mime("audio/aac") == ".aac"
 
 
 def test_audio_gc_fails_closed_for_corrupt_or_incomplete_session_metadata(
@@ -336,8 +338,8 @@ def test_trimmed_audio_is_deleted_only_after_all_references_are_gone(
 def test_wav_merge_works_without_ffmpeg(tmp_path, monkeypatch):
     persistent_audio = tmp_path / "persistent-audio"
     persistent_audio.mkdir()
-    monkeypatch.setattr(main_module, "AUDIO_DIR", persistent_audio)
-    monkeypatch.setattr(main_module, "_get_astrbot_temp_dir", lambda: tmp_path)
+    monkeypatch.setattr(session_helpers, "AUDIO_DIR", persistent_audio)
+    monkeypatch.setattr(tts_module, "_get_astrbot_temp_dir", lambda: tmp_path)
     paths = []
     for index, frame_count in enumerate((4, 6)):
         path = tmp_path / f"part-{index}.wav"
@@ -345,14 +347,13 @@ def test_wav_merge_works_without_ffmpeg(tmp_path, monkeypatch):
         paths.append(path)
 
     monkeypatch.setattr(
-        main_module.subprocess,
+        tts_module.subprocess,
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("ffmpeg should not be used for compatible WAV files")
         ),
     )
-    plugin = object.__new__(main_module.GalgamePlugin)
-    output = plugin._concat_audio(paths)
+    output = tts_module.concat_audio(paths)
     assert output and output.exists()
     with wave.open(str(output), "rb") as merged:
         assert merged.getnframes() == 10
@@ -365,8 +366,8 @@ def test_partial_parallel_tts_retries_the_full_text(tmp_path, monkeypatch):
         audio_dir = tmp_path / "audio"
         temp_dir.mkdir()
         audio_dir.mkdir()
-        monkeypatch.setattr(main_module, "AUDIO_DIR", audio_dir)
-        monkeypatch.setattr(main_module, "_get_astrbot_temp_dir", lambda: temp_dir)
+        monkeypatch.setattr(session_helpers, "AUDIO_DIR", audio_dir)
+        monkeypatch.setattr(tts_module, "_get_astrbot_temp_dir", lambda: temp_dir)
 
         partial = temp_dir / "partial.wav"
         fallback = temp_dir / "fallback.wav"
@@ -385,8 +386,7 @@ def test_partial_parallel_tts_retries_the_full_text(tmp_path, monkeypatch):
                     return str(fallback)
                 raise AssertionError(f"unexpected TTS text: {text}")
 
-        plugin = object.__new__(main_module.GalgamePlugin)
-        output = await plugin._parallel_tts(
+        output = await tts_module.parallel_tts(
             "第一句。第二句。", [], {}, Provider()
         )
 
@@ -406,8 +406,8 @@ def test_partial_parallel_tts_returns_none_when_full_retry_fails(
         audio_dir = tmp_path / "audio"
         temp_dir.mkdir()
         audio_dir.mkdir()
-        monkeypatch.setattr(main_module, "AUDIO_DIR", audio_dir)
-        monkeypatch.setattr(main_module, "_get_astrbot_temp_dir", lambda: temp_dir)
+        monkeypatch.setattr(session_helpers, "AUDIO_DIR", audio_dir)
+        monkeypatch.setattr(tts_module, "_get_astrbot_temp_dir", lambda: temp_dir)
 
         partial = temp_dir / "partial.wav"
         calls = []
@@ -420,8 +420,7 @@ def test_partial_parallel_tts_returns_none_when_full_retry_fails(
                     return str(partial)
                 raise RuntimeError("TTS failed")
 
-        plugin = object.__new__(main_module.GalgamePlugin)
-        output = await plugin._parallel_tts(
+        output = await tts_module.parallel_tts(
             "第一句。第二句。", [], {}, Provider()
         )
 
@@ -440,8 +439,8 @@ def test_tts_consumers_cleanup_temp_outputs_after_persisting(
         audio_dir = tmp_path / "audio"
         temp_dir.mkdir()
         audio_dir.mkdir()
-        monkeypatch.setattr(main_module, "AUDIO_DIR", audio_dir)
-        monkeypatch.setattr(main_module, "_get_astrbot_temp_dir", lambda: temp_dir)
+        monkeypatch.setattr(session_helpers, "AUDIO_DIR", audio_dir)
+        monkeypatch.setattr(tts_module, "_get_astrbot_temp_dir", lambda: temp_dir)
 
         queued_paths = []
 
@@ -457,9 +456,7 @@ def test_tts_consumers_cleanup_temp_outputs_after_persisting(
             def get_using_tts_provider(self):
                 return provider
 
-        plugin = object.__new__(main_module.GalgamePlugin)
-        plugin.context = Context()
-        plugin.config = {
+        config = {
             "tts_enabled": True,
             "tts_provider": "",
             "tts_emotion_map": "{}",
@@ -473,7 +470,7 @@ def test_tts_consumers_cleanup_temp_outputs_after_persisting(
         queued_paths.extend([first, second])
         session = {}
 
-        await plugin._do_bg_tts("First. Second.", session)
+        await tts_module.bg_tts("First. Second.", session, config, Context())
 
         background_file = audio_dir / session["_bg_tts_result"][2]
         assert background_file.is_file()
@@ -482,8 +479,8 @@ def test_tts_consumers_cleanup_temp_outputs_after_persisting(
         single = temp_dir / "single.wav"
         _write_wav(single)
         queued_paths.append(single)
-        _audio, _mime, sync_filename = await plugin._send_synthesize_tts(
-            "Single.", [], "input", None, ""
+        _audio, _mime, sync_filename = await tts_module.synthesize_audio(
+            "Single.", [], provider, config
         )
 
         assert (audio_dir / sync_filename).is_file()
@@ -498,10 +495,10 @@ def test_tts_temp_cleanup_never_deletes_persistent_audio(tmp_path, monkeypatch):
     audio_dir.mkdir(parents=True)
     persistent = audio_dir / "voice.wav"
     persistent.write_bytes(b"RIFF-persistent")
-    monkeypatch.setattr(main_module, "AUDIO_DIR", audio_dir)
-    monkeypatch.setattr(main_module, "_get_astrbot_temp_dir", lambda: temp_dir)
+    monkeypatch.setattr(session_helpers, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(tts_module, "_get_astrbot_temp_dir", lambda: temp_dir)
 
-    assert not main_module._cleanup_tts_temp_path(persistent)
+    assert not tts_module._cleanup_tts_temp_path(persistent)
     assert persistent.exists()
 
 
@@ -577,7 +574,6 @@ def test_terminate_cancels_managed_tasks():
 
 def test_thread_worker_finishes_cleanup_before_cancellation_returns(tmp_path):
     async def scenario():
-        api = object.__new__(session_module.SessionAPI)
         started = threading.Event()
         release = threading.Event()
         marker = tmp_path / "worker-finished"
@@ -587,7 +583,7 @@ def test_thread_worker_finishes_cleanup_before_cancellation_returns(tmp_path):
             release.wait(timeout=2)
             marker.write_text("done", encoding="utf-8")
 
-        task = asyncio.create_task(api._run_in_thread_to_completion(worker))
+        task = asyncio.create_task(async_utils.run_in_thread_to_completion(worker))
         while not started.is_set():
             await asyncio.sleep(0.001)
         task.cancel()

@@ -54,7 +54,7 @@ class FavoritesAPI:
         if audio_mime not in ALLOWED_AUDIO_MIMES:
             return {"error": "unsupported audio type"}, 400
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import AUDIO_DIR
+        from ..galgame_web.session_helpers import AUDIO_DIR
 
         audio_path = safe_path(audio_file, AUDIO_DIR)
         if not audio_path or not audio_path.is_file():
@@ -97,7 +97,7 @@ class FavoritesAPI:
 
     def _load_favorites(self) -> list[dict]:
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import AUDIO_DIR, FAVORITES_PATH
+        from ..galgame_web.session_helpers import AUDIO_DIR, FAVORITES_PATH
 
         if not FAVORITES_PATH.exists():
             return []
@@ -119,7 +119,6 @@ class FavoritesAPI:
         return cleaned
 
     def _save_favorites(self, favs: list[dict]):
-        from ..galgame_web.session_helpers import atomic_write_json
-        from ..main import FAVORITES_PATH
+        from ..galgame_web.session_helpers import FAVORITES_PATH, atomic_write_json
 
         atomic_write_json(FAVORITES_PATH, favs)

@@ -12,18 +12,18 @@ class PrefsAPI:
         )
 
     async def _api_prefs_get(self):
-        from ..main import _load_prefs
+        from ..galgame_web.session_helpers import load_prefs
 
-        return _load_prefs()
+        return load_prefs()
 
     async def _api_prefs_set(self):
         data = await request.get_json() or {}
         if not isinstance(data, dict) or not data:
             return {"error": "no data"}, 400
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import BGM_DIR, _load_prefs, _save_prefs
+        from ..galgame_web.session_helpers import BGM_DIR, load_prefs, save_prefs
 
-        prefs = _load_prefs()
+        prefs = load_prefs()
         if "bgm_file" in data:
             filename = data["bgm_file"]
             if not isinstance(filename, str):
@@ -52,5 +52,5 @@ class PrefsAPI:
             ):
                 return {"error": "invalid font_style"}, 400
             prefs["font_style"] = font_style
-        _save_prefs(prefs)
+        save_prefs(prefs)
         return {"status": "ok"}

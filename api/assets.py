@@ -53,7 +53,7 @@ class AssetAPI:
 
     async def _api_assets_list(self):
         from ..galgame_web.assets_helpers import IMAGE_EXTS
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         entries = [
@@ -65,7 +65,7 @@ class AssetAPI:
 
     async def _api_assets_upload(self):
         from ..galgame_web.assets_helpers import IMAGE_EXTS, MAX_UPLOAD_BYTES, safe_path
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -123,7 +123,7 @@ class AssetAPI:
             register_asset,
             safe_path,
         )
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -173,7 +173,7 @@ class AssetAPI:
 
     async def _api_assets_delete(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -190,7 +190,7 @@ class AssetAPI:
 
     async def _api_assets_file(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import ASSETS_DIR, AUDIO_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR, AUDIO_DIR
 
         filename = request.args.get("name", "")
         sp = safe_path(filename, ASSETS_DIR)
@@ -220,7 +220,7 @@ class AssetAPI:
 
     async def _api_assets_batch(self):
         from ..galgame_web.assets_helpers import MAX_UPLOAD_BYTES, safe_path
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -266,7 +266,7 @@ class AssetAPI:
             register_asset,
             safe_path,
         )
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -299,7 +299,7 @@ class AssetAPI:
 
     async def _api_assets_batch_delete(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import ASSETS_DIR
+        from ..galgame_web.session_helpers import ASSETS_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):

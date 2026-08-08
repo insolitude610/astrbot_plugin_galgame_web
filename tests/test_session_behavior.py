@@ -1,8 +1,6 @@
 import asyncio
 import importlib
 import json
-import sys
-import types
 from pathlib import Path
 
 PACKAGE_NAME = Path(__file__).resolve().parents[1].name
@@ -189,11 +187,8 @@ def test_loading_favorites_does_not_truncate_legacy_data(tmp_path, monkeypatch):
     ]
     favorites_path.write_text(json.dumps(favorites), encoding="utf-8")
 
-    main_module_name = f"{PACKAGE_NAME}.main"
-    main_stub = types.ModuleType(main_module_name)
-    main_stub.AUDIO_DIR = audio_dir
-    main_stub.FAVORITES_PATH = favorites_path
-    monkeypatch.setitem(sys.modules, main_module_name, main_stub)
+    monkeypatch.setattr(session_helpers, "AUDIO_DIR", audio_dir)
+    monkeypatch.setattr(session_helpers, "FAVORITES_PATH", favorites_path)
 
     api = object.__new__(favorites_module.FavoritesAPI)
     loaded = api._load_favorites()

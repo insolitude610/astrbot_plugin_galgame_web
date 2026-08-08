@@ -1,6 +1,4 @@
 import asyncio
-import base64
-import binascii
 import json
 import pathlib
 import re
@@ -10,38 +8,11 @@ import uuid
 from quart import request
 
 from astrbot.api import logger
-from astrbot.core.platform.sources.webchat.webchat_queue_mgr import webchat_queue_mgr
-from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-_MIME_EXT = {
-    "audio/wav": ".wav",
-    "audio/mpeg": ".mp3",
-    "audio/ogg": ".ogg",
-    "audio/flac": ".flac",
-    "audio/mp4": ".m4a",
-    "audio/aac": ".aac",
-}
+from ..galgame_web import audio_utils, pipeline, tts
+
 MAX_TEXT_CHARS = 20_000
-MAX_VOICE_BYTES = 15 * 1024 * 1024
-MAX_VOICE_BASE64_CHARS = ((MAX_VOICE_BYTES + 2) // 3) * 4
 MAX_SESSIONS = 200
-
-
-def _decode_audio_data(audio_data: str) -> bytes:
-    if not isinstance(audio_data, str):
-        raise ValueError("audio_data must be a base64 string")
-    payload = audio_data.split(",", 1)[1] if "," in audio_data else audio_data
-    if not payload:
-        return b""
-    if len(payload) > MAX_VOICE_BASE64_CHARS:
-        raise ValueError("voice message too large")
-    try:
-        raw = base64.b64decode(payload, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise ValueError("invalid audio_data") from exc
-    if len(raw) > MAX_VOICE_BYTES:
-        raise ValueError("voice message too large")
-    return raw
 
 
 class SessionAPI:
@@ -409,181 +380,7 @@ class SessionAPI:
 
         return removed, _do()
 
-    # ---- pipeline ----
-
-    def _ext_for_mime(self, mime: str) -> str:
-        return _MIME_EXT.get(mime, ".wav")
-
-    def _detect_audio_mime(self, raw: bytes) -> str:
-        if len(raw) < 4:
-            return "audio/wav"
-        head = raw[:4]
-        if head == b"RIFF":
-            return "audio/wav"
-        if head == b"OggS":
-            return "audio/ogg"
-        if head == b"fLaC":
-            return "audio/flac"
-        if (
-            head[:2] == b"\xff\xfb"
-            or head[:2] == b"\xff\xf3"
-            or head[:2] == b"\xff\xf2"
-        ):
-            return "audio/mpeg"
-        if head == b"ID3\x03" or head == b"ID3\x02" or head == b"ID3\x04":
-            return "audio/mpeg"
-        if raw[0] == 0xFF and raw[1] & 0xF6 == 0xF0:
-            return "audio/aac"
-        if len(raw) >= 12 and raw[4:8] == b"ftyp":
-            return "audio/mp4"
-        return "audio/wav"
-
-    def _is_pure_json(self, text: str) -> bool:
-        stripped = text.strip()
-        if not stripped.startswith("{"):
-            return False
-        try:
-            json.loads(stripped)
-            return True
-        except (json.JSONDecodeError, ValueError):
-            return False
-
-    async def _push_through_pipeline(
-        self, text: str, session_id: str, audio_path: str = ""
-    ) -> dict:
-        from ..main import AUDIO_DIR
-
-        t0 = time.time()
-        msg_id = str(uuid.uuid4())
-        wc_sid = f"webchat!{self._webchat_username}!{session_id}"
-        logger.info(
-            f"[pipeline] start msg_id={msg_id[:8]} sid={session_id[:8]} "
-            f"text_len={len(text)} audio={'yes' if audio_path else 'no'}"
-        )
-        back_queue = webchat_queue_mgr.get_or_create_back_queue(msg_id, wc_sid)
-        parts = []
-        if audio_path:
-            parts.append({"type": "record", "path": audio_path})
-        if text:
-            parts.append({"type": "plain", "text": text})
-        selected_provider = self.config.get("llm_provider", "").strip() or None
-        payload = {
-            "message": parts,
-            "message_id": msg_id,
-            "selected_provider": selected_provider,
-            "selected_model": None,
-            "enable_streaming": False,
-        }
-        t1 = time.time()
-        chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
-        await chat_queue.put((self._webchat_username, session_id, payload))
-        logger.info(f"[pipeline] pushed to chat_queue (setup={t1 - t0:.3f}s)")
-        collected = []
-        audio_b64 = ""
-        audio_mime = ""
-        audio_file = ""
-        first = True
-        try:
-            while True:
-                result = await asyncio.wait_for(back_queue.get(), timeout=300)
-                if first:
-                    logger.info(
-                        f"[pipeline] first resp after {(time.time() - t1) * 1000:.0f}ms"
-                    )
-                    first = False
-                mtype = result.get("type", "")
-                dtext = result.get("data", "")
-                if mtype == "end":
-                    break
-                elif mtype == "record":
-                    record_file = dtext.replace("[RECORD]", "").strip()
-                    if record_file:
-                        from ..galgame_web.assets_helpers import safe_path
-
-                        attachments_dir = (
-                            pathlib.Path(get_astrbot_data_path()) / "attachments"
-                        )
-                        record_path = safe_path(record_file, attachments_dir)
-                        if record_path and record_path.is_file():
-                            raw = record_path.read_bytes()
-                            audio_b64 = base64.b64encode(raw).decode()
-                            audio_mime = self._detect_audio_mime(raw)
-                            AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-                            audio_file = (
-                                f"{uuid.uuid4().hex}{self._ext_for_mime(audio_mime)}"
-                            )
-                            (AUDIO_DIR / audio_file).write_bytes(raw)
-                            logger.info(
-                                f"[pipeline] captured audio: {record_file} ({len(raw)} bytes, {audio_mime})"
-                            )
-                elif mtype in ("plain", "complete"):
-                    if dtext and not self._is_pure_json(dtext):
-                        collected.append(dtext)
-        except asyncio.TimeoutError:
-            logger.warning("[pipeline] TIMEOUT after 300s")
-        finally:
-            webchat_queue_mgr.remove_back_queue(msg_id)
-        result_text = "".join(collected).strip()
-        logger.info(
-            f"[pipeline] returning text_len={len(result_text)} audio={'yes' if audio_b64 else 'no'}"
-        )
-        return {
-            "text": result_text,
-            "audio": audio_b64,
-            "audio_mime": audio_mime,
-            "audio_file": audio_file,
-        }
-
-    def _save_audio(self, raw: bytes) -> str:
-        audio_dir = pathlib.Path(get_astrbot_data_path()) / "temp"
-        audio_dir.mkdir(parents=True, exist_ok=True)
-        audio_path = audio_dir / f"galgame_audio_{uuid.uuid4().hex}.wav"
-        with open(audio_path, "wb") as f:
-            f.write(raw)
-        logger.info(f"Saved voice audio: {audio_path} ({len(raw)} bytes)")
-        return str(audio_path.resolve())
-
-    def _build_tagged_text(self, text: str, emotions: list, emotion_map: dict) -> str:
-        groups: dict[int, list[str]] = {}
-        for emo_label, char_pos in emotions:
-            groups.setdefault(char_pos, []).append(emo_label)
-        sorted_positions = sorted(groups)
-        if not sorted_positions:
-            return f"[neutral]{text.strip()}" if text.strip() else text
-
-        result_parts: list[str] = []
-        cursor = 0
-        current_emotions = groups[sorted_positions[0]]
-
-        for pos in sorted_positions:
-            tags = groups[pos]
-            seg_text = text[cursor:pos].strip()
-            if seg_text and current_emotions:
-                for emo in current_emotions:
-                    fish_emo = emotion_map.get(emo, emo)
-                    result_parts.append(f"[{fish_emo}]")
-                result_parts.append(seg_text)
-            cursor = pos
-            current_emotions = tags
-
-        tail = text[cursor:].strip()
-        if tail or not result_parts:
-            for emo in current_emotions:
-                fish_emo = emotion_map.get(emo, emo)
-                result_parts.append(f"[{fish_emo}]")
-            result_parts.append(tail or text.strip())
-
-        return "".join(result_parts)
-
     # ---- _api_send broken into sub-steps ----
-
-    async def _run_in_thread_to_completion(self, func, *args):
-        worker = asyncio.create_task(asyncio.to_thread(func, *args))
-        try:
-            return await asyncio.shield(worker)
-        except asyncio.CancelledError:
-            await asyncio.gather(worker, return_exceptions=True)
-            raise
 
     async def _api_send(self):
         from ..galgame_web.session_helpers import is_valid_session_id
@@ -606,7 +403,7 @@ class SessionAPI:
         if len(text) > MAX_TEXT_CHARS:
             return {"error": "message too long"}, 400
         try:
-            audio_raw = _decode_audio_data(audio_data) if audio_data else b""
+            audio_raw = audio_utils.decode_audio_data(audio_data) if audio_data else b""
         except ValueError as e:
             return {"error": str(e)}, 400
 
@@ -668,10 +465,12 @@ class SessionAPI:
             return pipeline_result, 500
 
         if audio_raw:
-            from ..main import AUDIO_DIR
+            from ..galgame_web.session_helpers import AUDIO_DIR
 
-            user_audio_mime = self._detect_audio_mime(audio_raw)
-            user_audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(user_audio_mime)}"
+            user_audio_mime = audio_utils.detect_audio_mime(audio_raw)
+            user_audio_file = (
+                f"{uuid.uuid4().hex}{audio_utils.ext_for_mime(user_audio_mime)}"
+            )
             AUDIO_DIR.mkdir(parents=True, exist_ok=True)
             (AUDIO_DIR / user_audio_file).write_bytes(audio_raw)
 
@@ -761,7 +560,7 @@ class SessionAPI:
         audio_path = ""
         if audio_raw:
             try:
-                audio_path = self._save_audio(audio_raw)
+                audio_path = audio_utils.save_audio(audio_raw)
             except Exception as e:
                 logger.warning(f"Failed to save audio: {e}")
                 if not text:
@@ -771,7 +570,9 @@ class SessionAPI:
     async def _send_run_pipeline(self, text, sid, audio_path):
         try:
             t_pipe = time.time()
-            result = await self._push_through_pipeline(text, sid, audio_path)
+            result = await pipeline.push_through_pipeline(
+                self.config, self._webchat_username, sid, text, audio_path
+            )
             logger.info(f"[perf] pipeline roundtrip: {time.time() - t_pipe:.2f}s")
             return result
         except Exception as e:
@@ -863,72 +664,25 @@ class SessionAPI:
     async def _send_synthesize_tts(
         self, clean_text, emotions_all, text, matched_prefix, pipeline_audio
     ):
-        from ..main import AUDIO_DIR, _convert_audio
-
-        audio_b64 = pipeline_audio
-        audio_mime_val = ""
-        audio_file = ""
-
         if not self.config.get("tts_enabled", True):
-            return audio_b64, audio_mime_val, audio_file
-
+            return pipeline_audio, "", ""
         if not clean_text or matched_prefix:
             logger.debug(
                 f"[tts] skipped text_len={len(clean_text)} "
                 f"command={'yes' if matched_prefix else 'no'}"
             )
-            return audio_b64, audio_mime_val, audio_file
-
-        tts_emotion_map = {}
-        try:
-            tts_emotion_map = json.loads(
-                self.config.get("tts_emotion_map", "{}") or "{}"
-            )
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-        tts_provider_id = self.config.get("tts_provider", "").strip()
-        if tts_provider_id:
-            tts_provider = self.context.provider_manager.inst_map.get(tts_provider_id)
-        else:
-            tts_provider = self.context.get_using_tts_provider()
-
+            return pipeline_audio, "", ""
+        tts_provider = tts.select_tts_provider(self.config, self.context)
         if not tts_provider:
-            logger.warning("[fishaudio_tts] No TTS provider configured, skipping TTS")
-            return audio_b64, audio_mime_val, audio_file
-
+            logger.warning("[tts] No TTS provider configured, skipping TTS")
+            return pipeline_audio, "", ""
         try:
-            t0_tts = time.time()
-            audio_path = await self._parallel_tts(
-                clean_text, emotions_all, tts_emotion_map, tts_provider
+            return await tts.synthesize_audio(
+                clean_text, emotions_all, tts_provider, self.config
             )
-            if audio_path:
-                raw = pathlib.Path(audio_path).read_bytes()
-                mime = self._detect_audio_mime(raw)
-                audio_b64 = base64.b64encode(raw).decode()
-                audio_mime_val = mime
-                AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-                audio_file = f"{uuid.uuid4().hex}{self._ext_for_mime(mime)}"
-                (AUDIO_DIR / audio_file).write_bytes(raw)
-                if self.config.get("audio_format", "wav") == "mp3":
-                    converted = await self._run_in_thread_to_completion(
-                        _convert_audio, AUDIO_DIR / audio_file
-                    )
-                    if converted:
-                        audio_file = converted.name
-                        raw = converted.read_bytes()
-                        mime = "audio/mpeg"
-                        audio_b64 = base64.b64encode(raw).decode()
-                        audio_mime_val = mime
-                logger.info(
-                    f"[fishaudio_tts] synthesized {len(raw)} bytes, {mime} in {time.time() - t0_tts:.1f}s"
-                )
-            else:
-                logger.warning("[fishaudio_tts] TTS returned no audio")
         except Exception as e:
-            logger.warning(f"[fishaudio_tts] TTS failed: {e}")
-
-        return audio_b64, audio_mime_val, audio_file
+            logger.warning(f"[tts] TTS failed: {e}")
+            return pipeline_audio, "", ""
 
     async def _send_save_and_return(
         self,

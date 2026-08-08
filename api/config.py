@@ -11,13 +11,13 @@ class ConfigAPI:
             list_asset_files,
             resolve_assets,
         )
+        from ..galgame_web.session_helpers import ASSETS_DIR, load_prefs
         from ..galgame_web.utils import get_emotion_tags
-        from ..main import ASSETS_DIR, _load_prefs
 
         files = list_asset_files(ASSETS_DIR)
         resolved = resolve_assets(self.config, files)
         emotion_keys = get_emotion_tags(self.config)
-        prefs = _load_prefs()
+        prefs = load_prefs()
         history_avatar = (
             self.config.get("history_avatar", "")
             or find_asset_for("history_avatar", files, "avatar")

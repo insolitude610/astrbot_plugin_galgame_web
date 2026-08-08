@@ -34,7 +34,7 @@ class BGMAPI:
         )
 
     async def _api_bgm_list(self):
-        from ..main import BGM_DIR
+        from ..galgame_web.session_helpers import BGM_DIR
 
         BGM_DIR.mkdir(parents=True, exist_ok=True)
         entries = []
@@ -45,7 +45,7 @@ class BGMAPI:
 
     async def _api_bgm_upload(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import BGM_DIR
+        from ..galgame_web.session_helpers import BGM_DIR
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -80,7 +80,7 @@ class BGMAPI:
 
     async def _api_bgm_delete(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import BGM_DIR, _load_prefs, _save_prefs
+        from ..galgame_web.session_helpers import BGM_DIR, load_prefs, save_prefs
 
         data = await request.get_json() or {}
         if not isinstance(data, dict):
@@ -97,15 +97,15 @@ class BGMAPI:
             logger.info(f"Deleted BGM: {sp.name}")
         except OSError as e:
             return {"error": str(e)}, 500
-        prefs = _load_prefs()
+        prefs = load_prefs()
         if prefs.get("bgm_file") == filename:
             prefs["bgm_file"] = ""
-            _save_prefs(prefs)
+            save_prefs(prefs)
         return {"deleted": sp.name}
 
     async def _api_bgm_file(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import BGM_DIR
+        from ..galgame_web.session_helpers import BGM_DIR
 
         filename = request.args.get("name", "")
         sp = safe_path(filename, BGM_DIR)
@@ -129,7 +129,7 @@ class BGMAPI:
 
     async def _api_bgm_data(self):
         from ..galgame_web.assets_helpers import safe_path
-        from ..main import BGM_DIR
+        from ..galgame_web.session_helpers import BGM_DIR
 
         filename = request.args.get("name", "")
         sp = safe_path(filename, BGM_DIR)

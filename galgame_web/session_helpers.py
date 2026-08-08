@@ -14,7 +14,10 @@ _PLUGIN = "astrbot_plugin_galgame_web"
 _DATA = StarTools.get_data_dir(_PLUGIN)
 SESSIONS_DIR = _DATA / "sessions"
 AUDIO_DIR = _DATA / "audio"
+ASSETS_DIR = _DATA / "assets"
+BGM_DIR = _DATA / "bgm"
 FAVORITES_PATH = _DATA / "favorites.json"
+PREFS_PATH = _DATA / "prefs.json"
 
 PLATFORM_ID = "webchat"
 SESSION_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
@@ -55,6 +58,20 @@ def atomic_write_json(path: pathlib.Path, data) -> None:
 
 
 _atomic_write_json = atomic_write_json
+
+
+def load_prefs() -> dict:
+    if not PREFS_PATH.exists():
+        return {}
+    try:
+        loaded = json.loads(PREFS_PATH.read_text(encoding="utf-8")) or {}
+        return loaded if isinstance(loaded, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_prefs(data: dict):
+    atomic_write_json(PREFS_PATH, data)
 
 
 def concatenate_wav_files(paths: list[pathlib.Path], output: pathlib.Path) -> bool:
