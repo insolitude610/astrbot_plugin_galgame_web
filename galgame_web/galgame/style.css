@@ -31,19 +31,20 @@ html, body {
   z-index: 0;
 }
 
-/* Cool unified tone overlay: light at top, deepening toward the dialog
-   area so the dialog always sits on a dark base regardless of the
-   uploaded background image's original tone. */
+/* Cool unified tone overlay: light cool tint, deepening toward the dialog
+   area so the dialog always sits on a darker base regardless of the
+   uploaded background image's original tone. Light blue-gray stops avoid
+   the darkening that deep-navy stops caused. */
 #background::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(10, 16, 30, 0.04) 0%,
-    rgba(10, 16, 30, 0.10) 45%,
-    rgba(8, 13, 26, 0.22) 78%,
-    rgba(6, 10, 22, 0.30) 100%
+    rgba(180, 205, 235, 0.08) 0%,
+    rgba(150, 180, 215, 0.12) 45%,
+    rgba(100, 140, 185, 0.20) 78%,
+    rgba(70, 110, 160, 0.28) 100%
   );
   pointer-events: none;
 }
@@ -68,7 +69,7 @@ html, body {
   width: min(40vw, 500px);
   height: min(55vh, 700px);
   scale: var(--sprite-scale, 1);
-  filter: drop-shadow(0 10px 30px rgba(12, 34, 74, 0.45));
+  filter: drop-shadow(0 18px 10px rgba(12, 34, 74, 0.25));
 }
 
 #sprite-single.active {
