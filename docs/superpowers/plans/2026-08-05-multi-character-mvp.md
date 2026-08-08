@@ -8,7 +8,9 @@
 
 **Tech Stack:** Python 3.12 + pytest（mock 体系见 tests/conftest.py）、原生 JS（pages/galgame/ + pages/settings/，双端共用）、`http.server` 代理白名单（web_handler.py 新增路由）
 
-**基线:** v0.7.14 + 已提交修复（fa9692e）。64 项测试全绿。spec: `docs/superpowers/specs/2026-08-05-multi-character-mvp-design.md`
+**基线:** v0.8.3 + 后端结构重构（2a2f535：`api/` 拆分、TTS 收敛至 `galgame_web/tts.py`、路径常量单一真源于 `session_helpers.py`）。75 项测试全绿。spec: `docs/superpowers/specs/2026-08-05-multi-character-mvp-design.md`
+
+> **2026-08-09 重构后更新说明**：计划中的 `_do_send` 9 步编排、`_send_synthesize_tts`（签名不变，内部委托 `tts.synthesize_audio`）、`_edit_find_index/_edit_truncate`、会话端点、`_inject_galgame_rules`（main.py:215）均保留原样，任务代码片段仍有效；仅行号与 TTS 实现位置（`galgame_web/tts.py`）有变。测试数量期望值已按新基线 75 修正。
 
 ---
 
@@ -37,7 +39,7 @@
 - Create: `galgame_web/characters_helpers.py`
 - Test: `tests/test_characters_api.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_characters_api.py`：
 
@@ -118,12 +120,12 @@ def test_load_unknown_keys_dropped():
     assert set(loaded.keys()) == set(VALID_CHARACTER_KEYS) - {"tts_provider"} | {"tts_provider"}
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_characters_api.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'galgame_web.characters_helpers'`
 
-- [ ] **Step 3: 实现 characters_helpers.py**
+- [x] **Step 3: 实现 characters_helpers.py**
 
 ```python
 import json
@@ -227,12 +229,12 @@ def save_characters(items: list) -> bool:
         return False
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `python -m pytest tests/test_characters_api.py -v`
 Expected: PASS (6 passed)
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add galgame_web/characters_helpers.py tests/test_characters_api.py
@@ -370,7 +372,7 @@ class CharAPI:
 - [ ] **Step 6: 运行测试 + 全量回归**
 
 Run: `python -m pytest tests/ -q`
-Expected: 64 + 8 = 72 passed（原 64 全绿 + 新 8 项，含 Task 1 的 6 项与本 Task 的 2 项）
+Expected: 77 passed（基线 75 全绿 + 本 Task 新增 2 项；Task 1 的 6 项已含在基线中）
 
 Run: `ruff check .`；Expected: All checks passed!
 
@@ -389,7 +391,7 @@ git commit -m "feat: add character card and persona list APIs"
 - Modify: `galgame_web/session_helpers.py`、`api/session.py`（`_api_session_init_serialized`）
 - Test: `tests/test_multi_character.py`（新）
 
-- [ ] **Step 1: 写失败测试**（创建 `tests/test_multi_character.py`）
+- [x] **Step 1: 写失败测试**（创建 `tests/test_multi_character.py`）
 
 ```python
 import asyncio
@@ -455,12 +457,12 @@ def test_save_load_keeps_history_character_field():
     assert loaded["history"][0]["character"] == "alice"
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_multi_character.py -v`
 Expected: FAIL — `mode` KeyError / 无 `character` 字段
 
-- [ ] **Step 3: 修改 session_helpers.py**
+- [x] **Step 3: 修改 session_helpers.py**
 
 `load_session` 的返回 dict 增加：
 
@@ -498,12 +500,12 @@ Expected: FAIL — `mode` KeyError / 无 `character` 字段
 
 （history 条目本身已含 id/character，随 `session["history"]` 序列化）
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `python -m pytest tests/test_multi_character.py -v`
 Expected: PASS (3 passed)
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add galgame_web/session_helpers.py tests/test_multi_character.py
@@ -640,7 +642,7 @@ async def init_astrbot_conv(
 - [ ] **Step 4: 运行测试 + 回归**
 
 Run: `python -m pytest tests/ -q`
-Expected: 75 passed（新增 1 项 + 原 74）
+Expected: 76 passed（新增 1 项 + 基线 75）
 
 - [ ] **Step 5: 提交**
 
@@ -866,7 +868,7 @@ async def _send_switch_persona(self, sid):
 
 - [ ] **Step 5: main.py _inject_galgame_rules 注入 custom_prompt + 角色定位语**
 
-在 `_inject_galgame_rules` 中，`sid not in self._sessions` 检查后追加：
+在 `_inject_galgame_rules` 中（main.py:215，重构后位置），`sid not in self._sessions` 检查后追加：
 
 ```python
 session = self._sessions.get(sid)
@@ -924,7 +926,7 @@ session["history"].append(
 - [ ] **Step 7: 运行测试 + 回归**
 
 Run: `python -m pytest tests/ -q`
-Expected: 79 passed（新增 4 项）
+Expected: 80 passed（新增 4 项，含 Task 4 的 1 项）
 
 - [ ] **Step 8: 提交**
 
@@ -941,7 +943,7 @@ git commit -m "feat: integrate multi-character rotation into pipeline"
 - Modify: `api/session.py`
 - Test: `tests/test_message_editing.py`（新）
 
-- [ ] **Step 1: 写失败测试**（创建 `tests/test_message_editing.py`）
+- [x] **Step 1: 写失败测试**（创建 `tests/test_message_editing.py`）
 
 ```python
 import asyncio
@@ -997,12 +999,12 @@ def test_truncate_history():
     ]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_message_editing.py -v`
 Expected: FAIL — `AttributeError`
 
-- [ ] **Step 3: 实现辅助方法**
+- [x] **Step 3: 实现辅助方法**
 
 ```python
 def _edit_find_index(self, sid, message_id):
@@ -1039,12 +1041,12 @@ def _edit_truncate(self, sid, keep_n):
 
 注意：为配合 async 环境，`_edit_truncate` 返回 `(removed, coroutine)`，调用方 `await coroutine`。若测试直接断言 history，可在 run 中执行协程。
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `python -m pytest tests/test_message_editing.py -v`
 Expected: PASS (2 passed)
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add api/session.py tests/test_message_editing.py
@@ -1210,7 +1212,7 @@ session["history"].append({...assistant 消息...})
 - [ ] **Step 3: 运行测试**
 
 Run: `python -m pytest tests/test_message_editing.py -v`
-Expected: PASS (5 passed)
+Expected: PASS (7 passed)（Task 6 的 2 项 + 本 Task 新增 5 项）
 
 - [ ] **Step 4: 提交**
 
@@ -1374,7 +1376,7 @@ async def _api_message_delete(self):
 - [ ] **Step 4: 运行测试 + 全量回归**
 
 Run: `python -m pytest tests/ -q`
-Expected: 84 passed（Task 7/8 新增 5 + 4 = 9 项，79 + 5 = 84）
+Expected: 91 passed（Task 7/8 新增 5 + 4 = 9 项，82 + 9 = 91）
 
 - [ ] **Step 5: 提交**
 
@@ -1935,7 +1937,7 @@ git commit -m "feat: add message regenerate/edit/delete UI"
 - [ ] **Step 1: 全量测试与静态检查**
 
 Run: `python -m pytest tests/ -q`
-Expected: 全部通过（基线 64 + 新增 ~20）
+Expected: 全部通过（基线 75 + 新增 ~16 = 91）
 
 Run: `ruff check .` 与 `ruff format .`；Expected: All checks passed!
 Run: 前端全部 `node --check`；Expected: 无输出
@@ -1947,12 +1949,12 @@ Expected: 相同 Hash
 
 - [ ] **Step 3: 更新文档与版本**
 
-`metadata.yaml`：`version: "0.7.14"` → `"0.8.0"`；desc 追加多角色/消息编辑说明。
+`metadata.yaml`：`version: "0.8.3"` → `"0.9.0"`（MVP 为新功能版本；v0.8.0-0.8.3 已发布，原计划 v0.8.0 顺延）；desc 追加多角色/消息编辑说明。
 
 `CHANGELOG.md` 顶部新增：
 
 ```markdown
-## v0.8.0
+## v0.9.0
 
 **多角色轮流对话（MVP）**
 
@@ -1978,7 +1980,7 @@ Expected: 相同 Hash
 
 ```bash
 git add metadata.yaml CHANGELOG.md README.md
-git commit -m "chore: bump to 0.8.0 with docs"
+git commit -m "chore: bump to 0.9.0 with docs"
 ```
 
 ---

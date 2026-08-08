@@ -1,5 +1,7 @@
 # 2026-08-09 Backend Structure Refactor
 
+> **状态：已实施**（2026-08-09，提交 `2a2f535`，75 测试全绿 + ruff 通过，solution review 3 轮 PASS + final review 2 轮 PASS）
+
 > 纯结构重构，零用户可见行为变化。目标：拆分 `api/session.py` 上帝类、系统性消除 api↔main 循环导入、收敛 TTS 三段重复代码。为多角色 MVP Task 5（发送链路改造）铺路。
 
 ## 背景与问题（实测证据）
