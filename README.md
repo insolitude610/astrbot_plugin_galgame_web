@@ -67,6 +67,7 @@ http://localhost:6186
 |--------|------|--------|
 | `character_name` | 对话框上方显示的角色名 | 你的角色名 |
 | `persona` | AstrBot 内置人格 | AstrBot 预设 |
+| `system_prompt_extra` | 追加在人格 prompt 后的 galgame 回复规则（含情绪标签/格式约束，`{{emotions}}` 自动替换） | 留空用内置默认规则 |
 | `llm_provider` | 驱动对话的 AI 模型 | deepseek / gpt |
 | `tts_provider` | 语音合成提供商 | 选择已配置的 TTS Provider（推荐 Fish Audio S2-Pro） |
 | `tts_enabled` | 启用 TTS 语音朗读 | 默认 `true`，`false` = 静音对话 |
@@ -76,6 +77,7 @@ http://localhost:6186
 | `web_enabled` | 启用独立 WebUI | 默认 `true`，`false` = 仅 Dashboard 内嵌页 |
 | `web_password` | 独立 WebUI 专用密码 | 局域网访问必须设置；与 Dashboard 密码无关 |
 | `sprite_mode` | 立绘渲染模式 | **`single`**（推荐，VRM 尚不可用） |
+| `vrm_model` | VRM 3D 模型文件（`assets/` 下的 `.vrm`，仅 VRM 模式） | 留空自动匹配 |
 | `sprite_scale` | 立绘整体缩放倍数 | 默认 `1.0`，建议 0.5 ~ 2.0 |
 | `sprite_bottom` | 立绘距底部距离 (vh) | 默认 `28`，建议 5 ~ 45 |
 | `sprite_left` | 立绘水平锚点 (%) | 默认 `50`（居中） |
