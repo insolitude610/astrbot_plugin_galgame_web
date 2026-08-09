@@ -510,14 +510,6 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             if body is None:
                 return
 
-        length = len(body) if body else 0
-
-        logger.debug(
-            f"[proxy] {method} {self.path} cl={length} "
-            f"body_bytes={len(body) if body else 0} "
-            f"jwt={'yes' if GalgameWebHandler.jwt_token else 'no'}"
-        )
-
         req = urllib.request.Request(url, data=body, method=method)
         for key in ("Accept", "Accept-Language", "User-Agent"):
             val = self.headers.get(key)
@@ -546,7 +538,6 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
             if len(body_bytes) > MAX_PROXY_RESPONSE_BYTES:
                 self._send_json_error(502, "upstream response too large")
                 return
-            logger.debug(f"[proxy] upstream responded {status}")
 
             self.send_response(status)
             for key, val in response_headers:

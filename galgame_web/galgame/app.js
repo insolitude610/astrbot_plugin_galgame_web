@@ -1483,7 +1483,7 @@ function _handleComms(msg) {
 window.addEventListener("beforeunload", function () {
   stopVRMRender();
   if (typewriterTimer) clearTimeout(typewriterTimer);
-  if (_bgmPollTimer) clearInterval(_bgmPollTimer);
+  if (_bgmPollTimer) { clearInterval(_bgmPollTimer); _bgmPollTimer = null; }
 });
 
 var _bgmPollTimer = null;
@@ -1512,8 +1512,11 @@ function _startBgmPoll() {
 }
 
 document.addEventListener("visibilitychange", function () {
-  if (document.hidden) { stopVRMRender(); }
-  else {
+  if (document.hidden) {
+    stopVRMRender();
+    if (_bgmPollTimer) { clearInterval(_bgmPollTimer); _bgmPollTimer = null; }
+  } else {
     if (spriteMode === "vrm" && !vrmStarted) { startVRMRender(); }
+    _startBgmPoll();
   }
 });
