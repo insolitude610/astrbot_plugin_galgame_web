@@ -55,7 +55,7 @@ http://localhost:6186
 
 > **说明**：Dashboard 内嵌页运行在受限 sandbox 中；文字对话、会话管理、设置和收藏均可使用，麦克风录音及部分浏览器确认能力建议在独立 WebUI 中使用。
 
-> **安全说明**：`web_password` 是插件独立 WebUI 的密码，不是 AstrBot Dashboard 登录密码。密码为空时 WebUI 只监听 `127.0.0.1`；设置密码后才允许按 `web_host` 对局域网开放。公网访问必须置于 HTTPS 反向代理之后。独立 WebUI 是单用户/共享权限设计，知道同一密码的人可以访问全部 Galgame 会话；Dashboard 内嵌页仍依赖 Dashboard 自身登录。
+> **安全说明**：`web_password` 是插件独立 WebUI 的密码，不是 AstrBot Dashboard 登录密码。密码为空时 WebUI 只监听 `127.0.0.1`；设置密码后才允许按 `web_host` 对局域网开放。公网访问必须置于 HTTPS 反向代理之后。独立 WebUI 是单用户/共享权限设计，知道同一密码的人可以访问全部 Galgame 会话；Dashboard 内嵌页仍依赖 Dashboard 自身登录。反向代理/隧道部署时，转发后的 `Host` 必须与浏览器 `Origin` 的 host:port 一致（例如 cloudflared 不要覆盖 `httpHostHeader` 为 `localhost:端口`），否则同源 POST 会被判定为跨源请求并返回 403。
 
 打开后在输入框输入文字即可对话，点击输入框左侧麦克风按钮可语音输入。
 
@@ -69,6 +69,7 @@ http://localhost:6186
 | `persona` | AstrBot 内置人格 | AstrBot 预设 |
 | `system_prompt_extra` | 追加在人格 prompt 后的 galgame 回复规则（含情绪标签/格式约束，`{{emotions}}` 自动替换） | 留空用内置默认规则 |
 | `llm_provider` | 驱动对话的 AI 模型 | deepseek / gpt |
+| `show_reasoning` | 回复中显示模型思考过程（`🤔 思考: …`） | 默认 `false`；开启后思考内容会显示出来、被 TTS 朗读并写入会话历史 |
 | `tts_provider` | 语音合成提供商 | 选择已配置的 TTS Provider（推荐 Fish Audio S2-Pro） |
 | `tts_enabled` | 启用 TTS 语音朗读 | 默认 `true`，`false` = 静音对话 |
 | `audio_format` | TTS 音频格式 | `wav`=无损(≈2MB/条)；`mp3`=需 ffmpeg(≈200KB/条)，未安装自动回退 wav |

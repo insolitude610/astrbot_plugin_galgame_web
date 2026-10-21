@@ -1,6 +1,6 @@
 # AGENTS.md
 
-AstrBot 插件：galgame 风格 AI 虚拟伙伴 WebUI（当前 v0.8.5）。双端（Dashboard 内嵌页 + 独立 WebUI）共享大部分前端代码但结构不同，改动时极易踩坑。以下均为已验证事实。
+AstrBot 插件：galgame 风格 AI 虚拟伙伴 WebUI（当前 v0.8.6）。双端（Dashboard 内嵌页 + 独立 WebUI）共享大部分前端代码但结构不同，改动时极易踩坑。以下均为已验证事实。
 
 ## 测试 / Lint
 
@@ -28,10 +28,15 @@ AstrBot 插件：galgame 风格 AI 虚拟伙伴 WebUI（当前 v0.8.5）。双�
 - 前端判定：`IS_DASHBOARD()`（主页面）/ `window.AstrBotPluginPage`（设置/收藏页）
 - 快速点击检测（主页面）必须把弹层 `#confirm-overlay` 加入排除列表（click + keydown 两处）
 
+## AstrBot WebChat 契约（易踩坑）
+
+- `galgame_web/pipeline.py` 的载荷必须显式 `enable_streaming: False`，并把 `enable_reasoning` 绑定到 `show_reasoning` 配置（默认 false）：AstrBot 4.29+ 的 WebChat 默认开启 reasoning，会在回复链首插入 `🤔 思考: …`，污染对话、TTS 朗读与会话历史。顶层 legacy 字段与 `flags` 字典需同时下发（4.29+ 优先 `flags`，旧版忽略未知字段）。
+- 独立 WebUI 的 `Referrer-Policy` 只能是 `same-origin`：`no-referrer` 会让同源表单 POST 变成 `Origin: null`，导致 `/login` 必然 403。不要为了兼容而放行 `Origin: null`（攻击页可伪造）。
+
 ## 提交约定
 
 - commit message 用**英文** conventional commits（`feat:`/`fix:`/`docs:`/`chore:`）；CHANGELOG.md 用中文
-- 版本号：`metadata.yaml` 与 `CHANGELOG.md` 同步更新
+- 版本号：`metadata.yaml`、`CHANGELOG.md`、本文件顶部「当前 vX.Y.Z」三处同步更新
 - push 需要代理：`git -c http.proxy=http://127.0.0.1:10808 push`（用户日常用 GitHub Desktop；改写过历史，再次改写需 force push 并告知用户）
 
 ## 开发流程

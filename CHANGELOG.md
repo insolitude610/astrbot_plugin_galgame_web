@@ -1,5 +1,13 @@
 # 变更记录
 
+## v0.8.6
+
+**修复 Issue #2：独立 WebUI 登录 403 与思考内容泄漏**
+
+- 独立 WebUI 登录不再 403：`Referrer-Policy` 由 `no-referrer` 改为 `same-origin`。按 Fetch 规范，`no-referrer` 会让同源表单 POST 携带 `Origin: null`，登录页表单因此被 `_origin_ok()` 判为跨源请求而拒绝；`same-origin` 对跨源请求依旧不发送 Referer，隐私性不变。不放行 `Origin: null`（攻击页可自行伪造），同时在请求被拒时打印 origin/host/path 日志，便于排查反向代理改写 Host 的情况。
+- 回复不再出现「🤔 思考: …」：WebChat 载荷显式关闭 reasoning 注入（AstrBot 4.29 起 WebChat 默认开启 `enable_reasoning`），思考内容不再进入对话、TTS 朗读与会话历史。新增 `show_reasoning` 配置项（默认 `false`）供需要时开启；顶层旧字段与 `flags` 同时下发，兼容新旧 AstrBot。
+- README 补充 `show_reasoning` 配置说明，以及反向代理/隧道（`Host` 与 `Origin` 需一致）部署注意事项。
+
 ## v0.8.5
 
 **对话的新建与删除改为纯界面操作**
