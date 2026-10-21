@@ -255,7 +255,11 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
-        self.send_header("Referrer-Policy", "no-referrer")
+        # Only a no-referrer policy nulls the Origin header of same-origin
+        # form POSTs (Fetch, "append a request Origin header"), which made the
+        # /login form arrive as `Origin: null` and get rejected by _origin_ok().
+        # same-origin still suppresses Referer for cross-origin requests.
+        self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Content-Security-Policy", "frame-ancestors 'self'")
         super().end_headers()
 
@@ -393,6 +397,13 @@ class GalgameWebHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if not self._origin_ok():
+            # Surfaces reverse-proxy mistakes (Host rewritten to localhost) that
+            # otherwise only show up as an unexplained 403 in the browser.
+            logger.warning(
+                "[web] rejected POST with untrusted origin: "
+                f"origin={self.headers.get('Origin', '')!r} "
+                f"host={self.headers.get('Host', '')!r} path={path[:200]!r}"
+            )
             self._send_json_error(403, "cross-origin request rejected")
             return
 

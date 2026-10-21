@@ -74,12 +74,19 @@ def test_external_webui_keeps_static_and_plugin_apis_but_blocks_admin_routes(
         assert response.status == 200
         assert b'<script src="./app.js"></script>' in body
         assert response.getheader("X-Frame-Options") == "SAMEORIGIN"
+        assert response.getheader("Referrer-Policy") == "same-origin"
         assert response.getheader("Access-Control-Allow-Origin") is None
 
         connection.request("GET", "/assets/sprite.png")
         response = connection.getresponse()
         assert response.status == 200
         assert response.read() == b"image"
+
+        connection.request("GET", "/login")
+        response = connection.getresponse()
+        response.read()
+        assert response.status == 200
+        assert response.getheader("Referrer-Policy") == "same-origin"
 
         connection.request("GET", "/assets/script.html")
         response = connection.getresponse()
@@ -171,3 +178,44 @@ def test_external_webui_password_cookie_is_required_and_same_site():
         _stop_server(web, web_thread)
         GalgameWebHandler.web_password = ""
         GalgameWebHandler.jwt_token_factory = None
+
+
+def test_login_form_post_with_null_origin_is_rejected(tmp_path):
+    """A form POST carrying `Origin: null` stays rejected on purpose.
+
+    `Referrer-Policy: no-referrer` used to null the Origin of the plugin's own
+    login form, so the fix belongs in the response header, not in a `null`
+    whitelist: any hostile page can force `null` with its own referrer policy,
+    so the origin check is one of the barriers in front of the state-changing
+    POST routes (`_host_ok()` still pins Host to loopback while no web password
+    is configured, and it runs first).
+    """
+    previous_assets = GalgameWebHandler.assets_dir
+    GalgameWebHandler.web_password = "null origin probe"
+    GalgameWebHandler.jwt_token_factory = lambda: "test-token"
+    GalgameWebHandler.assets_dir = tmp_path
+    web, web_thread = _start_server(GalgameWebHandler)
+    connection = http.client.HTTPConnection("127.0.0.1", web.server_port, timeout=5)
+    try:
+        payload = "password=null+origin+probe"
+        connection.request(
+            "POST",
+            "/api/login",
+            body=payload,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Length": str(len(payload)),
+                "Origin": "null",
+            },
+        )
+        response = connection.getresponse()
+        body = response.read()
+        assert response.status == 403
+        assert response.getheader("Set-Cookie") is None
+        assert b"cross-origin request rejected" in body
+    finally:
+        connection.close()
+        _stop_server(web, web_thread)
+        GalgameWebHandler.web_password = ""
+        GalgameWebHandler.jwt_token_factory = None
+        GalgameWebHandler.assets_dir = previous_assets
