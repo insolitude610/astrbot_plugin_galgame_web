@@ -42,12 +42,24 @@ async def push_through_pipeline(
     if text:
         parts.append({"type": "plain", "text": text})
     selected_provider = config.get("llm_provider", "").strip() or None
+    # AstrBot 4.29+ enables reasoning for WebChat by default and prepends
+    # "🤔 思考: ..." to the reply chain, which would leak into the reply,
+    # the plugin TTS and both history stores. Keep it off unless the user opts
+    # in. `flags` wins on 4.29+; the legacy top-level keys cover older hosts,
+    # where reasoning injection follows the global display_reasoning_text flag.
+    show_reasoning = config.get("show_reasoning", False) is True
+    webchat_flags = {
+        "enable_streaming": False,
+        "enable_reasoning": show_reasoning,
+    }
     payload = {
         "message": parts,
         "message_id": msg_id,
         "selected_provider": selected_provider,
         "selected_model": None,
         "enable_streaming": False,
+        "enable_reasoning": show_reasoning,
+        "flags": webchat_flags,
     }
     t1 = time.time()
     chat_queue = webchat_queue_mgr.get_or_create_queue(session_id)
